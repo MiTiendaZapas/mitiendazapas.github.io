@@ -1,0 +1,201 @@
+/* Buscador, filtros rápidos por marca, filtros activos y paneles de filtros. */
+
+/* ---------- Barra: buscador + botón Filtros (queda fija al bajar) ---------- */
+.catalog-toolbar {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 30;
+  display: flex;
+  gap: var(--space-2);
+  margin-inline: calc(-1 * var(--gutter));
+  padding: var(--space-2) var(--gutter);
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+[data-catalog-toolbar] { display: contents; }
+
+.search { position: relative; flex: 1; min-width: 0; }
+.search > .icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  color: var(--color-text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.search__input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 40px 0 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font-size: 16px;   /* evita el zoom automático de iPhone */
+}
+.search__input::-webkit-search-cancel-button { display: none; }
+.search__input:focus { border-color: var(--color-accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent); }
+.search__clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  transform: translateY(-50%);
+}
+.search__clear .icon { width: 16px; height: 16px; }
+
+.filters-toggle { flex: none; padding-inline: var(--space-3); }
+.filters-toggle__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: 12px;
+}
+
+/* ---------- Fila de marcas (celular y tablet) ---------- */
+.brand-strip {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-1) calc(-1 * var(--gutter)) var(--space-3);
+  padding: var(--space-1) var(--gutter);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.brand-strip::-webkit-scrollbar { display: none; }
+.brand-chip {
+  flex: none;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.brand-chip[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-accent-contrast); font-weight: 600; }
+
+/* ---------- Filtros activos ---------- */
+.active-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); }
+.active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  font-size: 13px;
+  font-weight: 600;
+}
+.active-chip .icon { width: 14px; height: 14px; }
+.active-clear {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Grupos de filtros (panel lateral y panel de celular) ---------- */
+.filter-group { margin: 0 0 var(--space-5); padding: 0; border: 0; min-width: 0; }
+.filter-group__title {
+  margin-bottom: var(--space-3);
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.filter-group__hint { font-weight: 500; letter-spacing: 0; text-transform: none; }
+.filter-count { color: var(--color-text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.filter-checks { display: grid; gap: 2px; }
+.filter-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.filter-check:hover { background: var(--color-surface-2); }
+.filter-check input { width: 18px; height: 18px; accent-color: var(--color-accent); }
+.filter-check span:first-of-type { flex: 1; }
+.filter-check.is-empty { opacity: 0.4; cursor: default; }
+
+.filter-sizes { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+.filter-sizes .size-chip { min-width: 0; width: 100%; }
+.filter-sizes .size-chip:disabled { text-decoration: none; }
+
+.filter-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: 14px;
+}
+.filter-pill[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-accent-contrast); }
+.filter-pill[aria-pressed="true"] .filter-count { color: inherit; }
+
+/* ---------- Panel de filtros en celular ---------- */
+.filters-sheet { inset: auto 0 0 0; width: 100%; max-height: 88vh; }
+.filters-sheet[open] { animation: filters-up 260ms var(--ease-out); }
+@keyframes filters-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.filters-sheet__panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--color-bg);
+}
+.filters-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.filters-sheet__title { font-size: 26px; }
+.filters-sheet__body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-4); }
+.filters-sheet__footer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---------- Computadora: panel lateral fijo; sin botón ni fila de marcas ---------- */
+@media (min-width: 1024px) {
+  .filters-toggle,
+  .brand-strip { display: none; }
+  .catalog-toolbar { margin-inline: 0; padding-inline: 0; }
+}

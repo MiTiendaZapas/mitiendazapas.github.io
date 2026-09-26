@@ -1,0 +1,13 @@
+/*
+ * Hoja de estilos de entrada: las páginas cargan solo este archivo.
+ * Para sumar estilos nuevos alcanza con agregar una línea acá.
+ */
+@import url("tokens.css");
+@import url("base.css");
+@import url("layout.css");
+@import url("components.css");
+@import url("overlays.css");
+@import url("product-view.css");
+@import url("filters.css");
+@import url("sections.css");
+@import url("pages.css");

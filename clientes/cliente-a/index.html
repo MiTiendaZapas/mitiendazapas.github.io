@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TIENDA F.O · Zapatillas por mayor</title>
+  <meta name="description" content="Catálogo de zapatillas de TIENDA F.O. Elegí modelo y talle, armá tu pedido y envialo por WhatsApp.">
+  <meta name="theme-color" content="#f5f5f3">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="es_AR">
+  <meta property="og:title" content="TIENDA F.O · Zapatillas por mayor">
+  <meta property="og:description" content="Catálogo de zapatillas de TIENDA F.O. Elegí modelo y talle, armá tu pedido y envialo por WhatsApp.">
+  <link rel="icon" type="image/svg+xml" href="marca/favicon.svg">
+
+  <script src="configuracion.js"></script>
+  <script src="../../motor/js/theme.js"></script>
+  <link rel="preload" href="../../catalogo/productos.json" as="fetch" crossorigin>
+  <link rel="stylesheet" href="../../motor/css/tienda.css">
+  <script type="module" src="../../motor/js/main.js"></script>
+</head>
+<body data-channel="mayorista">
+  <a class="skip-link" href="#catalogo">Ir al catálogo</a>
+  <header class="site-header" id="site-header"></header>
+  <main id="main">
+    <section class="hero" id="hero"></section>
+    <section class="catalog" id="catalogo" aria-labelledby="catalog-title"></section>
+  </main>
+  <footer class="site-footer" id="site-footer"></footer>
+  <div id="overlays"></div>
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
+  <noscript>
+    <p class="noscript">Para ver el catálogo y armar tu pedido necesitás activar JavaScript en tu navegador.</p>
+  </noscript>
+</body>
+</html>

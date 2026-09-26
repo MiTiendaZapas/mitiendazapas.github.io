@@ -1,0 +1,14 @@
+# Memoria interna e informes del sincronizador (no se publican)
+sincronizador/estado/
+sincronizador/informes/
+catalogo/*.tmp
+
+# Python
+__pycache__/
+*.pyc
+
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/

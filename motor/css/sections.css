@@ -1,0 +1,286 @@
+/* Bloques de contenido de las páginas de información, footer y menú de celular. */
+
+/* ---------- Cómo comprar ---------- */
+.steps-grid {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+.step-card {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.step-card__number {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-accent-gradient);
+  color: var(--color-accent-contrast);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+.step-card__title { font-size: 22px; }
+.step-card__text { color: var(--color-text-muted); font-size: 15px; }
+
+@media (min-width: 640px) {
+  .steps-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .steps-grid { grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
+}
+
+/* ---------- Tarjetas de información ---------- */
+.info-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.info-card--accent { border-color: var(--color-accent); }
+.info-card__head { display: flex; gap: var(--space-3); align-items: flex-start; }
+.info-card__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+}
+.info-card__title { font-size: 24px; }
+.info-card__text { color: var(--color-text-muted); font-size: 15px; }
+.info-card__big { font-size: 18px; font-weight: 700; color: var(--color-accent-strong); }
+
+.shipping-grid { display: grid; gap: var(--space-3); }
+@media (min-width: 768px) {
+  .shipping-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-4); align-items: start; }
+}
+
+.check-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; font-size: 15px; }
+.check-list li { display: flex; gap: var(--space-2); }
+.check-list .icon { width: 18px; height: 18px; margin-top: 2px; color: var(--color-accent); }
+
+.exchange-grid { display: grid; gap: var(--space-3); }
+@media (min-width: 768px) {
+  .exchange-grid { grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
+}
+
+/* ---------- Tabla de talles ---------- */
+.size-table {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.size-table__row { display: contents; }
+.size-table__row > span {
+  padding: 9px var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 15px;
+  text-align: center;
+}
+.size-table__row > span:first-child { font-weight: 700; }
+.size-table__row:nth-child(even) > span { background: color-mix(in srgb, var(--color-surface-2) 55%, transparent); }
+.size-table__row--head > span {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.size-table__row:last-child > span { border-bottom: 0; }
+.size-table__hint { display: flex; gap: var(--space-2); color: var(--color-text-muted); font-size: 14px; }
+.size-table__hint .icon { flex: none; width: 18px; height: 18px; margin-top: 1px; }
+.size-page { display: grid; gap: var(--space-4); max-width: 520px; }
+
+/* ---------- Quiero revender ---------- */
+.feature-list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.feature {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg);
+}
+.feature__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+}
+.feature__title { font-family: var(--font-body); font-size: 16px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+.feature__text { color: var(--color-text-muted); font-size: 14px; }
+
+/* ---------- Nosotros ---------- */
+.about { display: grid; gap: var(--space-5); align-items: center; }
+.about__logo { width: min(220px, 60vw); height: auto; border-radius: 50%; }
+.about__copy { display: grid; gap: var(--space-3); }
+.about__text { max-width: 60ch; color: var(--color-text-muted); font-size: 16px; }
+.about__values { display: grid; gap: var(--space-3); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+.about__values li {
+  display: grid;
+  gap: 2px;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-accent);
+}
+.about__values strong { font-family: var(--font-display); font-size: 22px; text-transform: uppercase; }
+.about__values span { color: var(--color-text-muted); font-size: 14px; }
+@media (min-width: 768px) {
+  .about { grid-template-columns: auto 1fr; gap: var(--space-7); }
+  .about__values { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ---------- Preguntas frecuentes ---------- */
+.faq-list { display: grid; gap: var(--space-2); max-width: 820px; }
+.faq-item {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+}
+.faq-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary .icon { flex: none; color: var(--color-text-muted); transition: transform var(--duration); }
+.faq-item[open] summary .icon { transform: rotate(180deg); color: var(--color-accent); }
+.faq-item[open] { border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border)); }
+.faq-item p { padding: 0 var(--space-4) var(--space-4); color: var(--color-text-muted); line-height: 1.6; }
+.faq-more { margin-top: var(--space-4); color: var(--color-text-muted); }
+.faq-more a { color: var(--color-accent-strong); }
+
+/* ---------- ¿Querés una tienda así? (discreta, al final) ---------- */
+.platform-promo { border-top: 1px solid var(--color-border); }
+.platform-promo__inner {
+  display: grid;
+  gap: var(--space-3);
+  align-items: center;
+  padding-block: var(--space-5);
+}
+.platform-promo__icon { color: var(--color-text-muted); }
+.platform-promo__title { font-family: var(--font-body); font-size: 17px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+.platform-promo__text { color: var(--color-text-muted); font-size: 14px; }
+.platform-promo .btn { justify-self: start; }
+@media (min-width: 768px) {
+  .platform-promo__inner { grid-template-columns: auto 1fr auto; gap: var(--space-4); }
+}
+
+/* ---------- Footer ---------- */
+.site-footer__name { font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: 0.04em; }
+.footer-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  text-decoration: none;
+}
+.footer-whatsapp .icon { width: 28px; height: 28px; color: var(--color-whatsapp); }
+.footer-whatsapp span { display: grid; font-weight: 600; }
+.footer-whatsapp small { color: var(--color-text-muted); font-size: 12px; font-weight: 400; }
+.social-list { display: flex; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.social-link {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  color: var(--color-text);
+  transition: border-color var(--duration), color var(--duration);
+}
+.social-link:hover { border-color: var(--color-accent); color: var(--color-accent-strong); }
+/* Con el usuario (@...) al lado del ícono: más fácil de encontrar después en la app. */
+.social-list:has(.social-link--handle) { flex-wrap: wrap; }
+.social-link--handle {
+  display: inline-flex;
+  gap: var(--space-2);
+  width: auto;
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.social-link--handle .icon { width: 20px; height: 20px; }
+.social-list--stack { display: grid; }
+.social-list--stack .social-link--handle { width: 100%; justify-content: flex-start; }
+
+/* ---------- Menú de celular ---------- */
+.site-header__menu { margin-left: calc(-1 * var(--space-2)); }
+@media (min-width: 1024px) {
+  .site-header__menu { display: none; }
+}
+.menu-sheet { inset: 0 auto 0 0; width: min(340px, 88vw); height: 100%; }
+.menu-sheet[open] { animation: menu-in 260ms var(--ease-out); }
+@keyframes menu-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.menu-sheet__panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+.menu-sheet__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.menu-sheet__header img { border-radius: 50%; }
+.menu-sheet__header .icon-btn { margin-left: auto; }
+.menu-sheet__list { margin: 0; padding: var(--space-2) 0; list-style: none; }
+.menu-sheet__list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  font-size: 17px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.menu-sheet__list a:hover { background: var(--color-surface); }
+.menu-sheet__list .icon { color: var(--color-text-muted); }
+.menu-sheet__footer {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: auto;
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+}
+.site-footer__heading--social { margin-top: var(--space-4); }

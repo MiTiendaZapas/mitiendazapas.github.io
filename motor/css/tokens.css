@@ -1,0 +1,61 @@
+/*
+ * Tokens de diseño. Estos valores son el tema NEUTRO por defecto; cada
+ * tienda los reemplaza desde configuracion.js (theme.colors / theme.fonts).
+ */
+:root {
+  --color-bg: #f6f6f4;
+  --color-surface: #ffffff;
+  --color-surface-2: #efefec;
+  --color-border: #dcdcd7;
+  --color-text: #17171a;
+  --color-text-muted: #5f5f66;
+  --color-accent: #1f2937;
+  --color-accent-strong: #111827;
+  --color-accent-contrast: #ffffff;
+  --color-accent-gradient: var(--color-accent);
+  --color-danger: #c62828;
+  --color-success: #2e7d32;
+  --color-whatsapp: #25d366;
+  --color-whatsapp-contrast: #07210f;
+  --color-overlay: rgb(0 0 0 / 0.6);
+
+  --font-display: "Arial Narrow", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 72px;
+
+  --gutter: 16px;
+  --max-width: 1320px;
+  --header-height: 60px;
+  --tap: 44px;
+
+  --shadow-raised: 0 10px 30px rgb(0 0 0 / 0.35);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration: 180ms;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 24px;
+    --header-height: 68px;
+  }
+}
+
+@media (min-width: 1200px) {
+  :root { --gutter: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration: 0ms; }
+}

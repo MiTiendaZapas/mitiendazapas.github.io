@@ -1,0 +1,42 @@
+{
+  "_ayuda": [
+    "Precios de la tienda de REVENDEDORES (index.html). Copia fiel de las reglas de tienda.js.",
+    "Cada lista se lee de arriba hacia abajo y gana la PRIMERA regla que coincide con el nombre del modelo.",
+    "'contains': alguna de esas palabras aparece en el nombre. 'startsWith': el nombre empieza así. 'containsAll': aparecen todas.",
+    "No importan mayúsculas ni tildes ('air force' también encuentra 'Air forcé').",
+    "'bulk': precio especial llevando 'min' unidades del MISMO producto (se usa en indumentaria).",
+    "'overrides': precio fijo para un modelo puntual, usando su slug (el final de la URL del producto)."
+  ],
+  "wholesale": {
+    "minPairs": 5,
+    "label": "Llevando 5 o más pares surtidos"
+  },
+  "unit": {
+    "default": 43000,
+    "rules": [
+      { "price": 37000, "startsWith": ["mind "] },
+      { "price": 17000, "contains": ["remera"], "bulk": { "min": 10, "price": 15000 } },
+      { "price": 24000, "contains": ["baggy nk"], "bulk": { "min": 10, "price": 22000 } },
+      { "price": 35000, "contains": ["ojotas"] },
+      { "price": 35000, "contains": ["niño", "niños"] },
+      { "price": 43000, "contains": ["jordan low pink", "jordan pink low"] },
+      { "price": 55000, "contains": ["jordan 11", "retro 11 panda"] }
+    ]
+  },
+  "wholesalePrice": {
+    "default": 37000,
+    "rules": [
+      { "price": 35000, "startsWith": ["mind "] },
+      { "price": 31000, "contains": ["ojotas"] },
+      { "price": 42000, "contains": ["brillo"] },
+      { "price": 30000, "contains": ["niño", "niños"] },
+      { "price": 39000, "contains": ["jordan low pink", "jordan pink low"] },
+      { "price": 50000, "contains": ["jordan 11", "retro 11 panda"] },
+      { "price": 42000, "contains": ["nike v5 blancas", "nike v5 negras", "nike v5 rosa", "air jordan pipa gris", "air jordan black", "new balance 4000 negra", "nb 4000 negra"] },
+      { "price": 42000, "contains": ["forum verde summer", "jordan low 1 diamond", "jordan diamond pipa blanca", "jordan pink", "adidas 2000", "puma 180", "campus", "shox", "tl1", "haylan"] },
+      { "price": 41000, "contains": ["exclusivas white", "negras medias", "air force con medias"] },
+      { "price": 39000, "contains": ["samba classic", "jordan low glister", "jordan", "retro 4", "botitas", "530", "9060", "abzorb", "running", "mind"] }
+    ]
+  },
+  "overrides": {}
+}

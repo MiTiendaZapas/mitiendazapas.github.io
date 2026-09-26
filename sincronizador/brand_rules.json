@@ -1,0 +1,88 @@
+{
+  "_ayuda": "Se evalúan en orden y gana la primera regla que coincide. 'contains' busca palabras o frases completas dentro del nombre (sin importar tildes ni mayúsculas). Lo que no coincide con ninguna regla queda sin marca y aparece en sincronizador/informes/brand-review.json para revisar. Para decidir un caso puntual, agregalo en 'overrides' con el nombre exacto.",
+  "brands": [
+    {
+      "brand": "Jordan",
+      "contains": [
+        "jordan"
+      ]
+    },
+    {
+      "brand": "Nike",
+      "contains": [
+        "nike",
+        "air force",
+        "dunk",
+        "shox",
+        "mind",
+        "tl1",
+        "deportivas fit"
+      ]
+    },
+    {
+      "brand": "Adidas",
+      "contains": [
+        "adidas",
+        "forum",
+        "super star",
+        "superstar",
+        "samba",
+        "campus"
+      ]
+    },
+    {
+      "brand": "New Balance",
+      "contains": [
+        "new balance",
+        "nb",
+        "abzorb",
+        "9060"
+      ]
+    },
+    {
+      "brand": "Puma",
+      "contains": [
+        "puma"
+      ]
+    },
+    {
+      "brand": "Vans",
+      "contains": [
+        "vans",
+        "knu",
+        "haylan"
+      ]
+    },
+    {
+      "brand": "Fila",
+      "contains": [
+        "fila"
+      ]
+    }
+  ],
+  "overrides": {
+    "Ojotas Louis Vuitton negras": "Nike",
+    "Ojotas Louis Vuitton bege": "Nike",
+    "Ojotas total black": "Nike",
+    "Low preto brillo": "Nike"
+  },
+  "categories": {
+    "_ayuda": "Ojotas: nombre con 'ojota', que empiece con 'mind ' o con talles dobles tipo 37/38. Niños: nombre con alguna de estas palabras.",
+    "ojotas": {
+      "contains": [
+        "ojota",
+        "ojotas"
+      ],
+      "starts_with": [
+        "mind "
+      ]
+    },
+    "ninos": {
+      "contains": [
+        "niño",
+        "niños",
+        "nene"
+      ]
+    }
+  }
+}

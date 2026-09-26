@@ -1,0 +1,5 @@
+# Las imágenes son binarias: git no debe tocarles los fines de línea
+*.webp binary
+*.jpg binary
+*.jpeg binary
+*.png binary
