@@ -55,6 +55,7 @@ async function startStore() {
   let cartView = null;
 
   const catalogView = createCatalogView(document.getElementById("catalogo"), {
+    headStyle: config.catalogHeader,
     onAdded({ product, size, qty }) {
       toaster.show({
         title: qty > 1 ? `${qty} pares agregados a tu pedido` : "Agregado a tu pedido",
@@ -82,7 +83,10 @@ async function startStore() {
     catalogView.connect({ pricing, cart });
     catalogView.render(catalog.products);
     createFiltersView({ config, filters: createFilters(catalog.products), catalogView, overlays });
-    cartView = createCartView({ config, channel, cart, pricing, overlays, storagePrefix });
+    cartView = createCartView({
+      config, channel, cart, pricing, overlays, storagePrefix,
+      onOpenProduct: (product) => { location.hash = `#p/${encodeURIComponent(product.slug)}`; },
+    });
 
     const productView = createProductView({
       config,
@@ -121,7 +125,7 @@ async function startStore() {
   } catch (error) {
     console.error(error);
     catalogView.showError({
-      whatsappHref: whatsappLink(config.contact.whatsappQueries, `Hola ${config.name}! No me carga el catálogo, ¿me pasás los modelos disponibles?`),
+      whatsappHref: whatsappLink(config.contact.whatsappQueries, `Hola! No me carga el catálogo, ¿me pasás los modelos disponibles?`),
     });
   }
 }

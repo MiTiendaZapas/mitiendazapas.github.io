@@ -43,7 +43,7 @@ function howToBuyBody(config) {
 function shippingBody(config) {
   const cards = Object.values(config.shipping.methods).map((m) => {
     const consult = m.consultMessage
-      ? `<a class="btn btn--outline" href="${whatsappLink(config.contact.whatsappQueries, `Hola ${config.name}! ${m.consultMessage}`)}" target="_blank" rel="noopener">${icon("whatsapp")} ${esc(m.consultLabel ?? "Consultar")}</a>`
+      ? `<a class="btn btn--outline" href="${whatsappLink(config.contact.whatsappQueries, `Hola! ${m.consultMessage}`)}" target="_blank" rel="noopener">${icon("whatsapp")} ${esc(m.consultLabel ?? "Consultar")}</a>`
       : "";
     return `
       <article class="info-card">
@@ -155,7 +155,7 @@ export function renderInfoPage(root, { config, channel, channelKey, links }) {
       </div>`;
     return;
   }
-  const consult = whatsappLink(config.contact.whatsappQueries, `Hola ${config.name}! Tengo una consulta.`);
+  const consult = whatsappLink(config.contact.whatsappQueries, `Hola! Tengo una consulta.`);
 
   root.innerHTML = `
     <section class="page-hero${page.highlight ? " page-hero--highlight" : ""}" aria-labelledby="page-title">
@@ -185,11 +185,6 @@ export function renderInfoPage(root, { config, channel, channelKey, links }) {
 }
 
 // --- footer (incluye, discreta, la promo de tiendas a medida) --------------------
-
-function formatPhone(number) {
-  const local = String(number).replace(/\D/g, "").replace(/^549/, "");
-  return local.length === 10 ? `${local.slice(0, 2)} ${local.slice(2, 6)}-${local.slice(6)}` : local;
-}
 
 function platformPromo(config) {
   const c = config.platformPromo;
@@ -238,7 +233,7 @@ export function renderFooter(root, { config, links }) {
         <div>
           <h2 class="site-footer__heading">Contacto</h2>
           <a class="footer-whatsapp" href="${whatsappLink(config.contact.whatsappQueries)}" target="_blank" rel="noopener">
-            ${icon("whatsapp")} <span><small>WhatsApp</small>${esc(formatPhone(config.contact.whatsappQueries))}</span>
+            ${icon("whatsapp")} <span><small>WhatsApp</small>Escribinos</span>
           </a>
           ${config.social?.length ? `<h2 class="site-footer__heading site-footer__heading--social">Seguinos</h2>` : ""}
           ${socialLinksHtml(config, { handles: true, className: "social-list--stack" })}

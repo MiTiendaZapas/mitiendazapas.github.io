@@ -4,12 +4,36 @@
  */
 import { escapeHtml, plural } from "../utils.js";
 import { icon } from "./icons.js";
+import { countText } from "./filters-view.js";
 import { priceHtml, sizeButtonsHtml, stockStatus } from "./product-parts.js";
 
 const ADDED_FEEDBACK_MS = 1600;
 const EAGER_IMAGES = 4;
 
-export function createCatalogView(root, { onAdded }) {
+/**
+ * Encabezado del catálogo:
+ *   "compacto" (por defecto): "Catálogo" y la cantidad de modelos en una etiqueta, en la misma línea.
+ *   "clasico": la versión anterior ("Stock disponible", título grande y la cantidad a un costado).
+ */
+function headHtml(style) {
+  if (style === "clasico") {
+    return `
+      <div class="catalog__head">
+        <div>
+          <p class="eyebrow">Stock disponible</p>
+          <h2 class="catalog__title" id="catalog-title">Catálogo</h2>
+        </div>
+        <p class="catalog__count" data-catalog-count aria-live="polite"></p>
+      </div>`;
+  }
+  return `
+    <div class="catalog__head catalog__head--compact">
+      <h2 class="catalog__title" id="catalog-title">Catálogo</h2>
+      <p class="catalog__count" data-catalog-count aria-live="polite"></p>
+    </div>`;
+}
+
+export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
   const selection = new Map();   // productId -> { size, qty }
   let productsById = new Map();
   let pricing = null;
@@ -17,13 +41,7 @@ export function createCatalogView(root, { onAdded }) {
 
   root.innerHTML = `
     <div class="container">
-      <div class="catalog__head">
-        <div>
-          <p class="eyebrow">Stock disponible</p>
-          <h2 class="catalog__title" id="catalog-title">Catálogo</h2>
-        </div>
-        <p class="catalog__count" data-catalog-count aria-live="polite"></p>
-      </div>
+      ${headHtml(headStyle)}
       <div data-catalog-toolbar></div>
       <div class="catalog__layout">
         <aside class="catalog__filters-panel" data-filters-panel aria-label="Filtros"></aside>
@@ -189,7 +207,7 @@ export function createCatalogView(root, { onAdded }) {
   function render(products) {
     productsById = new Map(products.map((p) => [p.id, p]));
     grid.setAttribute("aria-busy", "false");
-    countLabel.textContent = plural(products.length, "modelo disponible", "modelos disponibles");
+    countLabel.textContent = countText(products.length, products.length, false, headStyle);
     grid.innerHTML = products.map(cardHtml).join("");
     for (const card of grid.querySelectorAll("[data-product-id]")) {
       card.querySelector("[data-buy]").innerHTML = buyHtml(productsById.get(card.dataset.productId));

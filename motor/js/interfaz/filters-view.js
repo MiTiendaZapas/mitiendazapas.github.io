@@ -161,9 +161,7 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
     // La fila de marcas se desplaza hasta la marca elegida.
     const pressed = brandStrip.querySelector('[aria-pressed="true"]');
     if (pressed) brandStrip.scrollLeft = pressed.offsetLeft - brandStrip.offsetLeft - 16;
-    catalogView.setCount(filters.hasAny()
-      ? `${plural(shown, "modelo", "modelos")} de ${catalogView.totalCount()}`
-      : plural(shown, "modelo disponible", "modelos disponibles"));
+    catalogView.setCount(countText(shown, catalogView.totalCount(), filters.hasAny(), config.catalogHeader));
     sheet.querySelector("[data-sheet-results]").textContent = shown ? `Ver ${plural(shown, "modelo", "modelos")}` : "Sin resultados";
 
     if (shown > 0) {
@@ -242,4 +240,12 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
   filters.readUrl();
   search.value = filters.state.q;
   update();
+}
+
+/** "179 modelos" / "12 de 179 modelos" (compacto) o "179 modelos disponibles" / "12 modelos de 179" (clásico). */
+export function countText(shown, total, filtered, headStyle) {
+  if (headStyle === "clasico") {
+    return filtered ? `${plural(shown, "modelo", "modelos")} de ${total}` : plural(shown, "modelo disponible", "modelos disponibles");
+  }
+  return filtered ? `${shown} de ${plural(total, "modelo", "modelos")}` : plural(shown, "modelo", "modelos");
 }

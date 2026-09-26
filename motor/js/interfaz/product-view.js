@@ -10,6 +10,7 @@ import { icon } from "./icons.js";
 import { priceHtml, sizeButtonsHtml, stockStatus } from "./product-parts.js";
 import { sizeTableHtml } from "./pages.js";
 import { createSharer, shareButtonHtml } from "./share.js";
+import { attachSwipe } from "./swipe.js";
 import { createZoomViewer } from "./zoom-viewer.js";
 
 const HASH_PREFIX = "#p/";
@@ -216,6 +217,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
         </ul>
       </div>`;
     updateCount();
+    setupGallery();
   }
 
   function renderBuy() {
@@ -229,27 +231,43 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
   }
 
   // --- galería --------------------------------------------------------------
-  function goToSlide(i) {
+  // Las fotos se mueven con transform (no con scroll): así se controla cuándo
+  // un gesto cambia de foto (ver swipe.js).
+  let slide = 0;
+
+  /** Posiciona la tira de fotos; "drag" son los píxeles que el dedo la está corriendo. */
+  function placeTrack(drag = 0) {
     const track = content.querySelector("[data-track]");
     if (!track) return;
-    const total = product.images.length;
-    const target = Math.min(Math.max(i, 0), total - 1);
-    track.scrollTo({ left: target * track.clientWidth, behavior: "smooth" });
+    track.classList.toggle("is-dragging", drag !== 0);
+    track.style.transform = `translateX(calc(${-slide * 100}% + ${drag}px))`;
   }
 
-  function currentSlide() {
-    const track = content.querySelector("[data-track]");
-    return track ? Math.round(track.scrollLeft / Math.max(track.clientWidth, 1)) : 0;
-  }
-
-  content.addEventListener("scroll", (event) => {
-    if (!event.target.matches?.("[data-track]")) return;
-    const active = currentSlide();
+  function goToSlide(i) {
+    if (!product.images.length) return;
+    slide = Math.min(Math.max(i, 0), product.images.length - 1);
+    placeTrack();
     content.querySelectorAll("[data-thumb]").forEach((thumb) => {
-      if (Number(thumb.dataset.thumb) === active) thumb.setAttribute("aria-current", "true");
+      if (Number(thumb.dataset.thumb) === slide) thumb.setAttribute("aria-current", "true");
       else thumb.removeAttribute("aria-current");
     });
-  }, true);
+    content.querySelectorAll("[data-zoom]").forEach((btn, i) => { btn.tabIndex = i === slide ? 0 : -1; });
+  }
+
+  const currentSlide = () => slide;
+
+  function setupGallery() {
+    slide = 0;
+    const viewport = content.querySelector(".gallery__viewport");
+    if (!viewport || product.images.length < 2) return;
+    const last = product.images.length - 1;
+    attachSwipe(viewport, {
+      // En la primera y la última foto el arrastre "resiste", para que se note que no hay más.
+      onMove: (dx) => placeTrack((slide === 0 && dx > 0) || (slide === last && dx < 0) ? dx / 3 : dx),
+      onEnd: (step) => goToSlide(slide + step),
+    });
+    goToSlide(0);
+  }
 
   content.addEventListener("keydown", (event) => {
     if (!event.target.matches("[data-track]")) return;

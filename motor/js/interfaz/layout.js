@@ -38,7 +38,7 @@ function renderTopbar(header, config) {
 }
 
 export function renderHeader(root, { config, channel, links }) {
-  const consult = whatsappLink(config.contact.whatsappQueries, `Hola ${config.name}! Tengo una consulta.`);
+  const consult = whatsappLink(config.contact.whatsappQueries, `Hola! Tengo una consulta.`);
   renderTopbar(root, config);
   const nav = menuItems(links, { onlyMenu: true }).map((item) => `<li>${linkHtml(item, "site-nav__link")}</li>`).join("");
 
@@ -58,6 +58,10 @@ export function renderHeader(root, { config, channel, links }) {
         <ul class="site-nav__list">${nav}</ul>
       </nav>
       <div class="site-header__actions">
+        ${window.storeTheme?.available ? `
+          <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="Cambiar entre modo claro y oscuro" title="Modo claro / oscuro">
+            ${icon("moon", "theme-toggle__moon")}${icon("sun", "theme-toggle__sun")}
+          </button>` : ""}
         <button class="cart-button" type="button" data-open-cart aria-label="Ver tu pedido, vacío">
           ${icon("bag")}
           <span class="cart-button__label">Tu pedido</span>
@@ -66,6 +70,7 @@ export function renderHeader(root, { config, channel, links }) {
       </div>
     </div>`;
   createMobileMenu(root, config, links, consult);
+  root.querySelector("[data-theme-toggle]")?.addEventListener("click", () => window.storeTheme.toggle());
 }
 
 /** Menú de celular: catálogo, páginas de información, WhatsApp y redes. */
@@ -89,7 +94,7 @@ function createMobileMenu(header, config, links, consultLink) {
       </nav>
       <div class="menu-sheet__footer">
         <a class="btn btn--whatsapp btn--block" href="${consultLink}" target="_blank" rel="noopener">${icon("whatsapp")} Consultar por WhatsApp</a>
-        ${socialLinksHtml(config, { handles: true, className: "social-list--stack" })}
+        ${socialLinksHtml(config, { className: "social-list--center" })}
       </div>
     </div>`;
   document.body.append(menu);
@@ -123,20 +128,23 @@ export function renderHero(root, { config, channel, links }) {
   }
 
   const howToBuy = links.pages.find((p) => p.id === "como-comprar");
-  const social = hero.showSocial ? socialLinksHtml(config, { handles: true }) : "";
+  const social = hero.showSocial ? socialLinksHtml(config, { className: "social-list--hero" }) : "";
+  // El título grande es opcional. Sin él, igual queda un título para buscadores
+  // y lectores de pantalla (no se ve).
+  const title = hero.title
+    ? `<h1 class="hero__title" id="hero-title">${escapeHtml(hero.title)} <em>${escapeHtml(hero.highlight ?? "")}</em></h1>`
+    : `<h1 class="visually-hidden" id="hero-title">${escapeHtml(`${config.name} · ${channel.label}`)}</h1>`;
   root.setAttribute("aria-labelledby", "hero-title");
   root.innerHTML = `
     <div class="container hero__inner">
-      <p class="eyebrow">${escapeHtml(hero.eyebrow)}</p>
-      <h1 class="hero__title" id="hero-title">
-        ${escapeHtml(hero.title)} <em>${escapeHtml(hero.highlight ?? "")}</em>
-      </h1>
+      ${hero.eyebrow ? `<p class="eyebrow">${escapeHtml(hero.eyebrow)}</p>` : ""}
+      ${title}
       <p class="hero__text">${escapeHtml(hero.text)}</p>
       <ul class="hero__points">${points}</ul>
       <div class="hero__actions">
         <a class="btn btn--primary btn--lg" href="#catalogo">Ver catálogo ${icon("arrowRight")}</a>
         ${howToBuy ? `<a class="btn btn--outline btn--lg" href="${escapeHtml(links.page(howToBuy))}">Cómo comprar</a>` : ""}
       </div>
-      ${social ? `<div class="hero__social"><span class="hero__social-title">Seguinos</span>${social}</div>` : ""}
+      ${social ? `<nav class="hero__social" aria-label="Redes sociales">${social}</nav>` : ""}
     </div>`;
 }

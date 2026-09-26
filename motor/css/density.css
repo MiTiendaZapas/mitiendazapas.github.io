@@ -1,0 +1,63 @@
+/*
+ * Versión COMPACTA: todo un poco más chico (menos "zoom"), para ver más
+ * modelos por pantalla. Se activa con theme.density: "compacta" en
+ * configuracion.js; con "normal" la tienda se ve como antes.
+ * Los botones siguen teniendo al menos 40 px de alto para tocarlos cómodo.
+ */
+:root[data-density="compacta"] {
+  --space-3: 10px;
+  --space-4: 14px;
+  --space-5: 20px;
+  --space-6: 28px;
+  --space-7: 40px;
+  --tap: 40px;
+  --header-height: 54px;
+  --radius-card: 12px;
+}
+@media (min-width: 768px) {
+  :root[data-density="compacta"] { --header-height: 62px; }
+}
+
+[data-density="compacta"] body { font-size: 15px; }
+
+/* Header */
+[data-density="compacta"] .brand__logo { width: 36px; height: 36px; }
+[data-density="compacta"] .brand__name { font-size: 20px; }
+[data-density="compacta"] .topbar__inner,
+[data-density="compacta"] .topbar__link { min-height: 34px; }
+
+/* Botones */
+[data-density="compacta"] .btn { font-size: 14px; }
+[data-density="compacta"] .btn--lg { min-height: 46px; font-size: 15px; }
+
+/* Portada */
+[data-density="compacta"] .hero__text { font-size: 15px; }
+[data-density="compacta"] .hero__point { padding: 5px 10px; font-size: 12px; }
+
+/* Tarjetas del catálogo */
+[data-density="compacta"] .product-card__name { font-size: 13px; }
+[data-density="compacta"] .price__unit { font-size: 21px; }
+[data-density="compacta"] .price__bulk { font-size: 11px; }
+[data-density="compacta"] .size-chip { min-width: 34px; height: 34px; font-size: 13px; }
+[data-density="compacta"] .add-btn { min-height: 40px; font-size: 13px; }
+
+/* Vista del modelo */
+[data-density="compacta"] .product-view__title { font-size: clamp(24px, 6vw, 34px); }
+[data-density="compacta"] .product-view__info .price__unit { font-size: 28px; }
+[data-density="compacta"] .product-view__sizes .size-chip { min-width: 42px; height: 42px; font-size: 14px; }
+
+/* Pedido */
+[data-density="compacta"] .drawer__title { font-size: 24px; }
+[data-density="compacta"] .drawer__total strong { font-size: 25px; }
+[data-density="compacta"] .cart-line { gap: var(--space-2) var(--space-3); padding-block: var(--space-2); grid-template-columns: 48px minmax(0, 1fr) auto; }
+[data-density="compacta"] .cart-line__thumb { width: 48px; height: 64px; }
+[data-density="compacta"] .cart-line__name { font-size: 13px; }
+[data-density="compacta"] .cart-line__meta { font-size: 12px; }
+[data-density="compacta"] .stepper--sm .stepper__btn { width: 30px; height: 30px; }
+[data-density="compacta"] .choice__box { padding-block: var(--space-2); }
+[data-density="compacta"] .choice__price { font-size: 19px; }
+[data-density="compacta"] .mode-choice__legend { font-size: 14px; }
+[data-density="compacta"] .cart-bar__button { min-height: 48px; }
+
+/* Páginas de información */
+[data-density="compacta"] .page-hero__title { font-size: clamp(30px, 8vw, 48px); }

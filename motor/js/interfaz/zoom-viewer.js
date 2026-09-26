@@ -6,10 +6,10 @@
  *                mover, flechas del teclado para cambiar de foto.
  */
 import { icon } from "./icons.js";
+import { SWIPE, swipeAxis, swipeResult } from "./swipe.js";
 
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
-const SWIPE_DISTANCE = 60;
 const DOUBLE_TAP_MS = 300;
 
 export function createZoomViewer(host) {
@@ -109,7 +109,7 @@ export function createZoomViewer(host) {
       const [a, b] = [...pointers.values()];
       gesture = { type: "pinch", distance: Math.hypot(a.x - b.x, a.y - b.y), scale };
     } else if (pointers.size === 1) {
-      gesture = { type: "drag", startX: event.clientX, startY: event.clientY, x, y, moved: false };
+      gesture = { type: "drag", startX: event.clientX, startY: event.clientY, x, y, moved: false, axis: null, time: performance.now() };
     }
   });
 
@@ -123,15 +123,19 @@ export function createZoomViewer(host) {
     } else if (gesture.type === "drag") {
       const dx = event.clientX - gesture.startX;
       const dy = event.clientY - gesture.startY;
-      if (Math.abs(dx) + Math.abs(dy) > 6) gesture.moved = true;
+      if (Math.abs(dx) + Math.abs(dy) > SWIPE.LOCK_DISTANCE) gesture.moved = true;
       if (scale > 1) {
         x = gesture.x + dx;
         y = gesture.y + dy;
         clamp();
         apply();
       } else {
-        img.style.transition = "none";
-        img.style.transform = `translateX(${dx}px)`;   // se ve cómo se desliza la foto
+        // Sin zoom: la foto sigue al dedo solo si el gesto es claramente hacia el costado.
+        gesture.axis ??= swipeAxis(dx, dy);
+        if (gesture.axis === "x") {
+          img.style.transition = "none";
+          img.style.transform = `translateX(${dx}px)`;
+        }
       }
     }
   });
@@ -141,8 +145,11 @@ export function createZoomViewer(host) {
     pointers.delete(event.pointerId);
     if (gesture?.type === "drag" && pointers.size === 0) {
       const dx = event.clientX - gesture.startX;
-      if (scale <= 1 && Math.abs(dx) > SWIPE_DISTANCE && images.length > 1) {
-        show(index + (dx < 0 ? 1 : -1));
+      const step = scale <= 1 && gesture.axis === "x" && images.length > 1
+        ? swipeResult(dx, performance.now() - gesture.time, stage.clientWidth)
+        : 0;
+      if (step && index + step >= 0 && index + step < images.length) {
+        show(index + step);
       } else if (scale <= 1) {
         apply(true);   // vuelve a su lugar
       }

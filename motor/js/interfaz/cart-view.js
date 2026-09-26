@@ -4,7 +4,7 @@
  * 5 o más pares) y enviarlo por WhatsApp. No se piden datos: nombre y envío
  * se coordinan en el chat.
  */
-import { escapeHtml, money, plural, readStorage, writeStorage } from "../utils.js";
+import { escapeHtml, money, plural, readStorage, whatsappLink, writeStorage } from "../utils.js";
 import { buildOrderMessage, orderLink } from "../whatsapp.js";
 import { icon } from "./icons.js";
 import { socialLinksHtml } from "./social.js";
@@ -12,7 +12,7 @@ import { socialLinksHtml } from "./social.js";
 const MODE_KEY = "purchase-mode";
 
 
-export function createCartView({ config, channel, cart, pricing, overlays, storagePrefix }) {
+export function createCartView({ config, channel, cart, pricing, overlays, storagePrefix, onOpenProduct }) {
   const headerButton = document.querySelector("[data-open-cart]");
   const headerCount = document.querySelector("[data-cart-count]");
   const modeKey = `${storagePrefix}:${MODE_KEY}`;
@@ -171,9 +171,11 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
           const thumb = line.product.images[0]?.sm;
           return `
             <li class="cart-line" data-line-product="${escapeHtml(line.productId)}" data-line-size="${escapeHtml(line.size)}">
-              ${thumb ? `<img class="cart-line__thumb" src="${escapeHtml(thumb)}" alt="" width="60" height="80" loading="lazy">` : `<span class="cart-line__thumb"></span>`}
+              <button class="cart-line__open" type="button" data-line-open aria-label="Ver fotos de ${escapeHtml(line.product.name)}">
+                ${thumb ? `<img class="cart-line__thumb" src="${escapeHtml(thumb)}" alt="" width="60" height="80" loading="lazy">` : `<span class="cart-line__thumb"></span>`}
+              </button>
               <div class="cart-line__info">
-                <p class="cart-line__name">${escapeHtml(line.product.name)}</p>
+                <p class="cart-line__name"><button class="cart-line__name-btn" type="button" data-line-open>${escapeHtml(line.product.name)}</button></p>
                 <p class="cart-line__meta">Talle <strong>${escapeHtml(line.size)}</strong> · <span class="money">${money(line.price)}</span> c/u</p>
                 <div class="cart-line__controls">
                   <div class="stepper stepper--sm" role="group" aria-label="Cantidad de ${escapeHtml(line.product.name)} talle ${escapeHtml(line.size)}">
@@ -220,6 +222,15 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
     const lineEl = event.target.closest("[data-line-product]");
     if (!lineEl) return;
     const { lineProduct, lineSize } = lineEl.dataset;
+    // Tocar la foto o el nombre abre ese modelo (el botón "Tu pedido" de la vista vuelve acá).
+    if (event.target.closest("[data-line-open]")) {
+      const line = cart.lines().find((l) => l.productId === lineProduct);
+      if (line) {
+        close();
+        onOpenProduct?.(line.product);
+      }
+      return;
+    }
     const stepBtn = event.target.closest("[data-line-step]");
     if (stepBtn) cart.setQty(lineProduct, lineSize, cart.qtyOf(lineProduct, lineSize) + Number(stepBtn.dataset.lineStep));
     if (event.target.closest("[data-line-remove]")) cart.remove(lineProduct, lineSize);
@@ -242,9 +253,10 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
         <p class="sent-panel__text">Tocá enviar en el chat y te confirmamos el stock y el envío.</p>
       </div>
       <div class="sent-help">
-        <p><strong>¿No se abrió WhatsApp?</strong> Copiá el mensaje y mandalo al ${escapeHtml(formatPhone(config.contact.whatsappOrders))}.</p>
+        <p><strong>¿No se abrió WhatsApp?</strong> Copiá el mensaje, abrí nuestro chat y pegalo.</p>
         <div class="sent-help__actions">
           <button class="btn btn--outline" type="button" data-copy>Copiar mensaje</button>
+          <a class="btn btn--outline" href="${whatsappLink(config.contact.whatsappOrders)}" target="_blank" rel="noopener">${icon("whatsapp")} Abrir chat</a>
           <button class="btn btn--ghost" type="button" data-clear>Ya lo envié, vaciar pedido</button>
         </div>
       </div>
@@ -286,10 +298,4 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   updateSummary();
 
   return { open, close, updateSummary };
-}
-
-function formatPhone(number) {
-  const digits = String(number).replace(/\D/g, "");
-  const local = digits.replace(/^549/, "");
-  return local.length === 10 ? `${local.slice(0, 2)} ${local.slice(2, 6)}-${local.slice(6)}` : digits;
 }

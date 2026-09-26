@@ -44,6 +44,7 @@ window.STORE_CONFIG = {
       "success": "#2e7d32",
     },
     colorScheme: "light",
+    density: "compacta",
   },
 
   contact: {
@@ -62,14 +63,12 @@ window.STORE_CONFIG = {
       page: "index.html",
       prices: "precios-mayorista.json",
       share: "fotos",   // compartir: fotos sin precio ni link (para revender)
+      // Versión para revendedores: simple, directo al catálogo (igual que L.A IMP).
       hero: {
-        eyebrow: "Venta por mayor",
-        title: "Catálogo de zapatillas",
-        highlight: "",
-        text: "Elegí modelos y talles, armá tu pedido y envialo por WhatsApp. Te confirmamos el stock y coordinamos la entrega.",
+        compact: true,
         points: [
-          { icon: "box", text: "Precio por mayor llevando 5 o más pares surtidos" },
-          { icon: "chat", text: "Sin pago online: confirmás por WhatsApp" },
+          { icon: "box", text: "Por mayor llevando 5 o más pares surtidos" },
+          { icon: "chat", text: "Armás el pedido y lo enviás por WhatsApp" },
         ],
       },
     },
@@ -78,10 +77,9 @@ window.STORE_CONFIG = {
       page: "minorista.html",
       prices: "precios-minorista.json",
       share: "link",
+      // Versión al público: la portada presenta la tienda y lleva a sus redes.
       hero: {
-        eyebrow: "Tienda online",
-        title: "Catálogo de zapatillas",
-        highlight: "",
+        showSocial: true,
         text: "Elegí tu modelo y tu talle, armá el pedido y envialo por WhatsApp. Te confirmamos el stock y coordinamos la entrega.",
         points: [
           { icon: "box", text: "Precio por mayor llevando 5 o más pares surtidos" },

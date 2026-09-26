@@ -11,7 +11,7 @@ import { money, whatsappLink } from "./utils.js";
 export function buildOrderMessage({ config, channel, quote }) {
   const lines = [];
 
-  lines.push(`Hola ${config.name}! Quiero hacer este pedido desde la tienda (${channel.label}):`);
+  lines.push(`Hola! Quiero hacer este pedido desde la tienda (${channel.label}):`);
   lines.push("");
   lines.push("*Pedido*");
   for (const line of quote.lines) {
@@ -39,5 +39,5 @@ export function orderLink(config, message) {
 export function productQueryLink(config, product, size) {
   const sizeText = size ? ` en talle ${size}` : "";
   return whatsappLink(config.contact.whatsappQueries,
-    `Hola ${config.name}! Quería consultar por ${product.name}${sizeText}.`);
+    `Hola! Quería consultar por ${product.name}${sizeText}.`);
 }

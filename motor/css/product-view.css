@@ -138,23 +138,26 @@
 
 /* ---------- Galería ---------- */
 .gallery { display: grid; gap: var(--space-2); min-width: 0; }
-.gallery__viewport { position: relative; background: var(--color-surface-2); }
+/* La tira de fotos se mueve con el dedo desde JS (swipe.js). "pan-y" deja que
+   la página haga scroll hacia arriba y abajo normalmente. */
+.gallery__viewport { position: relative; overflow: hidden; background: var(--color-surface-2); touch-action: pan-y pinch-zoom; }
 .gallery__track {
   display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
   outline-offset: -2px;
+  transition: transform 320ms var(--ease-out);
+  will-change: transform;
 }
-.gallery__track::-webkit-scrollbar { display: none; }
+.gallery__track.is-dragging { transition: none; }
 .gallery__slide {
   flex: 0 0 100%;
   padding: 0;
   border: 0;
   background: none;
-  scroll-snap-align: center;
   cursor: zoom-in;
+  -webkit-user-drag: none;
+  user-select: none;
 }
+.gallery__slide img { pointer-events: none; }
 .gallery__slide img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; }
 
 /* En celular la foto no ocupa toda la pantalla: nombre y precio se ven sin bajar. */

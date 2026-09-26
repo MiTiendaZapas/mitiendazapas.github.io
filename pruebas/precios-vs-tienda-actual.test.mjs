@@ -34,6 +34,11 @@ const cases = [
   ["ClienteA minorista", "revendedores/clienteA/minorista.js", "clientes/cliente-a/precios-minorista.json"],
 ];
 
+// Cambios de precio hechos a propósito en la tienda nueva (precio por mayor esperado).
+// 26/09: las Samba tejida y brillitos pasan a $42.000 por mayor en L.A IMP.
+const SAMBAS_42 = { "Samba tejida": 42000, "Samba brillitos": 42000 };
+const intentional = { "L.A IMP revendedores": SAMBAS_42, "L.A IMP minorista": SAMBAS_42 };
+
 for (const [name, legacyFile, pricesFile] of cases) {
   test(`${name}: mismos precios que la tienda actual`, { skip: !fs.existsSync(path.join(legacy, legacyFile)) && "no se encontró la tienda actual" }, () => {
     const old = legacyPriceFunctions(path.join(legacy, legacyFile));
@@ -41,7 +46,7 @@ for (const [name, legacyFile, pricesFile] of cases) {
     const differences = catalog.flatMap((product) => {
       const now = pricing.forProduct(product);
       const nowWholesale = now.wholesale ?? now.unit;
-      const before = [old.unit(product.name), old.wholesale(product.name)];
+      const before = [old.unit(product.name), intentional[name]?.[product.name] ?? old.wholesale(product.name)];
       return before[0] === now.unit && before[1] === nowWholesale
         ? []
         : [`${product.name}: antes ${before.join("/")} ahora ${now.unit}/${nowWholesale}`];

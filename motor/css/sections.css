@@ -284,3 +284,9 @@
   border-top: 1px solid var(--color-border);
 }
 .site-footer__heading--social { margin-top: var(--space-4); }
+
+/* Redes solo con íconos: centradas (menú del celular) o en fila (portada). */
+.social-list--center { justify-content: center; gap: var(--space-3); }
+.social-list--hero { gap: var(--space-3); }
+.social-list--hero .social-link { width: 46px; height: 46px; background: var(--color-surface); }
+.social-list--hero .social-link .icon { width: 22px; height: 22px; }

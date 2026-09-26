@@ -213,3 +213,8 @@ dialog::backdrop {
 .choice__box--row > span { display: grid; gap: 2px; }
 .choice__price { font-family: var(--font-display); font-size: 22px; }
 .drawer__pending { color: var(--color-accent-strong); font-size: 14px; font-weight: 600; text-align: right; }
+
+/* Foto y nombre de cada línea del pedido: abren el modelo. */
+.cart-line__open { padding: 0; border: 0; background: none; cursor: pointer; border-radius: 8px; }
+.cart-line__name-btn { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cart-line__name-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
