@@ -48,7 +48,8 @@
       var link = document.createElement("link");
       link.rel = "stylesheet";
       // Las páginas dentro de "paginas/" indican con STORE_ROOT dónde está la raíz.
-      link.href = /^https?:/.test(theme.fonts.stylesheet) ? theme.fonts.stylesheet : (window.STORE_ROOT || "") + theme.fonts.stylesheet;
+      // Las direcciones completas o que empiezan con "/" (tiendas de clientes) se usan tal cual.
+      link.href = /^(https?:|\/)/.test(theme.fonts.stylesheet) ? theme.fonts.stylesheet : (window.STORE_ROOT || "") + theme.fonts.stylesheet;
       document.head.append(link);
     }
   }
