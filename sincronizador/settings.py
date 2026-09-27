@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # --- Proveedor -------------------------------------------------------------
-ACTIVE_PROVIDER = "vestite_api"
+ACTIVE_PROVIDER = "tiendanube"   # 27/09: el proveedor sigue en su tienda de siempre (vestitepiola.mitiendanube.com)
 
 PROVIDERS = {
     "tiendanube": {
@@ -59,7 +59,7 @@ BRAND_RULES_FILE = ROOT / "sincronizador" / "brand_rules.json"
 IMAGE_SM_PX = 480
 IMAGE_LG_PX = 900
 IMAGE_QUALITY = 78
-MAX_IMAGES_PER_PRODUCT = 6
+MAX_IMAGES_PER_PRODUCT = None  # sin límite: cada modelo lleva TODAS las fotos que tiene en la tienda del proveedor
 IMAGE_REFRESH_DAYS = 14        # cada cuánto se revisa si el proveedor cambió las fotos
 IMAGE_KEEP_MISSING_DAYS = 7    # si un modelo desaparece, sus fotos se borran recién pasados estos días
 IMAGES_WARN_MB = 500           # aviso si la carpeta de imágenes supera este tamaño

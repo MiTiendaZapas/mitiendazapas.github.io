@@ -53,8 +53,9 @@ window.STORE_CONFIG = {
       "success": "#2e7d32",
     },
     colorScheme: "light",
-    // Modo oscuro: mismo estilo simple, en gris oscuro. Sigue la configuración
-    // del celular/computadora y se puede cambiar con el botón del header.
+    // Modo oscuro: mismo estilo simple, en gris oscuro. La tienda abre en blanco
+    // ("defaultMode") y el cliente la pasa a negro con el botón del header.
+    defaultMode: "light",
     darkColors: {
       "bg": "#111113",
       "surface": "#1a1a1d",

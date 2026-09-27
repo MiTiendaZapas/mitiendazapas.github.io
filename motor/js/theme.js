@@ -4,7 +4,8 @@
  * los colores por defecto.
  *
  * Modo oscuro (si la tienda define theme.darkColors):
- *   - por defecto sigue la configuración del celular o la computadora;
+ *   - se abre con theme.defaultMode ("light" = blanco); si no está definido,
+ *     sigue la configuración del celular o la computadora;
  *   - el botón del header lo cambia a mano y la elección queda guardada.
  */
 (function applyStoreTheme() {
@@ -24,6 +25,7 @@
     if (!theme.darkColors) return "light";
     var choice = saved();
     if (choice === "dark" || choice === "light") return choice;
+    if (theme.defaultMode === "dark" || theme.defaultMode === "light") return theme.defaultMode;
     return systemPrefersDark() ? "dark" : "light";
   }
 
@@ -55,7 +57,7 @@
   }
 
   // Si el cliente no eligió a mano, acompaña los cambios del sistema (por ejemplo, de noche).
-  if (theme.darkColors && window.matchMedia) {
+  if (theme.darkColors && !theme.defaultMode && window.matchMedia) {
     var query = window.matchMedia("(prefers-color-scheme: dark)");
     var follow = function () { if (!saved()) apply(modeToUse()); };
     if (query.addEventListener) query.addEventListener("change", follow);
