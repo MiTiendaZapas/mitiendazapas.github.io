@@ -113,6 +113,8 @@ window.STORE_CONFIG = {
         showSocial: true,
         // Accesos por marca con su logo, arriba del catálogo.
         brandAccess: true,
+        // Fila "Últimos pares": modelos con 3 pares o menos (se arma sola con el stock).
+        lastPairs: true,
       },
     },
     mayorista: {

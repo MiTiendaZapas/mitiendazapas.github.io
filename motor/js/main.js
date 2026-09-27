@@ -19,6 +19,7 @@ import { renderHeader, renderHero } from "./interfaz/layout.js";
 import { renderFooter, renderInfoPage } from "./interfaz/pages.js";
 import { createProductView } from "./interfaz/product-view.js";
 import { createToaster } from "./interfaz/toast.js";
+import { renderLastPairs } from "./interfaz/ultimos-pares.js";
 
 const OPEN_CART_HASH = "#pedido";
 
@@ -83,6 +84,7 @@ async function startStore() {
     catalogView.connect({ pricing, cart });
     catalogView.render(catalog.products);
     createFiltersView({ config, filters: createFilters(catalog.products), catalogView, overlays });
+    renderLastPairs(document.querySelector("[data-last-pairs]"), { products: catalog.products, pricing });
     cartView = createCartView({
       config, channel, cart, pricing, overlays, storagePrefix,
       onOpenProduct: (product) => { location.hash = `#p/${encodeURIComponent(product.slug)}`; },
