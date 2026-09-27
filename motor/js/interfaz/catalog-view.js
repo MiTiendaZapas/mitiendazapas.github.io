@@ -204,8 +204,11 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
     buy.innerHTML = buyHtml(product);
   }
 
+  let originalOrder = [];   // orden "Recomendados" (marca y modelo), para poder volver a él
+
   function render(products) {
     productsById = new Map(products.map((p) => [p.id, p]));
+    originalOrder = products.map((p) => p.id);
     grid.setAttribute("aria-busy", "false");
     countLabel.textContent = countText(products.length, products.length, false, headStyle);
     grid.innerHTML = products.map(cardHtml).join("");
@@ -270,6 +273,21 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
     event.target.outerHTML = `<div class="img-fallback">${icon("image")}<span>Foto no disponible</span></div>`;
   }, true);
 
+  /** Reordena las tarjetas: "menor" o "mayor" precio; cualquier otro valor vuelve al orden original.
+   *  A igual precio se respeta el orden original (marca y modelo). */
+  function sortBy(mode) {
+    const cards = new Map([...grid.querySelectorAll("[data-product-id]")].map((c) => [c.dataset.productId, c]));
+    const ids = [...originalOrder];
+    if ((mode === "menor" || mode === "mayor") && pricing) {
+      const price = (id) => pricing.forProduct(productsById.get(id)).unit;
+      ids.sort((a, b) => (mode === "menor" ? price(a) - price(b) : price(b) - price(a)));
+    }
+    for (const id of ids) {
+      const card = cards.get(id);
+      if (card) grid.append(card);
+    }
+  }
+
   return {
     /** Se llama cuando ya cargaron los precios y el pedido. */
     connect(deps) {
@@ -284,6 +302,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
     showError,
     showEmpty,
     showOnly,
+    sortBy,
     preselectSize,
     render,
     totalCount: () => productsById.size,
