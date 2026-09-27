@@ -77,8 +77,8 @@ window.STORE_CONFIG = {
   contact: {
     // Consultas (modelos, talles, stock) y pedidos van al mismo número,
     // pero con mensajes distintos para que se reconozcan en el chat.
-    whatsappQueries: "5491136284751",
-    whatsappOrders: "5491136284751",
+    whatsappQueries: "5491153773771",
+    whatsappOrders: "5491153773771",
   },
 
   // Redes: se muestran en la franja de arriba de todo, en la tienda minorista,
