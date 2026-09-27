@@ -28,14 +28,6 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
       </button>
     </div>
     <div class="brand-strip" role="group" aria-label="Filtrar por marca" data-brand-strip></div>
-    <div class="catalog-sort">
-      <label class="catalog-sort__label" for="catalog-sort">Ordenar por</label>
-      <select class="catalog-sort__select" id="catalog-sort" data-sort>
-        <option value="">Recomendados</option>
-        <option value="menor">Menor precio</option>
-        <option value="mayor">Mayor precio</option>
-      </select>
-    </div>
     <div class="active-filters" data-active hidden></div>`;
 
   const search = toolbar.querySelector("[data-search]");
@@ -271,19 +263,6 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
     const top = catalogView.layoutTop() - header - bar - 12;
     if (top < 0) window.scrollBy({ top });
   });
-
-  // --- ordenar por precio (queda en el link como ?orden=menor / ?orden=mayor) ---
-  const sortSelect = toolbar.querySelector("[data-sort]");
-  const initialSort = new URL(location.href).searchParams.get("orden");
-  if (initialSort === "menor" || initialSort === "mayor") sortSelect.value = initialSort;
-  sortSelect.addEventListener("change", () => {
-    catalogView.sortBy(sortSelect.value);
-    const url = new URL(location.href);
-    if (sortSelect.value) url.searchParams.set("orden", sortSelect.value);
-    else url.searchParams.delete("orden");
-    history.replaceState(history.state, "", url);
-  });
-  catalogView.sortBy(sortSelect.value);
 
   filters.readUrl();
   search.value = filters.state.q;
