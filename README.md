@@ -4,28 +4,31 @@ Base reutilizable para L.A IMP y futuras tiendas de clientes: **un catálogo
 compartido**, un **motor común** y una **configuración por tienda** (marca,
 colores, contactos, textos y precios).
 
-> Proyecto en construcción. No reemplaza ni modifica las tiendas actuales
-> (`../TiendaZapasOficial`), de las que solo **lee** el stock de casa.
+Publicada en **https://mitiendazapas.github.io** (repositorio
+`MiTiendaZapas/mitiendazapas.github.io`). Del repositorio de la tienda anterior
+(`../TiendaZapasOficial`) solo se usa el stock de casa que guarda el Panel Admin.
 
-## Estructura
+## Estructura y links
 
 ```
-plataforma-zapas/
-├── index.html                ← L.A IMP para revendedores (la tienda principal)
-├── minorista.html            ← L.A IMP para el público
+mitiendazapas.github.io/
+├── index.html                ← L.A IMP al público: mitiendazapas.github.io
+├── mayorista/                ← L.A IMP para revendedores: /mayorista
+├── como-comprar/ talles/ envios/ cambios/ preguntas/ nosotros/ revender/
+│                             ← páginas de información (una carpeta cada una)
 ├── configuracion.js          ← nombre, colores, WhatsApp, redes, textos de L.A IMP
-├── precios-mayorista.json    ← precios de la tienda de revendedores
-├── precios-minorista.json    ← precios de la tienda al público
-├── paginas/                  ← páginas de información: cómo comprar, envíos, cambios,
-│                               preguntas frecuentes, nosotros y quiero revender
-├── marca/                    ← logo, favicon e imagen para compartir de L.A IMP
-├── catalogo/                 ← productos.json + fotos/ (lo genera el sincronizador, no se edita a mano)
-├── clientes/                 ← tiendas de clientes: una carpeta por cliente con los mismos archivos
-│                               (guía paso a paso en guias/nuevo-cliente.md)
-├── guias/                    ← instrucciones (por ejemplo, cómo crear un cliente nuevo)
+├── precios-mayorista.json    ← precios de revendedores
+├── precios-minorista.json    ← precios al público
+├── marca/                    ← logo, favicon e imagen para compartir
+├── catalogo/                 ← productos.json + fotos/ (lo genera el sincronizador; lo leen TODAS las tiendas)
 ├── motor/                    ← CSS, JavaScript y fuentes comunes a todas las tiendas
-└── sincronizador/            ← programa en Python que actualiza el catálogo (corre en la laptop)
+├── guias/                    ← instrucciones (cómo crear un cliente nuevo, integración)
+└── sincronizador/            ← actualiza el catálogo (corre en la laptop con iniciar_piloto.bat)
 ```
+
+Las tiendas de clientes están en **su propio repositorio** (por ejemplo `fo` →
+`mitiendazapas.github.io/fo`) y leen el motor y el catálogo de acá. Guía en
+`guias/nuevo-cliente.md`.
 
 Para cambiar algo de L.A IMP casi siempre alcanza con `configuracion.js` o
 los archivos de precios. `motor/` no se toca para personalizar una tienda.
@@ -39,8 +42,7 @@ servidor local (abrir el HTML con doble clic no funciona):
 python -m http.server 8765
 ```
 
-y entrar a `http://localhost:8765/` (revendedores) o
-`http://localhost:8765/minorista.html` (público).
+y entrar a `http://localhost:8765/` (público) o `http://localhost:8765/mayorista/` (revendedores).
 
 ## Pruebas automáticas
 

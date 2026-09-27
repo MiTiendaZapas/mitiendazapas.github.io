@@ -1,8 +1,8 @@
 """Piloto automático: actualiza el catálogo cada 15-20 minutos y lo publica.
 
-Reemplaza a Automatizacion/piloto_automatico.py de la tienda actual, con el
+Reemplaza a Automatizacion/piloto_automatico.py de la tienda anterior, con el
 mismo comportamiento de fondo:
-  - descansa de 00:00 a 08:00 (no consulta al proveedor de noche),
+  - descansa de 00:00 a 07:30 (no consulta al proveedor de noche),
   - si el proveedor falla, espera más antes de reintentar,
   - reintenta git si se corta internet un momento.
 
@@ -14,9 +14,13 @@ Uso:
     python sincronizador/piloto.py --publicar      actualiza y sube a GitHub (uso normal en la laptop)
     python sincronizador/piloto.py --una-vez       hace un solo ciclo y termina
 
-Sube lo mismo que el piloto de siempre: el catálogo y, si hay cambios, el
-stock de casa del Panel Admin (zapatillas_manual.js, indumentaria.js y Fotos/),
-por si se editó y no se tocó "Publicar".
+Qué sube y adónde:
+  - el catálogo (catalogo/) a ESTE repositorio (mitiendazapas.github.io), del que
+    leen todas las tiendas, también las de los clientes;
+  - el stock de casa del Panel Admin (zapatillas_manual.js, indumentaria.js y
+    Fotos/) al repositorio de la tienda anterior (TiendaZapasOficial), donde lo
+    guarda el Panel Admin, por si se editó y no se tocó "Publicar".
+Antes de cada vuelta trae lo último de los dos repositorios.
 """
 import argparse
 import os
@@ -31,6 +35,8 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 SYNC_DIR = Path(__file__).resolve().parent
 ROOT = SYNC_DIR.parent
+sys.path.insert(0, str(SYNC_DIR))
+from settings import LEGACY_REPO  # noqa: E402  (repositorio donde el Panel Admin guarda el stock de casa)
 PID_FILE = SYNC_DIR / "estado" / "piloto.pid"
 LOG_FILE = SYNC_DIR / "informes" / "piloto.log"
 LOG_MAX_BYTES = 2_000_000
@@ -45,7 +51,8 @@ REST_START_MINUTE = 0          # 00:00
 REST_END_MINUTE = 7 * 60 + 30  # 07:30
 
 # Qué se sube a GitHub en cada ciclo (lo que no exista se saltea).
-FILES_TO_PUBLISH = ["catalogo", "zapatillas_manual.js", "indumentaria.js", "Fotos"]
+FILES_TO_PUBLISH = ["catalogo"]                                          # a este repositorio
+HOUSE_STOCK_FILES = ["zapatillas_manual.js", "indumentaria.js", "Fotos"]  # a TiendaZapasOficial
 
 
 def disable_quick_edit():
@@ -89,10 +96,10 @@ def seconds_until_rest_ends():
     return REST_END_MINUTE * 60 - (minute_of_day * 60 + now.tm_sec)
 
 
-def git(*args, retries=3, check=True):
-    """Corre un comando de git en la carpeta de la tienda, con reintentos por cortes de internet."""
+def git(*args, retries=3, check=True, repo=ROOT):
+    """Corre un comando de git en un repositorio, con reintentos por cortes de internet."""
     for attempt in range(1, retries + 1):
-        result = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+        result = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8")
         if result.returncode == 0 or not check:
             return result
         if attempt == retries:
@@ -101,30 +108,44 @@ def git(*args, retries=3, check=True):
         time.sleep(15)
 
 
-def publish():
-    """Sube el catálogo (y el stock de casa) si cambió. Devuelve True si hubo algo nuevo."""
-    existing = [name for name in FILES_TO_PUBLISH if (ROOT / name).exists()]
-    git("add", "--all", "--", *existing)
-    if not git("diff", "--cached", "--quiet", check=False).returncode:
+def publish(repo=ROOT, files=FILES_TO_PUBLISH, message="Catálogo actualizado"):
+    """Sube esos archivos si cambiaron. Devuelve True si hubo algo nuevo."""
+    existing = [name for name in files if (repo / name).exists()]
+    if not existing:
+        return False
+    git("add", "--all", "--", *existing, repo=repo)
+    if not git("diff", "--cached", "--quiet", check=False, repo=repo).returncode:
         return False   # sin cambios
-    git("commit", "-m", f"Catálogo actualizado a las {time.strftime('%H:%M')}", retries=1)
-    push = git("push", "origin", "HEAD", check=False)
+    git("commit", "-m", f"{message} a las {time.strftime('%H:%M')}", retries=1, repo=repo)
+    push = git("push", "origin", "HEAD", check=False, repo=repo)
     if push.returncode != 0:
         # Alguien más subió algo (por ejemplo, el Panel Admin): se trae y se reintenta.
-        rebase = git("pull", "--rebase", "origin", "HEAD", check=False)
+        rebase = git("pull", "--rebase", "origin", "HEAD", check=False, repo=repo)
         if rebase.returncode != 0:
-            git("rebase", "--abort", check=False)
+            git("rebase", "--abort", check=False, repo=repo)
             raise RuntimeError("No se pudo combinar con lo último de GitHub; se reintenta en el próximo ciclo.")
-        git("push", "origin", "HEAD")
+        git("push", "origin", "HEAD", repo=repo)
     return True
+
+
+def update_house_stock_repo():
+    """Trae el stock de casa publicado desde otra PC. Si falla, se usa el que ya está en esta PC."""
+    if not (LEGACY_REPO / ".git").exists():
+        log(f"⚠️ No encontré {LEGACY_REPO}: se usa el stock de casa que haya en esta PC.")
+        return
+    result = git("pull", "--rebase", "--autostash", "origin", "HEAD", check=False, repo=LEGACY_REPO)
+    if result.returncode != 0:
+        git("rebase", "--abort", check=False, repo=LEGACY_REPO)
+        log("⚠️ No se pudo traer el stock de casa de GitHub; se usa el que hay en esta PC.")
 
 
 def run_cycle(publish_enabled):
     """Un ciclo: (traer lo último) -> sincronizar -> (publicar). Devuelve True si salió bien."""
     if publish_enabled:
-        # Trae lo último de GitHub (por ejemplo, stock de casa publicado desde otra PC).
-        # --autostash guarda un momento los cambios sin publicar del Panel Admin.
+        # Trae lo último de GitHub de los dos repositorios (por ejemplo, stock de casa
+        # publicado desde otra PC). --autostash guarda un momento los cambios sin publicar.
         git("pull", "--rebase", "--autostash", "origin", "HEAD")
+        update_house_stock_repo()
     # Se muestra lo que va haciendo el sincronizador y se copia también a piloto.log.
     process = subprocess.Popen([sys.executable, str(SYNC_DIR / "sync_catalog.py")], cwd=ROOT,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
@@ -136,6 +157,8 @@ def run_cycle(publish_enabled):
         return False
     if publish_enabled:
         log("🔄 Catálogo publicado en GitHub." if publish() else "⏸️ Sin cambios de stock.")
+        if (LEGACY_REPO / ".git").exists() and publish(LEGACY_REPO, HOUSE_STOCK_FILES, "Stock de casa actualizado"):
+            log("🏠 Stock de casa (Panel Admin) publicado.")
     else:
         log("✅ Catálogo actualizado en esta PC (sin publicar: falta --publicar).")
     return True

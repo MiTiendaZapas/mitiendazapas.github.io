@@ -90,11 +90,32 @@ window.STORE_CONFIG = {
   socialInvite: "Seguinos: novedades y modelos nuevos todos los días",
 
   // Las dos versiones de la tienda. Cada página HTML indica cuál es con
-  // <body data-channel="...">.
+  // <body data-channel="...">. La PRIMERA es la del link corto (la raíz):
+  // la minorista, que es la que se comparte en redes. Revendedores va en /mayorista.
   channels: {
+    minorista: {
+      label: "Tienda",
+      page: "./",
+      prices: "precios-minorista.json",
+      purchaseModes: {
+        mayor: { title: "Por mayor", note: "Sin cambio de talle", when: "Llevando 5 o más pares surtidos y eligiendo comprar por mayor.", message: "Compra POR MAYOR (5 o más pares surtidos): sin cambio de talle." },
+        unidad: { title: "Por unidad", note: "Con cambio de talle sin cargo", when: "Cuando comprás por unidad (o elegís no comprar por mayor).", message: "Compra POR UNIDAD: con cambio de talle sin cargo." },
+      },
+      // "Compartir" de cada modelo: el link directo al modelo en esta tienda.
+      share: "link",
+      hero: {
+        text: "Elegí tu modelo y tu talle, armá el pedido y envialo por WhatsApp. Te confirmamos el stock y coordinamos la entrega.",
+        points: [
+          { icon: "repeat", text: "Cambio de talle sin cargo comprando por unidad" },
+          { icon: "truck", text: "Envíos por moto mensajería y Vía Cargo" },
+          { icon: "chat", text: "Sin pago online: confirmás por WhatsApp" },
+        ],
+        showSocial: true,
+      },
+    },
     mayorista: {
       label: "Revendedores",
-      page: "index.html",
+      page: "mayorista/",
       prices: "precios-mayorista.json",
       // Llevando 5 o más pares el cliente elige cómo comprar (igual que la tienda actual).
       purchaseModes: {
@@ -114,38 +135,18 @@ window.STORE_CONFIG = {
         ],
       },
     },
-    minorista: {
-      label: "Tienda",
-      page: "minorista.html",
-      prices: "precios-minorista.json",
-      purchaseModes: {
-        mayor: { title: "Por mayor", note: "Sin cambio de talle", when: "Llevando 5 o más pares surtidos y eligiendo comprar por mayor.", message: "Compra POR MAYOR (5 o más pares surtidos): sin cambio de talle." },
-        unidad: { title: "Por unidad", note: "Con cambio de talle sin cargo", when: "Cuando comprás por unidad (o elegís no comprar por mayor).", message: "Compra POR UNIDAD: con cambio de talle sin cargo." },
-      },
-      // "Compartir" de cada modelo: el link directo al modelo en esta tienda.
-      share: "link",
-      hero: {
-        text: "Elegí tu modelo y tu talle, armá el pedido y envialo por WhatsApp. Te confirmamos el stock y coordinamos la entrega.",
-        points: [
-          { icon: "repeat", text: "Cambio de talle sin cargo comprando por unidad" },
-          { icon: "truck", text: "Envíos por moto mensajería y Vía Cargo" },
-          { icon: "chat", text: "Sin pago online: confirmás por WhatsApp" },
-        ],
-        showSocial: true,
-      },
-    },
   },
 
-  // Páginas de información (cada una es un archivo dentro de "paginas/").
+  // Páginas de información (cada una es una carpeta: /talles, /envios, etc.).
   // "menu: true" = aparece en el menú de arriba; todas aparecen en el footer.
   pages: [
-    { id: "como-comprar", label: "Cómo comprar", file: "paginas/como-comprar.html", menu: true },
-    { id: "talles", label: "Talles", file: "paginas/tabla-de-talles.html", menu: true },
-    { id: "envios", label: "Envíos", file: "paginas/envios.html", menu: true },
-    { id: "cambios", label: "Cambios", file: "paginas/cambios-y-devoluciones.html", menu: true },
-    { id: "preguntas", label: "Preguntas", file: "paginas/preguntas-frecuentes.html", menu: true },
-    { id: "nosotros", label: "Nosotros", file: "paginas/nosotros.html" },
-    { id: "revender", label: "Quiero revender", file: "paginas/revender.html" },
+    { id: "como-comprar", label: "Cómo comprar", file: "como-comprar/", menu: true },
+    { id: "talles", label: "Talles", file: "talles/", menu: true },
+    { id: "envios", label: "Envíos", file: "envios/", menu: true },
+    { id: "cambios", label: "Cambios", file: "cambios/", menu: true },
+    { id: "preguntas", label: "Preguntas", file: "preguntas/", menu: true },
+    { id: "nosotros", label: "Nosotros", file: "nosotros/" },
+    { id: "revender", label: "Quiero revender", file: "revender/" },
   ],
 
   // Tabla de talles: se ve en la página "Talles" y dentro de cada modelo de

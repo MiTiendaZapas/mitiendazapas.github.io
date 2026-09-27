@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # --- Proveedor -------------------------------------------------------------
-ACTIVE_PROVIDER = "tiendanube"
+ACTIVE_PROVIDER = "vestite_api"
 
 PROVIDERS = {
     "tiendanube": {
@@ -34,8 +34,9 @@ EXCLUDE_KEYWORDS = ["remera", "baggy"]
 # --- Stock manual (de casa) ------------------------------------------------
 # Se LEEN (nunca se escriben) los archivos que ya edita el Panel Admin de la
 # tienda actual, así el stock de casa se carga en un solo lugar.
-# Hoy la tienda nueva vive en una carpeta aparte; cuando se integre en el
-# mismo repositorio que la tienda actual, esta línea pasa a ser: LEGACY_REPO = ROOT
+# El Panel Admin sigue guardando el stock de casa en el repositorio de la tienda
+# anterior (TiendaZapasOficial), que tiene que estar en la misma carpeta que este.
+# El piloto trae lo último de ahí antes de cada vuelta.
 LEGACY_REPO = ROOT.parent / "TiendaZapasOficial"
 MANUAL_STOCK_FILES = {
     "zapatillas": LEGACY_REPO / "zapatillas_manual.js",

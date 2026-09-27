@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// ClienteA ya no está en este repositorio: sus precios se leen de su propio repositorio (../repositorio-fo).
 const legacy = path.resolve(root, "../TiendaZapasOficial");
 const { createPricing } = await import("../motor/js/pricing.js");
 const catalog = JSON.parse(fs.readFileSync(path.join(root, "catalogo/productos.json"), "utf8")).products;
@@ -30,8 +31,8 @@ function legacyPriceFunctions(file) {
 const cases = [
   ["L.A IMP revendedores", "tienda.js", "precios-mayorista.json"],
   ["L.A IMP minorista", "minorista.js", "precios-minorista.json"],
-  ["ClienteA revendedores", "revendedores/clienteA/tienda.js", "clientes/cliente-a/precios-mayorista.json"],
-  ["ClienteA minorista", "revendedores/clienteA/minorista.js", "clientes/cliente-a/precios-minorista.json"],
+  ["ClienteA revendedores", "revendedores/clienteA/tienda.js", "../repositorio-fo/precios-mayorista.json"],
+  ["ClienteA minorista", "revendedores/clienteA/minorista.js", "../repositorio-fo/precios-minorista.json"],
 ];
 
 // Cambios de precio hechos a propósito en la tienda nueva (precio por mayor esperado).
