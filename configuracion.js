@@ -79,6 +79,8 @@ window.STORE_CONFIG = {
     // pero con mensajes distintos para que se reconozcan en el chat.
     whatsappQueries: "5491153773771",
     whatsappOrders: "5491153773771",
+    // WhatsApp del pie de página ("Escribinos"): el número del socio.
+    whatsappFooter: "5491136284751",
   },
 
   // Redes: se muestran en la franja de arriba de todo, en la tienda minorista,

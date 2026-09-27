@@ -232,7 +232,7 @@ export function renderFooter(root, { config, links }) {
         </nav>
         <div>
           <h2 class="site-footer__heading">Contacto</h2>
-          <a class="footer-whatsapp" href="${whatsappLink(config.contact.whatsappQueries)}" target="_blank" rel="noopener">
+          <a class="footer-whatsapp" href="${whatsappLink(config.contact.whatsappFooter ?? config.contact.whatsappQueries)}" target="_blank" rel="noopener">
             ${icon("whatsapp")} <span><small>WhatsApp</small>Escribinos</span>
           </a>
           ${config.social?.length ? `<h2 class="site-footer__heading site-footer__heading--social">Seguinos</h2>` : ""}
