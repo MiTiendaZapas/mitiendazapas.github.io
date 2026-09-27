@@ -27,15 +27,8 @@
 }
 .topbar__link .icon { width: 17px; height: 17px; }
 .topbar__link:hover span { text-decoration: underline; text-underline-offset: 3px; }
-/* En celulares angostos se ve solo el ícono y la red, sin el @usuario. */
+/* Celu y PC iguales: ícono + nombre de la red, sin el @usuario ni frase larga. */
 .topbar__handle { display: none; }
-@media (min-width: 560px) {
-  .topbar__handle { display: inline; }
-  .topbar__name { display: none; }
-}
-@media (min-width: 900px) {
-  .topbar__text { display: inline; opacity: 0.8; }
-}
 
 /* ---------- Header ---------- */
 .site-header {

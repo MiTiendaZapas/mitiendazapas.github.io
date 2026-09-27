@@ -183,7 +183,7 @@ dialog::backdrop {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
 }
-.sent-social__title { font-weight: 700; }
+.sent-social__title { font-weight: 700; text-align: center; }
 .sent-help {
   display: grid;
   gap: var(--space-3);

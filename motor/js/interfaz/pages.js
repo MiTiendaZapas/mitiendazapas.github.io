@@ -236,7 +236,7 @@ export function renderFooter(root, { config, links }) {
             ${icon("whatsapp")} <span><small>WhatsApp</small>Escribinos</span>
           </a>
           ${config.social?.length ? `<h2 class="site-footer__heading site-footer__heading--social">Seguinos</h2>` : ""}
-          ${socialLinksHtml(config, { handles: true, className: "social-list--stack" })}
+          ${socialLinksHtml(config)}
         </div>
       </div>
       <div class="site-footer__bottom">

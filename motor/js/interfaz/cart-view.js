@@ -245,7 +245,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
       return;
     }
     const message = buildOrderMessage({ config, channel, quote });
-    const social = socialLinksHtml(config, { handles: true, className: "social-list--stack" });
+    const social = socialLinksHtml(config, { className: "social-list--center" });
     body.innerHTML = `
       <div class="sent-panel">
         <span class="sent-panel__icon">${icon("check")}</span>
