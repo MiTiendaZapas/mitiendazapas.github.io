@@ -111,6 +111,8 @@ window.STORE_CONFIG = {
           { icon: "chat", text: "Sin pago online: confirmás por WhatsApp" },
         ],
         showSocial: true,
+        // Accesos por marca con su logo, arriba del catálogo.
+        brandAccess: true,
       },
     },
     mayorista: {

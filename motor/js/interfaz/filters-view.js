@@ -6,6 +6,7 @@
  */
 import { escapeHtml, plural } from "../utils.js";
 import { icon } from "./icons.js";
+import { brandLogo } from "./marcas.js";
 
 const SEARCH_DELAY_MS = 150;
 
@@ -107,8 +108,34 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
     const all = `<button class="brand-chip" type="button" data-strip-brand="" aria-pressed="${selected.size === 0}">Todas</button>`;
     return all + options.brands.filter((b) => b.value).map((b) => `
       <button class="brand-chip" type="button" data-strip-brand="${escapeHtml(b.value)}"
-        aria-pressed="${selected.size === 1 && b.selected}">${escapeHtml(b.value)}</button>`).join("");
+        aria-pressed="${selected.size === 1 && b.selected}">${brandLogo(b.value, "brand-chip__logo") ?? ""}${escapeHtml(b.value)}</button>`).join("");
   }
+
+  // --- accesos por marca (portada de la tienda al público) ---------------------
+  // Se llenan con las marcas que tienen stock; tocar una deja el catálogo solo con
+  // esa marca y baja hasta él.
+  const brandAccess = document.querySelector("[data-brand-access]");
+  function renderBrandAccess() {
+    if (!brandAccess) return;
+    const brands = filters.options().brands.filter((b) => b.value && b.count > 0);
+    brandAccess.hidden = brands.length < 2;
+    brandAccess.innerHTML = `
+      <h2 class="brand-access__title" id="brand-access-title">Elegí tu marca</h2>
+      <div class="brand-access__list">
+        ${brands.map((b) => `
+          <button class="brand-tile" type="button" data-access-brand="${escapeHtml(b.value)}">
+            ${brandLogo(b.value, "brand-tile__logo") ?? `<span class="brand-tile__word">${escapeHtml(b.value)}</span>`}
+            <span class="brand-tile__name">${escapeHtml(b.value)}</span>
+            <span class="brand-tile__count">${plural(b.count, "modelo")}</span>
+          </button>`).join("")}
+      </div>`;
+  }
+  brandAccess?.addEventListener("click", (event) => {
+    const tile = event.target.closest("[data-access-brand]");
+    if (!tile) return;
+    filters.setOnlyBrand(tile.dataset.accessBrand);
+    document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" });
+  });
 
   function activeHtml() {
     const { state } = filters;
@@ -239,6 +266,7 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
 
   filters.readUrl();
   search.value = filters.state.q;
+  renderBrandAccess();
   update();
 }
 
