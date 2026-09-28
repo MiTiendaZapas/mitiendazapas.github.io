@@ -108,22 +108,43 @@ def git(*args, retries=3, check=True, repo=ROOT):
         time.sleep(15)
 
 
+def bring_latest(repo):
+    """Trae lo que haya llegado a GitHub y deja los commits propios encima.
+    --autostash guarda un momento cualquier otro cambio sin subir (sin eso, git se
+    niega a combinar si hay algún archivo modificado en la carpeta)."""
+    result = git("pull", "--rebase", "--autostash", "origin", "HEAD", check=False, repo=repo)
+    if result.returncode != 0:
+        git("rebase", "--abort", check=False, repo=repo)
+        raise RuntimeError("No se pudo combinar con lo último de GitHub; se reintenta en el próximo ciclo.")
+
+
+def has_unpushed_commits(repo):
+    """True si hay commits guardados acá que todavía no están en GitHub (por ejemplo,
+    de una vuelta anterior que no pudo subir)."""
+    git("fetch", "origin", check=False, repo=repo)
+    ahead = git("rev-list", "--count", "@{upstream}..HEAD", check=False, repo=repo)
+    return ahead.returncode == 0 and ahead.stdout.strip() not in ("", "0")
+
+
 def publish(repo=ROOT, files=FILES_TO_PUBLISH, message="Catálogo actualizado"):
-    """Sube esos archivos si cambiaron. Devuelve True si hubo algo nuevo."""
+    """Sube esos archivos si cambiaron (o si quedó algo sin subir de una vuelta
+    anterior). Devuelve True si se subió algo."""
     existing = [name for name in files if (repo / name).exists()]
-    if not existing:
-        return False
-    git("add", "--all", "--", *existing, repo=repo)
-    if not git("diff", "--cached", "--quiet", check=False, repo=repo).returncode:
-        return False   # sin cambios
-    git("commit", "-m", f"{message} a las {time.strftime('%H:%M')}", retries=1, repo=repo)
+    if existing:
+        git("add", "--all", "--", *existing, repo=repo)
+    changed = bool(existing) and git("diff", "--cached", "--quiet", check=False, repo=repo).returncode != 0
+    if changed:
+        git("commit", "-m", f"{message} a las {time.strftime('%H:%M')}", retries=1, repo=repo)
+    elif not has_unpushed_commits(repo):
+        return False   # sin cambios y nada pendiente
+
+    # El escaneo puede tardar hasta ~45 minutos: justo antes de subir se trae lo que
+    # haya llegado mientras tanto (Panel Admin, cambios de la tienda, la otra PC).
+    bring_latest(repo)
     push = git("push", "origin", "HEAD", check=False, repo=repo)
     if push.returncode != 0:
-        # Alguien más subió algo (por ejemplo, el Panel Admin): se trae y se reintenta.
-        rebase = git("pull", "--rebase", "origin", "HEAD", check=False, repo=repo)
-        if rebase.returncode != 0:
-            git("rebase", "--abort", check=False, repo=repo)
-            raise RuntimeError("No se pudo combinar con lo último de GitHub; se reintenta en el próximo ciclo.")
+        # Alguien subió algo en estos segundos: se trae otra vez y se reintenta.
+        bring_latest(repo)
         git("push", "origin", "HEAD", repo=repo)
     return True
 
