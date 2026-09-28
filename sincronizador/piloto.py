@@ -44,6 +44,7 @@ LOG_MAX_BYTES = 2_000_000
 WAIT_MIN_MINUTES = 15
 WAIT_MAX_MINUTES = 20
 WAIT_AFTER_FAILURE_MINUTES = 30
+ALERT_AFTER_HOURS = 2          # aviso bien visible si pasan estas horas sin una vuelta buena
 # Descanso nocturno (igual que el piloto de la laptop): de 00:00 a 07:30.
 # Termina 7:30 para que a las 8, cuando se usa el bot de WhatsApp, ya estén
 # las novedades del día.
@@ -118,25 +119,61 @@ def bring_latest(repo):
         raise RuntimeError("No se pudo combinar con lo último de GitHub; se reintenta en el próximo ciclo.")
 
 
-def has_unpushed_commits(repo):
-    """True si hay commits guardados acá que todavía no están en GitHub (por ejemplo,
-    de una vuelta anterior que no pudo subir)."""
+def unpushed_files(repo):
+    """Archivos que cambian los commits guardados acá y todavía no subidos a GitHub
+    (por ejemplo, de una vuelta anterior que no pudo subir). None si no se puede saber."""
     git("fetch", "origin", check=False, repo=repo)
-    ahead = git("rev-list", "--count", "@{upstream}..HEAD", check=False, repo=repo)
-    return ahead.returncode == 0 and ahead.stdout.strip() not in ("", "0")
+    diff = git("diff", "--name-only", "@{upstream}...HEAD", check=False, repo=repo)
+    if diff.returncode != 0:
+        return None
+    return [line for line in diff.stdout.splitlines() if line.strip()]
+
+
+def only_touches(paths, allowed):
+    """True si todos esos archivos están dentro de lo permitido (ej. la carpeta catalogo)."""
+    return all(any(p == a or p.startswith(a.rstrip("/") + "/") for a in allowed) for p in paths)
+
+
+def start_cycle_sync(repo, own_files):
+    """Al empezar la vuelta trae lo último de GitHub. Si choca con un catálogo guardado
+    acá que no pudo subir, ese catálogo se descarta (se vuelve a generar en esta misma
+    vuelta) y se sigue con el de GitHub: así el piloto nunca queda trabado a mitad de combinar."""
+    result = git("pull", "--rebase", "--autostash", "origin", "HEAD", check=False, repo=repo)
+    if result.returncode == 0:
+        return
+    git("rebase", "--abort", check=False, repo=repo)
+    pending = unpushed_files(repo)
+    if pending is not None and only_touches(pending, own_files):
+        # --keep: vuelve a lo de GitHub sin tocar otros archivos modificados de la carpeta.
+        if git("reset", "--keep", "@{upstream}", check=False, repo=repo).returncode == 0:
+            log("♻️ El catálogo guardado en esta PC chocaba con el de GitHub: se usa el de GitHub "
+                "y se vuelve a generar en esta vuelta.")
+            return
+    raise RuntimeError("No se pudo traer lo último de GitHub: en esta PC hay cambios guardados "
+                       "que no son del catálogo. Hay que revisarlo a mano.")
 
 
 def publish(repo=ROOT, files=FILES_TO_PUBLISH, message="Catálogo actualizado"):
-    """Sube esos archivos si cambiaron (o si quedó algo sin subir de una vuelta
-    anterior). Devuelve True si se subió algo."""
+    """Sube SOLO esos archivos si cambiaron (o si quedaron sin subir de una vuelta
+    anterior). Nunca sube otros cambios de la carpeta. Devuelve True si se subió algo."""
     existing = [name for name in files if (repo / name).exists()]
     if existing:
         git("add", "--all", "--", *existing, repo=repo)
-    changed = bool(existing) and git("diff", "--cached", "--quiet", check=False, repo=repo).returncode != 0
-    if changed:
-        git("commit", "-m", f"{message} a las {time.strftime('%H:%M')}", retries=1, repo=repo)
-    elif not has_unpushed_commits(repo):
+        changed = git("diff", "--cached", "--quiet", "--", *existing, check=False, repo=repo).returncode != 0
+        if changed:
+            # "-- archivos": guarda solo esos, aunque haya otras cosas preparadas en la carpeta.
+            git("commit", "-m", f"{message} a las {time.strftime('%H:%M')}", "--", *existing, retries=1, repo=repo)
+
+    pending = unpushed_files(repo)
+    if pending is None:
+        raise RuntimeError("No se pudo comparar con GitHub; se reintenta en el próximo ciclo.")
+    if not pending:
         return False   # sin cambios y nada pendiente
+    if not only_touches(pending, files):
+        otros = ", ".join(p for p in pending if not only_touches([p], files))[:200]
+        log(f"⚠️ No se sube nada: en {repo.name} hay cambios guardados que no son de "
+            f"{', '.join(files)} ({otros}). Hay que revisarlos y subirlos a mano.")
+        return False
 
     # El escaneo puede tardar hasta ~45 minutos: justo antes de subir se trae lo que
     # haya llegado mientras tanto (Panel Admin, cambios de la tienda, la otra PC).
@@ -164,8 +201,8 @@ def run_cycle(publish_enabled):
     """Un ciclo: (traer lo último) -> sincronizar -> (publicar). Devuelve True si salió bien."""
     if publish_enabled:
         # Trae lo último de GitHub de los dos repositorios (por ejemplo, stock de casa
-        # publicado desde otra PC). --autostash guarda un momento los cambios sin publicar.
-        git("pull", "--rebase", "--autostash", "origin", "HEAD")
+        # publicado desde otra PC), sin quedar trabado si choca con un catálogo viejo.
+        start_cycle_sync(ROOT, FILES_TO_PUBLISH)
         update_house_stock_repo()
     # Se muestra lo que va haciendo el sincronizador y se copia también a piloto.log.
     process = subprocess.Popen([sys.executable, str(SYNC_DIR / "sync_catalog.py")], cwd=ROOT,
@@ -196,12 +233,14 @@ def main():
     PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
     log(f"🤖 Piloto automático ({'publica en GitHub' if args.publicar else 'SIN publicar'}) en {ROOT}")
 
+    last_ok = time.time()   # para avisar si pasa mucho tiempo sin una vuelta buena
     try:
         while True:
             rest = seconds_until_rest_ends()
             if rest and not args.una_vez:
                 log(f"😴 Horario de descanso (00:00-07:30). Durmiendo {rest / 3600:.1f} h.")
                 time.sleep(rest)
+                last_ok = time.time()   # la noche no cuenta como tiempo sin actualizar
                 continue
 
             try:
@@ -209,6 +248,12 @@ def main():
             except Exception as error:
                 log(f"❌ Error: {error}")
                 ok = False
+            if ok:
+                last_ok = time.time()
+            elif time.time() - last_ok > ALERT_AFTER_HOURS * 3600:
+                horas = (time.time() - last_ok) / 3600
+                log("🚨🚨🚨 ATENCIÓN: hace {:.1f} horas que el catálogo NO se actualiza. "
+                    "La tienda muestra stock viejo. Revisar los mensajes de arriba. 🚨🚨🚨".format(horas))
 
             if args.una_vez:
                 return 0 if ok else 1

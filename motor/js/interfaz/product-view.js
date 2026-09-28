@@ -54,7 +54,14 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
 
   // --- apertura y cierre, sincronizados con la dirección --------------------
   function slugFromHash() {
-    return location.hash.startsWith(HASH_PREFIX) ? decodeURIComponent(location.hash.slice(HASH_PREFIX.length)) : null;
+    if (!location.hash.startsWith(HASH_PREFIX)) return null;
+    try {
+      return decodeURIComponent(location.hash.slice(HASH_PREFIX.length));
+    } catch {
+      // Link cortado o mal copiado (por ejemplo, un "%" suelto): se trata como
+      // un modelo que no existe, en vez de romper toda la tienda.
+      return "#link-invalido#";   // ningún modelo se llama así
+    }
   }
 
   function syncWithHash() {

@@ -19,7 +19,10 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   // Si la versión de la tienda define "purchaseModes", el cliente elige por mayor o
   // por unidad. Si no, el precio por mayor se aplica solo al llegar a la cantidad.
   const modes = channel.purchaseModes ?? null;
-  let purchaseMode = modes ? readStorage(modeKey, null) : "mayor";   // "mayor" | "unidad" | null (sin elegir)
+  // "mayor" | "unidad" | null (sin elegir). Lo guardado solo vale si es una forma de compra
+  // que existe en la configuración; si no (dato viejo o dañado), se toma como "sin elegir".
+  const savedMode = modes ? readStorage(modeKey, null) : null;
+  let purchaseMode = modes ? (Object.hasOwn(modes, savedMode ?? "") ? savedMode : null) : "mayor";
   let sent = false;   // true después de tocar "Enviar pedido por WhatsApp"
 
   // --- barra fija (celular) --------------------------------------------------

@@ -112,7 +112,12 @@ async function startStore() {
       history.replaceState(null, "", location.pathname + location.search);
       cartView.open();
     } else {
-      productView.openFromUrl();
+      // Un problema al abrir el modelo del link nunca tiene que tapar el catálogo.
+      try {
+        productView.openFromUrl();
+      } catch (error) {
+        console.error(error);
+      }
     }
 
     if (restored.removed || restored.adjusted) {
