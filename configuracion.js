@@ -101,8 +101,8 @@ window.STORE_CONFIG = {
       page: "./",
       prices: "precios-minorista.json",
       purchaseModes: {
-        mayor: { title: "Por mayor", note: "Sin cambio de talle", when: "Llevando 5 o más pares surtidos y eligiendo comprar por mayor.", message: "Compra POR MAYOR (5 o más pares surtidos): sin cambio de talle." },
-        unidad: { title: "Por unidad", note: "Con cambio de talle sin cargo", when: "Cuando comprás por unidad (o elegís no comprar por mayor).", message: "Compra POR UNIDAD: con cambio de talle sin cargo." },
+        mayor: { title: "Por mayor", note: "Sin cambio de talle", when: "Llevando 5 o más pares surtidos y eligiendo comprar por mayor.", message: "Compra por MAYOR (5 pares o más): SIN cambio de talle" },
+        unidad: { title: "Por unidad", note: "Con cambio de talle sin cargo", when: "Cuando comprás por unidad (o elegís no comprar por mayor).", message: "Compra por UNIDAD: cambio de talle SIN cargo" },
       },
       // "Compartir" de cada modelo: el link directo al modelo en esta tienda.
       share: "link",
@@ -123,11 +123,13 @@ window.STORE_CONFIG = {
     mayorista: {
       label: "Revendedores",
       page: "mayorista/",
+      // En el mensaje del pedido: "...pedido del catálogo de revendedores:" (la minorista no lo aclara).
+      orderSource: "de revendedores",
       prices: "precios-mayorista.json",
       // Llevando 5 o más pares el cliente elige cómo comprar (igual que la tienda actual).
       purchaseModes: {
-        mayor: { title: "Por mayor", note: "Sin cambio de talle", when: "Llevando 5 o más pares surtidos y eligiendo comprar por mayor.", message: "Compra POR MAYOR (5 o más pares surtidos): sin cambio de talle." },
-        unidad: { title: "Por unidad", note: "Cambio de talle con recargo de $5.000", when: "Cuando comprás por unidad (o elegís no comprar por mayor).", message: "Compra POR UNIDAD: cambio de talle con recargo de $5.000." },
+        mayor: { title: "Por mayor", note: "Sin cambio de talle", when: "Llevando 5 o más pares surtidos y eligiendo comprar por mayor.", message: "Compra por MAYOR (5 pares o más): SIN cambio de talle" },
+        unidad: { title: "Por unidad", note: "Cambio de talle con recargo de $5.000", when: "Cuando comprás por unidad (o elegís no comprar por mayor).", message: "Compra por UNIDAD: cambio de talle con recargo de $5.000" },
       },
       // "Compartir" de cada modelo: las fotos con nombre y talles, sin precio ni link,
       // para que el revendedor se las mande a su cliente.

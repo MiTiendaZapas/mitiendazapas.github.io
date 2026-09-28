@@ -1,34 +1,47 @@
 /*
  * Mensajes de WhatsApp: pedido completo y consultas.
- * Usa *negrita* de WhatsApp y texto plano, sin emojis que puedan verse mal.
+ * Texto plano, sin emojis que puedan verse mal.
  */
-import { money, whatsappLink } from "./utils.js";
+import { money, plural, whatsappLink } from "./utils.js";
 
 /**
- * Mensaje del pedido. No lleva datos del cliente: nombre, dirección y envío
- * se hablan directo en el chat (así armar el pedido es más rápido).
+ * Mensaje del pedido (formato pedido por el usuario el 27/09):
+ *
+ *   ¡Hola! Quiero hacer el siguiente pedido del catálogo de revendedores:
+ *
+ *   Mind beige (39/40) $35.000 x2 = $70.000
+ *   Mind negras (39/40) $35.000
+ *
+ *   Total: 3 pares - $105.000
+ *
+ *   Compra por UNIDAD: cambio de talle con recargo de $5.000
+ *   El envío se coordina aparte.
+ *
+ * "del catálogo de revendedores" sale de channel.orderSource (solo revendedores).
+ * No lleva datos del cliente: nombre, dirección y envío se hablan en el chat.
  */
 export function buildOrderMessage({ config, channel, quote }) {
   const lines = [];
+  const source = channel.orderSource ? ` ${channel.orderSource}` : "";
 
-  lines.push(`Hola! Quiero hacer este pedido desde la tienda (${channel.label}):`);
+  lines.push(`¡Hola! Quiero hacer el siguiente pedido del catálogo${source}:`);
   lines.push("");
-  lines.push("*Pedido*");
   for (const line of quote.lines) {
-    lines.push(`• ${line.product.name} | Talle ${line.size} | x${line.qty} | ${money(line.price)} c/u = ${money(line.subtotal)}`);
+    const many = line.qty > 1 ? ` x${line.qty} = ${money(line.subtotal)}` : "";
+    lines.push(`${line.product.name} (${line.size}) ${money(line.price)}${many}`);
   }
   lines.push("");
-  lines.push(`Pares: ${quote.pairs}`);
-  lines.push(`*TOTAL: ${money(quote.total)}*`);
-  // Igual que la tienda actual: la modalidad elegida (y su condición de cambio)
-  // se aclara cuando el pedido llega a la cantidad para comprar por mayor.
-  if (quote.canChoose) {
-    lines.push(channel.purchaseModes
-      ? channel.purchaseModes[quote.mode].message
-      : `Compra POR MAYOR (${quote.minPairs} o más pares surtidos).`);
-  }
+  const count = quote.lines.reduce((sum, line) => sum + line.qty, 0);
+  const onlyFootwear = quote.lines.every((line) => line.product.category !== "indumentaria");
+  lines.push(`Total: ${onlyFootwear ? plural(count, "par", "pares") : plural(count, "producto")} - ${money(quote.total)}`);
   lines.push("");
-  lines.push("Quedo a la espera de la confirmación de stock para coordinar el envío.");
+  // Condición de cambio según cómo compra: por mayor (5 o más, si eligió) o por unidad.
+  if (channel.purchaseModes) {
+    lines.push(channel.purchaseModes[quote.canChoose ? quote.mode : "unidad"].message);
+  } else if (quote.canChoose) {
+    lines.push(`Compra por MAYOR (${quote.minPairs} pares o más)`);
+  }
+  lines.push("El envío se coordina aparte.");
   return lines.join("\n");
 }
 

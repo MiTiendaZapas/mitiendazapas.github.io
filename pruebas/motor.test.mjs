@@ -167,17 +167,34 @@ describe("mensaje de WhatsApp", () => {
   const pricing = createPricing(PRICES);
   const lines = [{ product: PRODUCTS[0], productId: "p1", size: "40", qty: 5 }];
 
-  test("con elección: aclara la modalidad y su condición de cambio", () => {
-    const channel = { label: "Revendedores", purchaseModes: { mayor: { message: "Compra POR MAYOR: sin cambio de talle." }, unidad: { message: "x" } } };
+  const modes = { mayor: { message: "Compra por MAYOR (5 pares o más): SIN cambio de talle" }, unidad: { message: "Compra por UNIDAD: cambio de talle con recargo de $5.000" } };
+
+  test("revendedores, por mayor: formato completo", () => {
+    const channel = { label: "Revendedores", orderSource: "de revendedores", purchaseModes: modes };
     const msg = buildOrderMessage({ config, channel, quote: pricing.quote(lines, "mayor") });
-    assert.match(msg, /Air forcé 1 blancas \| Talle 40 \| x5 \| \$37\.000 c\/u = \$185\.000/);
-    assert.match(msg, /\*TOTAL: \$185\.000\*/);
-    assert.match(msg, /Compra POR MAYOR: sin cambio de talle\./);
-    // Sin datos del cliente ni del envío: eso se habla en el chat.
-    assert.doesNotMatch(msg, /Cliente|Envío:|Dirección/);
+    assert.equal(msg, [
+      "¡Hola! Quiero hacer el siguiente pedido del catálogo de revendedores:",
+      "",
+      "Air forcé 1 blancas (40) $37.000 x5 = $185.000",
+      "",
+      "Total: 5 pares - $185.000",
+      "",
+      "Compra por MAYOR (5 pares o más): SIN cambio de talle",
+      "El envío se coordina aparte.",
+    ].join("\n"));
+    // Sin datos del cliente: eso se habla en el chat.
+    assert.doesNotMatch(msg, /Cliente|Dirección/);
+  });
+  test("minorista: no aclara la tienda; con menos de 5 pares dice la condición por unidad", () => {
+    const channel = { label: "Tienda", purchaseModes: modes };
+    const msg = buildOrderMessage({ config, channel, quote: pricing.quote([{ ...lines[0], qty: 1 }]) });
+    assert.match(msg, /^¡Hola! Quiero hacer el siguiente pedido del catálogo:\n/);
+    assert.match(msg, /\nAir forcé 1 blancas \(40\) \$\d{2}\.000\n/);   // un solo par: sin "x1"
+    assert.match(msg, /Total: 1 par - /);
+    assert.match(msg, /Compra por UNIDAD: cambio de talle con recargo de \$5\.000/);
   });
   test("sin elección (tiendas de clientes): precio por mayor automático", () => {
     const msg = buildOrderMessage({ config, channel: { label: "Por mayor" }, quote: pricing.quote(lines, "mayor") });
-    assert.match(msg, /Compra POR MAYOR \(5 o más pares surtidos\)\./);
+    assert.match(msg, /Compra por MAYOR \(5 pares o más\)/);
   });
 });
