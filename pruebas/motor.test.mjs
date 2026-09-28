@@ -193,6 +193,12 @@ describe("mensaje de WhatsApp", () => {
     assert.match(msg, /Total: 1 par - /);
     assert.match(msg, /Compra por UNIDAD: cambio de talle con recargo de \$5\.000/);
   });
+  test("si el texto de la forma de compra está vacío, no se agrega la línea", () => {
+    const channel = { label: "Tienda", purchaseModes: { ...modes, unidad: { message: "" } } };
+    const msg = buildOrderMessage({ config, channel, quote: pricing.quote([{ ...lines[0], qty: 1 }]) });
+    assert.doesNotMatch(msg, /Compra por UNIDAD/);
+    assert.match(msg, /Total: 1 par - \$\d{2}\.000\n\nEl envío se coordina aparte\.$/);
+  });
   test("sin elección (tiendas de clientes): precio por mayor automático", () => {
     const msg = buildOrderMessage({ config, channel: { label: "Por mayor" }, quote: pricing.quote(lines, "mayor") });
     assert.match(msg, /Compra por MAYOR \(5 pares o más\)/);

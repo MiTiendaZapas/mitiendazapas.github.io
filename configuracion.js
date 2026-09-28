@@ -102,7 +102,7 @@ window.STORE_CONFIG = {
       prices: "precios-minorista.json",
       purchaseModes: {
         mayor: { title: "Por mayor", note: "Sin cambio de talle", when: "Llevando 5 o más pares surtidos y eligiendo comprar por mayor.", message: "Compra por MAYOR (5 pares o más): SIN cambio de talle" },
-        unidad: { title: "Por unidad", note: "Con cambio de talle sin cargo", when: "Cuando comprás por unidad (o elegís no comprar por mayor).", message: "Compra por UNIDAD: cambio de talle SIN cargo" },
+        unidad: { title: "Por unidad", note: "Con cambio de talle sin cargo", when: "Cuando comprás por unidad (o elegís no comprar por mayor).", message: "" },   // en el pedido de la minorista no se aclara nada al comprar por unidad
       },
       // "Compartir" de cada modelo: el link directo al modelo en esta tienda.
       share: "link",

@@ -36,8 +36,10 @@ export function buildOrderMessage({ config, channel, quote }) {
   lines.push(`Total: ${onlyFootwear ? plural(count, "par", "pares") : plural(count, "producto")} - ${money(quote.total)}`);
   lines.push("");
   // Condición de cambio según cómo compra: por mayor (5 o más, si eligió) o por unidad.
+  // Si el texto de esa forma de compra está vacío, no se agrega la línea.
   if (channel.purchaseModes) {
-    lines.push(channel.purchaseModes[quote.canChoose ? quote.mode : "unidad"].message);
+    const modeLine = channel.purchaseModes[quote.canChoose ? quote.mode : "unidad"].message;
+    if (modeLine) lines.push(modeLine);
   } else if (quote.canChoose) {
     lines.push(`Compra por MAYOR (${quote.minPairs} pares o más)`);
   }
