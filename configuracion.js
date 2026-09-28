@@ -77,8 +77,8 @@ window.STORE_CONFIG = {
   contact: {
     // Consultas (modelos, talles, stock) y pedidos van al mismo número,
     // pero con mensajes distintos para que se reconozcan en el chat.
-    whatsappQueries: "5491153773771",
-    whatsappOrders: "5491153773771",
+    whatsappQueries: "5491150116524",
+    whatsappOrders: "5491150116524",
     // WhatsApp del pie de página ("Escribinos"): el número del socio.
     whatsappFooter: "5491136284751",
   },
