@@ -5,7 +5,7 @@
  * computadora es una ventana con fotos a la izquierda y datos a la derecha.
  */
 import { escapeHtml, plural } from "../utils.js";
-import { productQueryLink } from "../whatsapp.js";
+import { buildOrderMessage, orderLink, productQueryLink } from "../whatsapp.js";
 import { icon } from "./icons.js";
 import { priceHtml, sizeButtonsHtml, stockStatus } from "./product-parts.js";
 import { sizeTableHtml } from "./pages.js";
@@ -191,7 +191,20 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
           ${icon("bag")} Agregar talle ${escapeHtml(state.size)}
         </button>
       </div>
-      <p class="stock-hint${low ? " is-low" : ""}">${hint}</p>`;
+      <p class="stock-hint${low ? " is-low" : ""}">${hint}</p>
+      ${quickOrderHtml()}`;
+  }
+
+  /** "Pedir este par": manda por WhatsApp el pedido de 1 par de ese talle, sin pasar por el carrito. */
+  function quickOrderHtml() {
+    const size = product.sizes.find((s) => s.size === state.size);
+    if (!size || size.stock <= 0) return "";
+    const quote = pricing.quote([{ product, productId: product.id, size: state.size, qty: 1 }], "unidad");
+    const message = buildOrderMessage({ config, channel, quote });
+    return `
+      <a class="btn btn--whatsapp btn--block quick-order" href="${orderLink(config, message)}" target="_blank" rel="noopener" data-quick-order>
+        ${icon("whatsapp")} Pedir este par por WhatsApp
+      </a>`;
   }
 
   function render() {

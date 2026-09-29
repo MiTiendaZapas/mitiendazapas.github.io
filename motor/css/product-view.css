@@ -305,3 +305,6 @@
 @media (hover: hover) {
   .zoom__hint { display: none; }
 }
+
+/* "Pedir este par por WhatsApp" (pedido rápido de 1 par, sin carrito). */
+.quick-order { min-height: 46px; margin-top: var(--space-2); font-size: 15px; }
