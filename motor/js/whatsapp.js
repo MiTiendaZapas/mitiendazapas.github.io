@@ -54,5 +54,5 @@ export function orderLink(config, message) {
 export function productQueryLink(config, product, size) {
   const sizeText = size ? ` en talle ${size}` : "";
   return whatsappLink(config.contact.whatsappQueries,
-    `Hola! Quería consultar por ${product.name}${sizeText}.`);
+    `¡Hola! Quería consultar por ${product.name}${sizeText}.`);
 }

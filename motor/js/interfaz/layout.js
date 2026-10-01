@@ -38,7 +38,7 @@ function renderTopbar(header, config) {
 }
 
 export function renderHeader(root, { config, channel, links }) {
-  const consult = whatsappLink(config.contact.whatsappQueries, `Hola! Tengo una consulta.`);
+  const consult = whatsappLink(config.contact.whatsappQueries, `¡Hola! Tengo una consulta.`);
   renderTopbar(root, config);
   const nav = menuItems(links, { onlyMenu: true }).map((item) => `<li>${linkHtml(item, "site-nav__link")}</li>`).join("");
 

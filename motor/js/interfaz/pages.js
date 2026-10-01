@@ -43,7 +43,7 @@ function howToBuyBody(config) {
 function shippingBody(config) {
   const cards = Object.values(config.shipping.methods).map((m) => {
     const consult = m.consultMessage
-      ? `<a class="btn btn--outline" href="${whatsappLink(config.contact.whatsappQueries, `Hola! ${m.consultMessage}`)}" target="_blank" rel="noopener">${icon("whatsapp")} ${esc(m.consultLabel ?? "Consultar")}</a>`
+      ? `<a class="btn btn--outline" href="${whatsappLink(config.contact.whatsappQueries, `¡Hola! ${m.consultMessage}`)}" target="_blank" rel="noopener">${icon("whatsapp")} ${esc(m.consultLabel ?? "Consultar")}</a>`
       : "";
     return `
       <article class="info-card">
@@ -155,7 +155,7 @@ export function renderInfoPage(root, { config, channel, channelKey, links }) {
       </div>`;
     return;
   }
-  const consult = whatsappLink(config.contact.whatsappQueries, `Hola! Tengo una consulta.`);
+  const consult = whatsappLink(config.contact.whatsappQueries, `¡Hola! Tengo una consulta.`);
 
   root.innerHTML = `
     <section class="page-hero${page.highlight ? " page-hero--highlight" : ""}" aria-labelledby="page-title">

@@ -132,7 +132,7 @@ async function startStore() {
   } catch (error) {
     console.error(error);
     catalogView.showError({
-      whatsappHref: whatsappLink(config.contact.whatsappQueries, `Hola! No me carga el catálogo, ¿me pasás los modelos disponibles?`),
+      whatsappHref: whatsappLink(config.contact.whatsappQueries, `¡Hola! No me carga el catálogo, ¿me pasás los modelos disponibles?`),
     });
   }
 }

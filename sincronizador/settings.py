@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # --- Proveedor -------------------------------------------------------------
-ACTIVE_PROVIDER = "tiendanube"   # 27/09: el proveedor sigue en su tienda de siempre (vestitepiola.mitiendanube.com)
+ACTIVE_PROVIDER = "vestite_api"   # 01/10: el proveedor pasa a su tienda nueva (vestite-piola.vercel.app)
 
 PROVIDERS = {
     "tiendanube": {

@@ -111,7 +111,7 @@ window.STORE_CONFIG = {
         points: [
           { icon: "repeat", text: "Cambio de talle sin cargo comprando por unidad" },
           { icon: "truck", text: "Envíos por moto mensajería y Vía Cargo" },
-          { icon: "chat", text: "Sin pago online: confirmás por WhatsApp" },
+          { icon: "chat", text: "Sin pago por la web: confirmás por WhatsApp" },
         ],
         showSocial: true,
         // Accesos por marca con su logo, arriba del catálogo.
@@ -243,7 +243,7 @@ window.STORE_CONFIG = {
     ],
     whatsapp: "5491136284751",
     ctaLabel: "Quiero asesoramiento",
-    message: "Hola! Quiero empezar a revender zapatillas y me gustaría asesoramiento.",
+    message: "¡Hola! Quiero empezar a revender zapatillas y me gustaría asesoramiento.",
   },
 
   about: {
@@ -271,17 +271,17 @@ window.STORE_CONFIG = {
     { q: "¿Puedo cambiar el talle?", channels: ["minorista"], a: "Comprando por unidad, sí, y sin cargo. Comprando por mayor (5 o más pares) no hay cambio de talle." },
     { q: "¿Hay cambios por falla?", a: "Sí, en cualquier tipo de compra, pero la falla se tiene que avisar en el momento de recibir el pedido. Revisá cada par cuando te llega." },
     { q: "¿Cuánto tarda el pedido?", a: "Depende de la confirmación del stock y del método de envío. Cuando confirmamos tu pedido por WhatsApp te decimos cuándo lo recibís." },
-    { q: "¿Cómo puedo empezar a revender?", a: "Escribinos desde la sección “¿Querés empezar a vender zapatillas?” y te asesoramos para armar tu primer pedido." },
+    { q: "¿Cómo puedo empezar a revender?", a: "Entrá a “Quiero revender” (en el menú o al pie de la página), escribinos desde ahí y te asesoramos para armar tu primer pedido." },
   ],
 
-  // Servicio de tiendas online (queda al final, discreto, sin interferir con la compra).
+  // Servicio de tiendas por internet (queda al final, discreto, sin interferir con la compra).
   platformPromo: {
     enabled: true,
     title: "¿Querés una tienda así para tu negocio?",
-    text: "Armamos catálogos online a medida para emprendimientos: con tu marca, tus precios y los pedidos directo a tu WhatsApp.",
+    text: "Armamos catálogos por internet a medida para emprendimientos: con tu marca, tus precios y los pedidos directo a tu WhatsApp.",
     whatsapp: "5491153773771",
     ctaLabel: "Consultar",
-    message: "Hola! Vi la tienda y me interesa una tienda así para mi negocio.",
+    message: "¡Hola! Vi la tienda y me interesa una tienda así para mi negocio.",
   },
 
   footer: {

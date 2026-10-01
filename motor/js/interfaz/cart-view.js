@@ -193,7 +193,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
             </li>`;
         }).join("")}
       </ul>
-      <p class="drawer__note">${icon("chat")} No se paga online. Te confirmamos el stock por WhatsApp y ahí coordinamos el envío.</p>`;
+      <p class="drawer__note">${icon("chat")} No se paga por la web. Te confirmamos el stock por WhatsApp y ahí coordinamos el envío.</p>`;
 
     const pending = needsModeChoice(quote);
     footer.innerHTML = `

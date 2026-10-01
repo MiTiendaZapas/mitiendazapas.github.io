@@ -232,7 +232,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
           ${shareButtonHtml(channel, icon("share"))}
         </div>
         <ul class="product-view__facts">
-          <li>${icon("chat")} No se paga online: confirmamos el stock por WhatsApp.</li>
+          <li>${icon("chat")} No se paga por la web: confirmamos el stock por WhatsApp.</li>
           <li>${icon("truck")} Envíos: ${escapeHtml(Object.values(config.shipping.methods).map((m) => m.label).join(" y "))}.</li>
         </ul>
       </div>`;

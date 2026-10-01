@@ -22,10 +22,12 @@ export function priceHtml(product, pricing) {
 export function sizeButtonsHtml(sizes, selectedSize) {
   return sizes.map((s) => {
     const soldOut = s.stock <= 0;
+    // Debajo del talle se ve siempre cuántos pares hay (los agotados van tachados, sin número).
+    const label = soldOut ? `Talle ${s.size}, agotado` : `Talle ${s.size}, ${plural(s.stock, "par disponible", "pares disponibles")}`;
     return `
-      <button class="size-chip${s.size.length > 3 ? " size-chip--wide" : ""}" type="button"
-        data-size="${escapeHtml(s.size)}" aria-pressed="${s.size === selectedSize}"
-        ${soldOut ? `disabled aria-label="Talle ${escapeHtml(s.size)}, agotado"` : ""}>${escapeHtml(s.size)}</button>`;
+      <button class="size-chip size-chip--stock${s.size.length > 3 ? " size-chip--wide" : ""}" type="button"
+        data-size="${escapeHtml(s.size)}" aria-pressed="${s.size === selectedSize}" aria-label="${escapeHtml(label)}"
+        ${soldOut ? "disabled" : ""}><span class="size-chip__size">${escapeHtml(s.size)}</span>${soldOut ? "" : `<span class="size-chip__stock">${plural(s.stock, "par", "pares")}</span>`}</button>`;
   }).join("");
 }
 
@@ -33,13 +35,20 @@ export function sizeButtonsHtml(sizes, selectedSize) {
 export function stockStatus(cart, productId, size) {
   const inCart = cart.qtyOf(productId, size);
   const remaining = cart.maxFor(productId, size) - inCart;
-  let hint = inCart > 0 ? `${plural(inCart, "par", "pares")} del ${size} en tu pedido` : "";
+  // Siempre se dice cuántos pares quedan del talle (resaltado si son pocos).
+  const enPedido = inCart ? ` · ${plural(inCart, "par", "pares")} en tu pedido` : "";
+  let hint;
   let low = false;
   if (remaining <= 0) {
     hint = `Ya tenés en tu pedido todo el stock del talle ${size}`;
+  } else if (remaining === 1) {
+    low = true;
+    hint = `Último par en talle ${size}${enPedido}`;
   } else if (remaining <= LOW_STOCK) {
     low = true;
-    hint = `Últimos ${remaining} en talle ${size}${inCart ? ` · ${inCart} en tu pedido` : ""}`;
+    hint = `Quedan ${remaining} pares en talle ${size}${enPedido}`;
+  } else {
+    hint = `Hay ${remaining} pares en talle ${size}${enPedido}`;
   }
   return { inCart, remaining, hint: escapeHtml(hint), low };
 }
