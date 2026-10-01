@@ -1,7 +1,5 @@
 /* Piezas que comparten la tarjeta del catálogo y la vista de detalle. */
-import { escapeHtml, money, plural } from "../utils.js";
-
-const LOW_STOCK = 3;
+import { escapeHtml, money } from "../utils.js";
 
 /** Precio por unidad y, debajo, el precio por mayor (o por cantidad en indumentaria). */
 export function priceHtml(product, pricing) {
@@ -33,21 +31,17 @@ export function sizeButtonsHtml(sizes, selectedSize) {
 export function stockStatus(cart, productId, size) {
   const inCart = cart.qtyOf(productId, size);
   const remaining = cart.maxFor(productId, size) - inCart;
-  // Al elegir un talle se ve siempre su stock (el talle no se repite: ya está marcado).
-  // Si quedan pocos, el aviso se resalta.
-  const enPedido = inCart ? ` · ${inCart} en tu pedido` : "";
+  // Al elegir un talle se ve su stock: "Stock: 4". Solo cuando queda uno se resalta
+  // en rojo: "¡Último par!".
   let hint;
   let low = false;
   if (remaining <= 0) {
     hint = "Ya tenés en tu pedido todo el stock de este talle";
   } else if (remaining === 1) {
     low = true;
-    hint = `Stock: último par${enPedido}`;
-  } else if (remaining <= LOW_STOCK) {
-    low = true;
-    hint = `Stock: ${remaining} pares · quedan pocos${enPedido}`;
+    hint = "¡Último par!";
   } else {
-    hint = `Stock: ${remaining} pares${enPedido}`;
+    hint = `Stock: ${remaining}`;
   }
   return { inCart, remaining, hint: escapeHtml(hint), low };
 }
