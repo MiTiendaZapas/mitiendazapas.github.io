@@ -61,22 +61,3 @@
 
 /* Páginas de información */
 [data-density="compacta"] .page-hero__title { font-size: clamp(30px, 8vw, 48px); }
-
-/* Botones de talle con la cantidad de pares abajo. Van al final de todos los
-   estilos para ganarles a los tamaños fijos de arriba (necesitan dos renglones). */
-.size-chip.size-chip--stock {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  height: auto;
-  min-height: 44px;
-  min-width: 44px;
-  padding: 4px 6px;
-  line-height: 1.05;
-}
-.product-view__sizes .size-chip.size-chip--stock { height: auto; min-height: 50px; min-width: 50px; }
-.size-chip__size { font-weight: 700; }
-.size-chip__stock { font-size: 10px; font-weight: 500; opacity: 0.75; white-space: nowrap; }
-.size-chip[aria-pressed="true"] .size-chip__stock { opacity: 0.9; }
