@@ -43,8 +43,9 @@ export function buildOrderMessage({ config, channel, quote }) {
   } else if (quote.canChoose) {
     lines.push(`Compra por MAYOR (${quote.minPairs} pares o más)`);
   }
-  lines.push("El envío se coordina aparte.");
-  return lines.join("\n");
+  // Las tiendas de clientes no llevan esta línea (orderShippingNote: false en su configuración).
+  if (config.orderShippingNote !== false) lines.push("El envío se coordina aparte.");
+  return lines.join("\n").trimEnd();
 }
 
 export function orderLink(config, message) {

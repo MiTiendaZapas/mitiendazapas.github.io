@@ -222,4 +222,15 @@ describe("mensaje de WhatsApp", () => {
     const msg = buildOrderMessage({ config, channel: { label: "Por mayor" }, quote: pricing.quote(lines, "mayor") });
     assert.match(msg, /Compra por MAYOR \(5 pares o más\)/);
   });
+  test("tiendas de clientes: sin la línea del envío y sin renglones vacíos al final", () => {
+    const msg = buildOrderMessage({ config: { ...config, orderShippingNote: false }, channel: { label: "Tienda" },
+      quote: createPricing({ wholesale: false, unit: { default: 60000, rules: [] } }).quote([{ ...lines[0], qty: 1 }]) });
+    assert.equal(msg, [
+      "¡Hola! Quiero hacer el siguiente pedido del catálogo:",
+      "",
+      "Air forcé 1 blancas (40) $60.000",
+      "",
+      "Total: 1 par - $60.000",
+    ].join("\n"));
+  });
 });
