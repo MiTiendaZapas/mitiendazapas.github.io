@@ -47,7 +47,7 @@ export function renderHeader(root, { config, channel, links }) {
       <button class="icon-btn site-header__menu" type="button" data-open-menu aria-label="Abrir menú" aria-haspopup="dialog">
         ${icon("menu")}
       </button>
-      <a class="brand" href="${escapeHtml(links.store())}" aria-label="${escapeHtml(config.name)}, ir al catálogo">
+      <a class="brand${config.name.length > 16 ? " brand--long" : ""}" href="${escapeHtml(links.store())}" aria-label="${escapeHtml(config.name)}, ir al catálogo">
         ${config.logo ? `<img class="brand__logo" src="${escapeHtml(fromRoot(config.logo.small))}" alt="" width="44" height="44">` : ""}
         <span class="brand__text">
           <span class="brand__name">${escapeHtml(config.name)}</span>
