@@ -79,6 +79,17 @@ describe("precios", () => {
     assert.deepEqual(pricing.forProduct(byId("p1")), { unit: 43000, wholesale: 37000, bulk: null });
     assert.equal(pricing.forProduct(byId("p4")).unit, 35000);
   });
+  test("'empieza con' también encuentra el modelo si el nombre tiene la marca adelante", () => {
+    const table = { unit: { default: 43000, rules: [{ price: 37000, startsWith: ["mind "] }] },
+      wholesalePrice: { default: 39000, rules: [{ price: 35000, startsWith: ["mind "] }, { price: 41000, startsWith: ["530"] }] } };
+    const prices = createPricing(table);
+    const expected = { unit: 37000, wholesale: 35000, bulk: null };
+    assert.deepEqual(prices.forProduct(product("m1", "Mind negras", [], { category: "ojotas" })), expected);
+    assert.deepEqual(prices.forProduct(product("m2", "Nike mind negras", [], { category: "ojotas" })), expected);
+    assert.equal(prices.forProduct(product("m3", "NB 530 gris", [], { brand: "New Balance" })).wholesale, 41000);
+    // Otra marca adelante no se saca: "Adidas mind" no es una Mind de Nike.
+    assert.equal(prices.forProduct(product("m4", "Adidas mind x", [], { brand: "Nike" })).unit, 43000);
+  });
   test("los precios fijos por modelo (overrides) tienen prioridad", () => {
     assert.deepEqual(pricing.forProduct(byId("p5")), { unit: 60000, wholesale: 45000, bulk: null });
   });

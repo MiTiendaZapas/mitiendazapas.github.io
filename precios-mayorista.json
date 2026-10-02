@@ -2,7 +2,7 @@
   "_ayuda": [
     "Precios de la tienda de REVENDEDORES (index.html). Copia fiel de las reglas de tienda.js.",
     "Cada lista se lee de arriba hacia abajo y gana la PRIMERA regla que coincide con el nombre del modelo.",
-    "'contains': alguna de esas palabras aparece en el nombre. 'startsWith': el nombre empieza así. 'containsAll': aparecen todas.",
+    "'contains': alguna de esas palabras aparece en el nombre. 'startsWith': el nombre empieza así (también si tiene la marca adelante: 'Nike mind negras' cuenta como 'mind negras'). 'containsAll': aparecen todas.",
     "No importan mayúsculas ni tildes ('air force' también encuentra 'Air forcé').",
     "'bulk': precio especial llevando 'min' unidades del MISMO producto (se usa en indumentaria).",
     "'overrides': precio fijo para un modelo puntual, usando su slug (el final de la URL del producto)."

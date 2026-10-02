@@ -39,6 +39,9 @@ const cases = [
 // 26/09: las Samba tejida y brillitos pasan a $42.000 por mayor en L.A IMP.
 // 27/09: la Súper star total black también pasa a $42.000 por mayor.
 const SAMBAS_42 = { "Samba tejida": 42000, "Samba brillitos": 42000, "Súper star total black": 42000 };
+// 02/10: "Nike mind negras" cobraba otro precio porque tiene la marca adelante; ahora es igual a las otras Mind.
+const MIND = { "L.A IMP revendedores": [37000, 35000], "L.A IMP minorista": [40000, 35000],
+  "ClienteA revendedores": [37000, 35000], "ClienteA minorista": [49000, 35000] };
 const intentional = { "L.A IMP revendedores": SAMBAS_42, "L.A IMP minorista": SAMBAS_42 };
 
 for (const [name, legacyFile, pricesFile] of cases) {
@@ -48,7 +51,9 @@ for (const [name, legacyFile, pricesFile] of cases) {
     const differences = catalog.flatMap((product) => {
       const now = pricing.forProduct(product);
       const nowWholesale = now.wholesale ?? now.unit;
-      const before = [old.unit(product.name), intentional[name]?.[product.name] ?? old.wholesale(product.name)];
+      const before = product.name === "Nike mind negras" && MIND[name]
+        ? MIND[name]
+        : [old.unit(product.name), intentional[name]?.[product.name] ?? old.wholesale(product.name)];
       return before[0] === now.unit && before[1] === nowWholesale
         ? []
         : [`${product.name}: antes ${before.join("/")} ahora ${now.unit}/${nowWholesale}`];

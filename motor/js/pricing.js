@@ -19,14 +19,31 @@ function compileList(list) {
   };
 }
 
-function matches(rule, key) {
-  if (rule.startsWith.some((text) => key.startsWith(text))) return true;
+// Formas cortas de escribir una marca al principio del nombre.
+const BRAND_ALIASES = { "new balance": ["nb"] };
+
+/**
+ * Nombre sin la marca adelante: "Nike mind negras" -> "mind negras".
+ * Así una regla "empieza con 'mind '" también sirve si el proveedor
+ * le agrega la marca al nombre.
+ */
+function withoutBrand(key, brand) {
+  const name = normalize(brand);
+  if (!name) return key;
+  for (const prefix of [name, ...(BRAND_ALIASES[name] ?? [])]) {
+    if (key.startsWith(`${prefix} `)) return key.slice(prefix.length + 1);
+  }
+  return key;
+}
+
+function matches(rule, key, shortKey) {
+  if (rule.startsWith.some((text) => key.startsWith(text) || shortKey.startsWith(text))) return true;
   if (rule.contains.some((text) => key.includes(text))) return true;
   return rule.containsAll.length > 0 && rule.containsAll.every((text) => key.includes(text));
 }
 
-function findRule(list, key) {
-  return list.rules.find((rule) => matches(rule, key)) ?? null;
+function findRule(list, key, shortKey = key) {
+  return list.rules.find((rule) => matches(rule, key, shortKey)) ?? null;
 }
 
 export function createPricing(table) {
@@ -40,13 +57,14 @@ export function createPricing(table) {
   function resolve(product) {
     if (cache.has(product.id)) return cache.get(product.id);
     const key = normalize(product.name);
+    const shortKey = withoutBrand(key, product.brand);
     const override = overrides[product.slug] ?? overrides[product.id] ?? {};
-    const unitRule = findRule(unitList, key);
+    const unitRule = findRule(unitList, key, shortKey);
     const unit = Number(override.unit) || unitRule?.price || unitList.default;
     const bulk = unitRule?.bulk ?? null;
     let wholesale = null;
     if (!bulk && product.category !== "indumentaria") {
-      wholesale = Number(override.wholesale) || findRule(wholesaleList, key)?.price || wholesaleList.default;
+      wholesale = Number(override.wholesale) || findRule(wholesaleList, key, shortKey)?.price || wholesaleList.default;
       if (wholesale >= unit) wholesale = null;   // nunca mostrar un "precio por mayor" que no conviene
     }
     const result = { unit, wholesale, bulk };
