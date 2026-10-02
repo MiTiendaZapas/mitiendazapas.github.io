@@ -26,7 +26,8 @@
 
   <!-- Esta página está dentro de "preguntas/": la raíz de la tienda está un nivel arriba. -->
   <script>window.STORE_ROOT = "../";</script>
-  <script src="../configuracion.js"></script>
+  <!-- La configuración (colores, textos, números) se pide siempre nueva: así un cambio se ve enseguida en todos los celulares. -->
+  <script>document.write('<script src="../configuracion.js?t=' + Math.floor(Date.now() / 60000) + '"><\/script>');</script>
   <script src="../motor/js/theme.js"></script>
   <link rel="stylesheet" href="../motor/css/tienda.css">
   <script type="module" src="../motor/js/main.js"></script>
