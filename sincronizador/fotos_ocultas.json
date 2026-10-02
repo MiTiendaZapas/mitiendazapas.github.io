@@ -1,0 +1,11 @@
+{
+  "_ayuda": [
+    "Fotos que NO se muestran aunque el proveedor las tenga cargadas (por ejemplo, la foto de otro modelo).",
+    "Se pone el final del link del modelo (lo que va después de #p/) y el código de la foto.",
+    "El código son los 10 caracteres del nombre del archivo de la foto: .../fotos/<modelo>/b81b25709c-lg.webp -> b81b25709c.",
+    "El piloto lo aplica en la próxima actualización (15-20 minutos)."
+  ],
+  "fotos": {
+    "shox-tapon-celeste": ["b81b25709c"]
+  }
+}

@@ -26,7 +26,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 import manual_stock  # noqa: E402
 import settings  # noqa: E402
 from classify import Classifier, clean_name, normalize, slugify  # noqa: E402
-from images import ImageStore, _retry  # noqa: E402
+from images import ImageStore, _file_name, _retry, _source_key  # noqa: E402
 from proveedores import load_active  # noqa: E402
 
 
@@ -116,6 +116,19 @@ def _photos_folder_index():
             if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")}
 
 
+def _hidden_photos():
+    """Fotos a no mostrar (sincronizador/fotos_ocultas.json): {slug del modelo: [códigos de foto]}."""
+    path = Path(__file__).resolve().parent / "fotos_ocultas.json"
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8")).get("fotos", {})
+    return {slug: {code.strip().lower() for code in codes} for slug, codes in data.items()}
+
+
+def _photo_code(source):
+    return _file_name(_source_key(source), "lg")[:10]
+
+
 def attach_images(products, provider, store, download):
     """Fotos de cada modelo. Orden de preferencia:
       1. las del proveedor,
@@ -125,13 +138,21 @@ def attach_images(products, provider, store, download):
       4. la foto con el mismo nombre en la carpeta Fotos/ del Panel Admin.
     Las de 3 y 4 son de respaldo: apenas el proveedor cargue las suyas, se reemplazan.
     """
-    pending = [p for p in products if download and store.needs_check(p["id"])]
+    hidden = _hidden_photos()
+
+    def shows_hidden(product):
+        codes = hidden.get(product["slug"], set())
+        return any(Path(img["lg"]).name[:10] in codes for img in store.current(product["id"]))
+
+    pending = [p for p in products if download and (store.needs_check(p["id"]) or shows_hidden(p))]
     photos_folder = _photos_folder_index() if pending else {}
     for product in products:
         product["images"] = store.current(product["id"])
     for number, product in enumerate(pending, 1):
         print(f"  [{number}/{len(pending)}] imágenes de {product['name']}")
         sources = provider.get_image_urls(product["_provider_item"]) if product["_provider_item"] else []
+        if hidden.get(product["slug"]):
+            sources = [s for s in sources if _photo_code(s) not in hidden[product["slug"]]]
         if not sources and product["_manual_photo"]:
             local = settings.LEGACY_PHOTOS_DIR / product["_manual_photo"]
             if local.exists():
