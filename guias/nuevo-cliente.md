@@ -44,7 +44,7 @@ Lo mínimo:
 | `name` | El nombre que se ve en la tienda. |
 | `contact.whatsappQueries` / `whatsappOrders` | Número con formato `5491100000000` (sin +, sin espacios). |
 | `social` | Sus redes. Si queda vacío, no se muestran. |
-| `theme` | **No se cambia**: todas las tiendas de clientes usan los colores neutros de ClienteA (aunque el logo tenga otros colores). |
+| `theme` | **No se cambia**: todas las tiendas de clientes usan los colores neutros de ClienteA (aunque el logo tenga otros colores), con `darkColors` y sin `defaultMode`: abren en blanco, o en negro si el celular del cliente está en oscuro. |
 | `logo` | `null` si no tiene. Si tiene, poné los archivos en `marca/` y completá `{ small, large, alt }`. |
 | `includeHouseStock` | `false` para que vea solo el stock del proveedor (sin el stock de casa de L.A IMP). |
 | `platformCredit` | La pregunta "¿Querés una tienda así?" al pie. `enabled: false` si el cliente prefiere que no aparezca. |
