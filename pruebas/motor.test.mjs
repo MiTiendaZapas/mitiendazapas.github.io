@@ -90,6 +90,14 @@ describe("precios", () => {
     // Otra marca adelante no se saca: "Adidas mind" no es una Mind de Nike.
     assert.equal(prices.forProduct(product("m4", "Adidas mind x", [], { brand: "Nike" })).unit, 43000);
   });
+  test("una tienda sin venta por mayor nunca aplica ni muestra precio por mayor", () => {
+    const prices = createPricing({ wholesale: false, unit: { default: 65000, rules: [] }, wholesalePrice: { default: 37000, rules: [] } });
+    assert.equal(prices.hasWholesale, false);
+    assert.deepEqual(prices.forProduct(byId("p1")), { unit: 65000, wholesale: null, bulk: null });
+    const q = prices.quote([{ product: byId("p1"), size: "40", qty: 6 }], "mayor");
+    assert.equal(q.canChoose, false);
+    assert.equal(q.total, 6 * 65000);
+  });
   test("los precios fijos por modelo (overrides) tienen prioridad", () => {
     assert.deepEqual(pricing.forProduct(byId("p5")), { unit: 60000, wholesale: 45000, bulk: null });
   });

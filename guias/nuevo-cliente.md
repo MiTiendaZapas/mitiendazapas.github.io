@@ -74,6 +74,8 @@ gana la primera que coincide con el nombre del modelo:
 - `containsAll`: aparecen todas.
 - `default`: el precio si ninguna regla coincide.
 - `overrides`: precio fijo para un modelo puntual (por su código de producto).
+- `"wholesale": false`: la tienda **no vende por mayor** (no aparece nada de precio por mayor).
+  Ejemplo: `repositorio-importalestore/precios-minorista.json`.
 
 No importan tildes ni mayúsculas. **Para subir todos los precios alcanza con editar este archivo**:
 el diseño no se toca.

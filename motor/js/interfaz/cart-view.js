@@ -133,7 +133,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   }
 
   function wholesaleProgress(quote) {
-    if (quote.pairs === 0) return "";
+    if (quote.pairs === 0 || !pricing.hasWholesale) return "";
     if (quote.canChoose && modes) return modeChoice(quote);
     if (quote.canChoose) {
       const savings = quote.totals.unidad - quote.totals.mayor;

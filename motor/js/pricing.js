@@ -50,6 +50,8 @@ export function createPricing(table) {
   const unitList = compileList(table.unit);
   const wholesaleList = compileList(table.wholesalePrice);
   const overrides = table.overrides ?? {};
+  // "wholesale": false = la tienda no vende por mayor (no se muestra nada de precio por mayor).
+  const hasWholesale = table.wholesale !== false;
   const minPairs = Number(table.wholesale?.minPairs) || 5;
   const wholesaleLabel = table.wholesale?.label ?? `Llevando ${minPairs} o más pares surtidos`;
   const cache = new Map();
@@ -63,7 +65,7 @@ export function createPricing(table) {
     const unit = Number(override.unit) || unitRule?.price || unitList.default;
     const bulk = unitRule?.bulk ?? null;
     let wholesale = null;
-    if (!bulk && product.category !== "indumentaria") {
+    if (hasWholesale && !bulk && product.category !== "indumentaria") {
       wholesale = Number(override.wholesale) || findRule(wholesaleList, key, shortKey)?.price || wholesaleList.default;
       if (wholesale >= unit) wholesale = null;   // nunca mostrar un "precio por mayor" que no conviene
     }
@@ -73,6 +75,7 @@ export function createPricing(table) {
   }
 
   return {
+    hasWholesale,
     minPairs,
     wholesaleLabel,
     forProduct: resolve,
@@ -93,7 +96,7 @@ export function createPricing(table) {
      */
     quote(lines, mode = null) {
       const pairs = this.countPairs(lines);
-      const canChoose = pairs >= minPairs;
+      const canChoose = hasWholesale && pairs >= minPairs;
       const qtyByProduct = new Map();
       for (const line of lines) qtyByProduct.set(line.product.id, (qtyByProduct.get(line.product.id) ?? 0) + line.qty);
 
