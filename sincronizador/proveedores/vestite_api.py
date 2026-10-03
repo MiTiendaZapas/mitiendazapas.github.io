@@ -23,6 +23,23 @@ def _get_json(path):
     return json.loads(net.fetch_text(CONFIG["base_url"] + path))
 
 
+def _is_without_color(color):
+    return not str(color or "").strip() or str(color).strip().upper() == "SIN COLOR"
+
+
+def visible_variants(variants):
+    """Los talles que muestra el proveedor al abrir el modelo (misma regla que su página).
+
+    Los talles "SIN COLOR" vienen de su tienda vieja de Tiendanube. Si el modelo
+    tiene algún talle con color de verdad (ej. "Único"), la página del proveedor
+    muestra solo esos y deja afuera los "SIN COLOR". Si todos son "SIN COLOR",
+    los muestra todos.
+    """
+    if any(not _is_without_color(v.get("color")) for v in variants):
+        return [v for v in variants if not _is_without_color(v.get("color"))]
+    return variants
+
+
 def list_products():
     brands = {c["id"]: c["name"] for c in _get_json("/catalog/categories")}
     products, page = [], 1
@@ -30,7 +47,7 @@ def list_products():
         data = _get_json(f"/catalog/products?page={page}")
         for item in data["items"]:
             sizes = {}
-            for variant in item.get("variants", []):
+            for variant in visible_variants(item.get("variants", [])):
                 size = str(variant.get("size") or "").strip()
                 if size:
                     sizes[size] = sizes.get(size, 0) + max(int(variant.get("stockDisponible") or 0), 0)
