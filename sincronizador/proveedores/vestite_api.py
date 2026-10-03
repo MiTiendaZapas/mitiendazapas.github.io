@@ -1,15 +1,14 @@
-"""Adaptador para el proveedor FUTURO (vestite-piola.vercel.app).
+"""Adaptador del proveedor (vestite-piola.vercel.app). Activo desde el 01/10.
 
-NO está activo: la migración todavía no ocurrió. Queda preparado a partir de
-lo que se analizó de su API pública (septiembre 2026):
+Lee la API pública que usa su propia página (analizada en septiembre 2026):
 
   GET {base_url}/catalog/categories  -> [{id, name}]   (las categorías son marcas)
   GET {base_url}/catalog/products?page=N -> {items: [...], page: {page, limit, total}}
       item.variants[]: {size, color, stockDisponible}
       item.images[]:   {url}   <- URLs firmadas que VENCEN: hay que descargarlas
 
-Antes de activarlo: confirmar con el proveedor que se puede usar la API y
-volver a verificar el formato, porque es una API interna y puede cambiar.
+Es una API interna y puede cambiar: si el piloto deja de traer stock, revisar
+primero que este formato siga igual.
 """
 import json
 

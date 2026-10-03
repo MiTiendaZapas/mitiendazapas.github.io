@@ -1,8 +1,8 @@
 """Configuración del sincronizador de catálogo.
 
-Es el ÚNICO lugar donde figuran las URLs del proveedor. Para migrar al
-proveedor nuevo alcanza con cambiar ACTIVE_PROVIDER (y terminar su adaptador
-en proveedores/).
+Es el ÚNICO lugar donde figuran las URLs del proveedor. Si algún día cambia
+de sistema, se escribe un adaptador nuevo en proveedores/ y se cambia
+ACTIVE_PROVIDER.
 """
 from pathlib import Path
 
@@ -12,12 +12,8 @@ ROOT = Path(__file__).resolve().parent.parent
 ACTIVE_PROVIDER = "vestite_api"   # 01/10: el proveedor pasa a su tienda nueva (vestite-piola.vercel.app)
 
 PROVIDERS = {
-    "tiendanube": {
-        "base_url": "https://vestitepiola.mitiendanube.com",
-        "listing_path": "/productos/",
-        "listing_query": "?order=best-selling",   # mismo orden que la tienda actual
-    },
-    # Proveedor futuro. Todavía NO se usa: la migración no ocurrió.
+    # Tienda del proveedor (vestite-piola.vercel.app). La tienda vieja de
+    # Tiendanube se dejó de usar y se borró del sincronizador el 03/10.
     "vestite_api": {
         "base_url": "https://gestion-negocio-backend.vercel.app/api/v1",
     },

@@ -5,7 +5,7 @@ así el resto del sistema no sabe (ni le importa) de dónde vienen:
 
     list_products() -> [
         {
-            "ref": "tn-281297951",          # id estable dentro del proveedor
+            "ref": "vp-0578dd89-...",       # id estable dentro del proveedor
             "name": "Panda sb dunk",
             "sizes": [{"size": "38", "stock": 3}, ...],   # incluye talles en 0
             "provider_brand": "Nike" | None,

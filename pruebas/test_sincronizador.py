@@ -60,9 +60,9 @@ class TestClasificacion(unittest.TestCase):
 class TestFusionConStockDeCasa(unittest.TestCase):
     def setUp(self):
         self.provider = [
-            {"ref": "tn-1", "name": "Air forcé 1 blancas", "sizes": [{"size": "40", "stock": 3}, {"size": "41", "stock": 0}]},
-            {"ref": "tn-2", "name": "Panda sb dunk", "sizes": [{"size": "38", "stock": 0}]},     # sin stock
-            {"ref": "tn-3", "name": "Remera Adidas", "sizes": [{"size": "M", "stock": 5}]},      # indumentaria: se excluye
+            {"ref": "vp-1", "name": "Air forcé 1 blancas", "sizes": [{"size": "40", "stock": 3}, {"size": "41", "stock": 0}]},
+            {"ref": "vp-2", "name": "Panda sb dunk", "sizes": [{"size": "38", "stock": 0}]},     # sin stock
+            {"ref": "vp-3", "name": "Remera Adidas", "sizes": [{"size": "M", "stock": 5}]},      # indumentaria: se excluye
         ]
         self.manual = [
             ("zapatillas", {"name": "Air force 1 blancas", "sizes": [{"size": "40", "stock": 2}, {"size": "38", "stock": 1}], "photo": "Fotos/x.jpeg"}),
@@ -72,7 +72,7 @@ class TestFusionConStockDeCasa(unittest.TestCase):
 
     def test_mismo_modelo_se_fusiona_aunque_varie_la_tilde(self):
         af = self.products["Air forcé 1 blancas"]
-        self.assertEqual(af["id"], "tn-1")                       # usa el id del proveedor
+        self.assertEqual(af["id"], "vp-1")                       # usa el id del proveedor
         self.assertEqual(af["origin"], ["casa", "proveedor"])
         sizes = {s["size"]: s for s in af["sizes"]}
         self.assertEqual(sizes["40"], {"size": "40", "stock": 5, "casa": 2})   # 3 del proveedor + 2 de casa
@@ -130,13 +130,13 @@ class TestReutilizarFotos(unittest.TestCase):
             settings.CATALOG_DIR = Path(tmp)
             settings.IMAGES_DIR = Path(tmp) / "fotos"
             try:
-                old = settings.IMAGES_DIR / "tn-1"
+                old = settings.IMAGES_DIR / "vp-1"
                 old.mkdir(parents=True)
                 Image.new("RGB", (30, 40)).save(old / "a-lg.webp", "WEBP")
                 Image.new("RGB", (15, 20)).save(old / "a-sm.webp", "WEBP")
                 store = ImageStore.__new__(ImageStore)
-                store.state = {"tn-1": {"sources": ["x"], "name_key": "shox gris",
-                                        "images": [{"lg": "fotos/tn-1/a-lg.webp", "sm": "fotos/tn-1/a-sm.webp", "w": 30, "h": 40}]}}
+                store.state = {"vp-1": {"sources": ["x"], "name_key": "shox gris",
+                                        "images": [{"lg": "fotos/vp-1/a-lg.webp", "sm": "fotos/vp-1/a-sm.webp", "w": 30, "h": 40}]}}
                 images = store.reuse_by_name("vp-9", "shox gris")
                 self.assertEqual(images[0]["lg"], "fotos/vp-9/a-lg.webp")
                 self.assertTrue((settings.IMAGES_DIR / "vp-9" / "a-sm.webp").exists())
