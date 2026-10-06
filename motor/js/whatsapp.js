@@ -51,14 +51,14 @@ export function buildOrderMessage({ config, channel, quote }) {
   lines.push("");
   // Condición de cambio según cómo compra: por mayor (5 o más, si eligió) o por unidad.
   // Si el texto de esa forma de compra está vacío, no se agrega la línea.
+  // Con BR y G5, si solo una calidad llega al precio por mayor, se aclara cuál.
+  const partial = quote.byQuality && quote.canChoose && quote.groups.some((g) => !g.canChoose);
+  const onlyIn = partial ? ` (solo calidad ${quote.groups.filter((g) => g.canChoose).map((g) => g.key.toUpperCase()).join(" y ")})` : "";
   if (channel.purchaseModes) {
     const modeLine = channel.purchaseModes[quote.canChoose ? quote.mode : "unidad"].message;
-    // Con BR y G5, si solo una calidad llega al precio por mayor, se aclara cuál.
-    const partial = quote.byQuality && quote.isWholesale && quote.groups.some((g) => !g.canChoose);
-    const onlyIn = partial ? ` (solo calidad ${quote.groups.filter((g) => g.canChoose).map((g) => g.key.toUpperCase()).join(" y ")})` : "";
-    if (modeLine) lines.push(modeLine + onlyIn);
+    if (modeLine) lines.push(modeLine + (quote.isWholesale ? onlyIn : ""));
   } else if (quote.canChoose) {
-    lines.push(`Compra por MAYOR (${quote.minPairs} pares o más)`);
+    lines.push(`Compra por MAYOR (${quote.minPairs} pares o más)${onlyIn}`);
   }
   // Las tiendas de clientes no llevan esta línea (orderShippingNote: false en su configuración).
   if (config.orderShippingNote !== false) lines.push("El envío se coordina aparte.");
