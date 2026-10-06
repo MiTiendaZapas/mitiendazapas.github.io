@@ -115,7 +115,9 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
     return `
       <fieldset class="mode-choice" aria-describedby="mode-help">
         <legend class="mode-choice__legend">Llevás ${plural(quote.pairs, "par", "pares")}: ¿cómo querés comprar?</legend>
-        <p class="mode-choice__help" id="mode-help">Con ${pricing.minPairs} o más pares surtidos podés elegir.</p>
+        <p class="mode-choice__help" id="mode-help">${quote.byQuality
+          ? `El precio por mayor se aplica a cada calidad que llegue a ${pricing.minPairs} pares.`
+          : `Con ${pricing.minPairs} o más pares surtidos podés elegir.`}</p>
         <div class="choice-list">
           ${["mayor", "unidad"].map((key) => `
             <label class="choice">
@@ -135,6 +137,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   function wholesaleProgress(quote) {
     if (quote.pairs === 0 || !pricing.hasWholesale) return "";
     if (quote.canChoose && modes) return modeChoice(quote);
+    if (quote.byQuality) return "";   // con BR y G5, cada bloque muestra su propio aviso
     if (quote.canChoose) {
       const savings = quote.totals.unidad - quote.totals.mayor;
       return `
@@ -166,33 +169,56 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
       return;
     }
 
+    const lineHtml = (line) => {
+      const max = cart.maxFor(line.productId, line.size);
+      const thumb = line.product.images[0]?.sm;
+      return `
+        <li class="cart-line" data-line-product="${escapeHtml(line.productId)}" data-line-size="${escapeHtml(line.size)}">
+          <button class="cart-line__open" type="button" data-line-open aria-label="Ver fotos de ${escapeHtml(line.product.name)}">
+            ${thumb ? `<img class="cart-line__thumb" src="${escapeHtml(thumb)}" alt="" width="60" height="80" loading="lazy">` : `<span class="cart-line__thumb"></span>`}
+          </button>
+          <div class="cart-line__info">
+            <p class="cart-line__name"><button class="cart-line__name-btn" type="button" data-line-open>${escapeHtml(line.product.name)}</button></p>
+            <p class="cart-line__meta">Talle <strong>${escapeHtml(line.size)}</strong> · <span class="money">${money(line.price)}</span> c/u</p>
+            <div class="cart-line__controls">
+              <div class="stepper stepper--sm" role="group" aria-label="Cantidad de ${escapeHtml(line.product.name)} talle ${escapeHtml(line.size)}">
+                <button class="stepper__btn" type="button" data-line-step="-1" aria-label="Restar uno" ${line.qty <= 1 ? "disabled" : ""}>${icon("minus")}</button>
+                <output class="stepper__value">${line.qty}</output>
+                <button class="stepper__btn" type="button" data-line-step="1" aria-label="Sumar uno" ${line.qty >= max ? "disabled" : ""}>${icon("plus")}</button>
+              </div>
+              <button class="cart-line__remove" type="button" data-line-remove>${icon("trash")} Quitar</button>
+            </div>
+          </div>
+          <p class="cart-line__subtotal money">${money(line.subtotal)}</p>
+        </li>`;
+    };
+    // Con G5 en el pedido: un bloque por calidad, con su subtotal y su aviso de precio por mayor.
+    const groupHint = (group, label) => {
+      if (!pricing.hasWholesale) return "";
+      if (group.canChoose) {
+        const applied = !modes || quote.mode === "mayor";
+        return `<p class="cart-group__hint is-done">${icon("check")} ${applied ? "Precio por mayor aplicado" : "Llega al precio por mayor"}</p>`;
+      }
+      return `<p class="cart-group__hint">Sumá <strong>${plural(group.pairsToWholesale, "par", "pares")} ${label} más</strong> para el precio por mayor de esta calidad.</p>`;
+    };
+    const linesHtml = quote.byQuality
+      ? quote.groups.map((group) => {
+          const label = group.key === "g5" ? "G5" : "BR";
+          return `
+            <section class="cart-group cart-group--${group.key}">
+              <header class="cart-group__head">
+                <span class="cart-group__title">Calidad ${label}</span>
+                <span class="cart-group__sum">${plural(group.pairs, "par", "pares")} · <span class="money">${money(group.subtotal)}</span></span>
+              </header>
+              ${groupHint(group, label)}
+              <ul class="cart-lines">${group.lines.map(lineHtml).join("")}</ul>
+            </section>`;
+        }).join("")
+      : `<ul class="cart-lines">${quote.lines.map(lineHtml).join("")}</ul>`;
+
     body.innerHTML = `
       ${wholesaleProgress(quote)}
-      <ul class="cart-lines">
-        ${quote.lines.map((line) => {
-          const max = cart.maxFor(line.productId, line.size);
-          const thumb = line.product.images[0]?.sm;
-          return `
-            <li class="cart-line" data-line-product="${escapeHtml(line.productId)}" data-line-size="${escapeHtml(line.size)}">
-              <button class="cart-line__open" type="button" data-line-open aria-label="Ver fotos de ${escapeHtml(line.product.name)}">
-                ${thumb ? `<img class="cart-line__thumb" src="${escapeHtml(thumb)}" alt="" width="60" height="80" loading="lazy">` : `<span class="cart-line__thumb"></span>`}
-              </button>
-              <div class="cart-line__info">
-                <p class="cart-line__name"><button class="cart-line__name-btn" type="button" data-line-open>${escapeHtml(line.product.name)}</button></p>
-                <p class="cart-line__meta">Talle <strong>${escapeHtml(line.size)}</strong> · <span class="money">${money(line.price)}</span> c/u</p>
-                <div class="cart-line__controls">
-                  <div class="stepper stepper--sm" role="group" aria-label="Cantidad de ${escapeHtml(line.product.name)} talle ${escapeHtml(line.size)}">
-                    <button class="stepper__btn" type="button" data-line-step="-1" aria-label="Restar uno" ${line.qty <= 1 ? "disabled" : ""}>${icon("minus")}</button>
-                    <output class="stepper__value">${line.qty}</output>
-                    <button class="stepper__btn" type="button" data-line-step="1" aria-label="Sumar uno" ${line.qty >= max ? "disabled" : ""}>${icon("plus")}</button>
-                  </div>
-                  <button class="cart-line__remove" type="button" data-line-remove>${icon("trash")} Quitar</button>
-                </div>
-              </div>
-              <p class="cart-line__subtotal money">${money(line.subtotal)}</p>
-            </li>`;
-        }).join("")}
-      </ul>
+      ${linesHtml}
       <p class="drawer__note">${icon("chat")} No se paga por la web. Te confirmamos el stock por WhatsApp y ahí coordinamos el envío.</p>`;
 
     const pending = needsModeChoice(quote);

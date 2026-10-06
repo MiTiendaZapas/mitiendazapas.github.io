@@ -284,3 +284,10 @@
   .last-pair, .last-pair__img { width: 160px; }
   .last-pair__img { height: 213px; }
 }
+
+/* ---------- Calidad BR / G5 (catálogo separado por calidad) ---------- */
+.quality-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: var(--space-3); padding: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-surface-2); }
+.quality-tabs[hidden] { display: none; }
+.quality-tab { min-height: 40px; border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-text-muted); font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
+.quality-tab[aria-selected="true"] { background: var(--color-accent); color: var(--color-accent-contrast); }
+.quality-tab__count { font-family: var(--font-body); font-size: 12px; font-weight: 600; opacity: 0.75; }

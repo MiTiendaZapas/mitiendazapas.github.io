@@ -98,6 +98,27 @@ describe("precios", () => {
     assert.equal(q.canChoose, false);
     assert.equal(q.total, 6 * 65000);
   });
+  test("BR y G5: cada calidad cuenta sus pares para el precio por mayor", () => {
+    const table = { wholesale: { minPairs: 5 },
+      unit: { default: 43000, rules: [{ price: 83000, category: ["g5"] }] },
+      wholesalePrice: { default: 37000, rules: [{ price: 78000, category: ["g5"] }] } };
+    const prices = createPricing(table);
+    const br = product("b1", "Air force blancas", [{ size: "40", stock: 9 }]);
+    const g5 = product("g1", "Air Max 1 Rojo", [{ size: "40", stock: 9 }], { category: "g5" });
+    // 3 BR + 2 G5 = 5 pares, pero ninguna calidad llega a 5: todo por unidad.
+    let q = prices.quote([{ product: br, size: "40", qty: 3 }, { product: g5, size: "40", qty: 2 }], "mayor");
+    assert.equal(q.canChoose, false);
+    assert.equal(q.total, 3 * 43000 + 2 * 83000);
+    assert.equal(q.byQuality, true);
+    assert.deepEqual(q.groups.map((g) => [g.key, g.pairs, g.pairsToWholesale]), [["br", 3, 2], ["g5", 2, 3]]);
+    // 5 G5 + 1 BR: solo las G5 pasan a precio por mayor.
+    q = prices.quote([{ product: br, size: "40", qty: 1 }, { product: g5, size: "40", qty: 5 }], "mayor");
+    assert.equal(q.total, 43000 + 5 * 78000);
+    const msg = buildOrderMessage({ config: { orderShippingNote: false }, channel: { label: "Tienda" }, quote: q });
+    assert.ok(msg.includes("CALIDAD BR\nAir force blancas (40) $43.000\nSubtotal BR: 1 par - $43.000"));
+    assert.ok(msg.includes("CALIDAD G5\nAir Max 1 Rojo (40) $78.000 x5 = $390.000\nSubtotal G5: 5 pares por mayor - $390.000"));
+    assert.match(msg, /Total: 6 pares - \$433\.000/);
+  });
   test("los precios fijos por modelo (overrides) tienen prioridad", () => {
     assert.deepEqual(pricing.forProduct(byId("p5")), { unit: 60000, wholesale: 45000, bulk: null });
   });

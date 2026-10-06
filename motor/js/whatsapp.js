@@ -26,22 +26,37 @@ export function buildOrderMessage({ config, channel, quote }) {
 
   lines.push(`¡Hola! Quiero hacer el siguiente pedido del catálogo${source}:`);
   lines.push("");
-  for (const line of quote.lines) {
+  const itemLine = (line) => {
     const many = line.qty > 1 ? ` x${line.qty} = ${money(line.subtotal)}` : "";
-    // Las G5 se aclaran en el pedido: vienen de otro proveedor.
-    const quality = line.product.category === "g5" ? " - G5" : "";
-    lines.push(`${line.product.name}${quality} (${line.size}) ${money(line.price)}${many}`);
-  }
-  lines.push("");
+    return `${line.product.name} (${line.size}) ${money(line.price)}${many}`;
+  };
   const count = quote.lines.reduce((sum, line) => sum + line.qty, 0);
   const onlyFootwear = quote.lines.every((line) => line.product.category !== "indumentaria");
-  lines.push(`Total: ${onlyFootwear ? plural(count, "par", "pares") : plural(count, "producto")} - ${money(quote.total)}`);
+  const items = (n) => (onlyFootwear ? plural(n, "par", "pares") : plural(n, "producto"));
+  if (quote.byQuality) {
+    // Con G5 en el pedido, cada calidad va en su bloque con su subtotal (son proveedores distintos).
+    for (const group of quote.groups) {
+      const label = group.key === "g5" ? "G5" : "BR";
+      const wholesale = quote.isWholesale && group.canChoose ? " por mayor" : "";
+      lines.push(`CALIDAD ${label}`);
+      group.lines.forEach((line) => lines.push(itemLine(line)));
+      lines.push(`Subtotal ${label}: ${items(group.lines.reduce((s, l) => s + l.qty, 0))}${wholesale} - ${money(group.subtotal)}`);
+      lines.push("");
+    }
+  } else {
+    quote.lines.forEach((line) => lines.push(itemLine(line)));
+    lines.push("");
+  }
+  lines.push(`Total: ${items(count)} - ${money(quote.total)}`);
   lines.push("");
   // Condición de cambio según cómo compra: por mayor (5 o más, si eligió) o por unidad.
   // Si el texto de esa forma de compra está vacío, no se agrega la línea.
   if (channel.purchaseModes) {
     const modeLine = channel.purchaseModes[quote.canChoose ? quote.mode : "unidad"].message;
-    if (modeLine) lines.push(modeLine);
+    // Con BR y G5, si solo una calidad llega al precio por mayor, se aclara cuál.
+    const partial = quote.byQuality && quote.isWholesale && quote.groups.some((g) => !g.canChoose);
+    const onlyIn = partial ? ` (solo calidad ${quote.groups.filter((g) => g.canChoose).map((g) => g.key.toUpperCase()).join(" y ")})` : "";
+    if (modeLine) lines.push(modeLine + onlyIn);
   } else if (quote.canChoose) {
     lines.push(`Compra por MAYOR (${quote.minPairs} pares o más)`);
   }

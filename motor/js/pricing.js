@@ -5,6 +5,7 @@
  * datos actuales, así no se puede manipular desde el navegador.
  */
 import { normalize } from "./utils.js";
+import { qualityOf } from "./filters.js";
 
 function compileList(list) {
   return {
@@ -98,8 +99,14 @@ export function createPricing(table) {
      * Indumentaria: precio especial llevando bulk.min unidades del mismo producto.
      */
     quote(lines, mode = null) {
+      // Calidades (BR y G5): cada una cuenta SUS pares para el precio por mayor,
+      // porque son de proveedores y precios distintos. Sin G5 hay un solo grupo
+      // y todo funciona como siempre.
+      const groupKeys = [...new Set(lines.map((line) => qualityOf(line.product)))].sort();
+      const groupPairs = new Map(groupKeys.map((key) => [key, this.countPairs(lines.filter((l) => qualityOf(l.product) === key))]));
+      const qualifies = (key) => hasWholesale && groupPairs.get(key) >= minPairs;
       const pairs = this.countPairs(lines);
-      const canChoose = hasWholesale && pairs >= minPairs;
+      const canChoose = groupKeys.some(qualifies);
       const qtyByProduct = new Map();
       for (const line of lines) qtyByProduct.set(line.product.id, (qtyByProduct.get(line.product.id) ?? 0) + line.qty);
 
@@ -107,7 +114,7 @@ export function createPricing(table) {
         const prices = resolve(line.product);
         let price = prices.unit;
         if (prices.bulk && qtyByProduct.get(line.product.id) >= prices.bulk.min) price = prices.bulk.price;
-        else if (useWholesale && prices.wholesale) price = prices.wholesale;
+        else if (useWholesale && prices.wholesale && qualifies(qualityOf(line.product))) price = prices.wholesale;
         return { ...line, price, subtotal: price * line.qty, unitPrice: prices.unit };
       });
       const sum = (priced) => priced.reduce((acc, line) => acc + line.subtotal, 0);
@@ -116,15 +123,29 @@ export function createPricing(table) {
       const wholesaleLines = canChoose ? priceLines(true) : unitLines;
       const isWholesale = canChoose && mode === "mayor";
       const priced = isWholesale ? wholesaleLines : unitLines;
+      const groups = groupKeys.map((key) => {
+        const groupLines = priced.filter((line) => qualityOf(line.product) === key);
+        return {
+          key,
+          lines: groupLines,
+          pairs: groupPairs.get(key),
+          canChoose: qualifies(key),
+          pairsToWholesale: Math.max(minPairs - groupPairs.get(key), 0),
+          subtotal: sum(groupLines),
+        };
+      });
 
       return {
         lines: priced,
+        groups,
+        // true si hay G5 en el pedido: el carrito y el mensaje se muestran separados por calidad.
+        byQuality: groupKeys.includes("g5"),
         pairs,
         minPairs,
         canChoose,
         mode: canChoose ? mode : "unidad",
         isWholesale,
-        pairsToWholesale: Math.max(minPairs - pairs, 0),
+        pairsToWholesale: Math.max(minPairs - Math.max(0, ...groupPairs.values()), 0),
         total: sum(priced),
         totals: { unidad: sum(unitLines), mayor: sum(wholesaleLines) },
       };

@@ -6,7 +6,11 @@
 import { normalize } from "./utils.js";
 
 const collator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
-const PARAMS = { q: "q", brands: "marca", sizes: "talle", category: "categoria" };
+const PARAMS = { q: "q", brands: "marca", sizes: "talle", category: "categoria", quality: "calidad" };
+
+/** Calidad de un modelo: "g5" (proveedor G5) o "br" (el resto). */
+export const qualityOf = (product) => (product.category === "g5" ? "g5" : "br");
+export const QUALITY_LABELS = { br: "Calidad BR", g5: "Calidad G5" };
 
 /** Talles "simples" de un producto: "37/38" (ojotas) cuenta como 37 y 38. */
 function simpleSizes(product) {
@@ -22,11 +26,15 @@ export function createFilters(products) {
     sizes: simpleSizes(p),
   }]));
 
-  const state = { q: "", brands: new Set(), sizes: new Set(), category: "" };
+  // Si el catálogo trae G5, el catálogo se separa por calidad (BR / G5) y nunca se mezclan.
+  const hasQualities = products.some((p) => qualityOf(p) === "g5");
+  const state = { q: "", brands: new Set(), sizes: new Set(), category: "", quality: hasQualities ? "br" : "" };
+  const inQuality = (product) => !state.quality || qualityOf(product) === state.quality;
   const listeners = new Set();
 
   function matches(product, skip = null) {
     const info = index.get(product.id);
+    if (!inQuality(product)) return false;
     if (skip !== "q" && state.q) {
       const words = normalize(state.q).split(" ").filter(Boolean);
       if (!words.every((word) => info.text.includes(word))) return false;
@@ -59,6 +67,7 @@ export function createFilters(products) {
     set(PARAMS.brands, [...state.brands].join(","));
     set(PARAMS.sizes, [...state.sizes].join(","));
     set(PARAMS.category, state.category);
+    set(PARAMS.quality, state.quality === "g5" ? "g5" : "");
     history.replaceState(history.state, "", url);
   }
 
@@ -69,7 +78,8 @@ export function createFilters(products) {
     state.q = (params.get(PARAMS.q) ?? "").slice(0, 60);
     state.brands = new Set(list(PARAMS.brands).map((b) => brandNames.get(normalize(b))).filter(Boolean));
     state.sizes = new Set(list(PARAMS.sizes).filter((s) => /^[\d.]+$/.test(s)));
-    state.category = products.some((p) => p.category === params.get(PARAMS.category)) ? params.get(PARAMS.category) : "";
+    state.category = products.some((p) => p.category === params.get(PARAMS.category) && p.category !== "g5") ? params.get(PARAMS.category) : "";
+    if (hasQualities) state.quality = params.get(PARAMS.quality) === "g5" || params.get(PARAMS.category) === "g5" ? "g5" : "br";
   }
 
   return {
@@ -84,6 +94,30 @@ export function createFilters(products) {
       return products.filter((p) => matches(p));
     },
 
+    /** Modelos de la calidad elegida (sin los demás filtros). */
+    total() {
+      return products.filter(inQuality).length;
+    },
+
+    /** Botones de calidad: vacío si el catálogo no trae G5. */
+    qualities() {
+      if (!hasQualities) return [];
+      return ["br", "g5"].map((value) => ({
+        value, label: QUALITY_LABELS[value], selected: state.quality === value,
+        count: products.filter((p) => qualityOf(p) === value).length,
+      }));
+    },
+
+    setQuality(quality) {
+      if (!hasQualities || state.quality === quality) return;
+      state.quality = quality;
+      // Las marcas y talles de una calidad pueden no existir en la otra: se empieza de cero.
+      state.brands.clear();
+      state.sizes.clear();
+      state.category = "";
+      emit();
+    },
+
     activeCount() {
       return state.brands.size + state.sizes.size + (state.category ? 1 : 0);
     },
@@ -96,9 +130,10 @@ export function createFilters(products) {
       const brandCounts = facetCounts("brands", (p) => [p.brand ?? ""]);
       const sizeCounts = facetCounts("sizes", (p) => index.get(p.id).sizes);
       const categoryCounts = facetCounts("category", (p) => [p.category]);
-      const allBrands = [...new Set(products.map((p) => p.brand ?? ""))].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || collator.compare(a, b));
-      const allSizes = [...new Set(products.flatMap((p) => [...index.get(p.id).sizes]))].sort(collator.compare);
-      const allCategories = [...new Set(products.map((p) => p.category))];
+      const pool = products.filter(inQuality);
+      const allBrands = [...new Set(pool.map((p) => p.brand ?? ""))].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || collator.compare(a, b));
+      const allSizes = [...new Set(pool.flatMap((p) => [...index.get(p.id).sizes]))].sort(collator.compare);
+      const allCategories = [...new Set(pool.map((p) => p.category))].filter((c) => c !== "g5");
       return {
         brands: allBrands.map((value) => ({ value, count: brandCounts.get(value) ?? 0, selected: state.brands.has(value) })),
         sizes: allSizes.map((value) => ({ value, count: sizeCounts.get(value) ?? 0, selected: state.sizes.has(value) })),

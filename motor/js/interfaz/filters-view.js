@@ -16,6 +16,7 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
   const categoryNames = config.categories ?? {};
 
   toolbar.innerHTML = `
+    <div class="quality-tabs" role="tablist" aria-label="Calidad" data-quality-tabs hidden></div>
     <div class="catalog-toolbar">
       <div class="search">
         ${icon("search")}
@@ -35,6 +36,21 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
   const brandStrip = toolbar.querySelector("[data-brand-strip]");
   const activeBox = toolbar.querySelector("[data-active]");
   const toggleCount = toolbar.querySelector("[data-filters-count]");
+  const qualityTabs = toolbar.querySelector("[data-quality-tabs]");
+
+  // Botones Calidad BR / Calidad G5 (solo si el catálogo trae G5).
+  function renderQualityTabs() {
+    const qualities = filters.qualities();
+    qualityTabs.hidden = qualities.length === 0;
+    qualityTabs.innerHTML = qualities.map((q) => `
+      <button class="quality-tab" type="button" role="tab" aria-selected="${q.selected}" data-quality="${q.value}">
+        ${escapeHtml(q.label)} <span class="quality-tab__count">${q.count}</span>
+      </button>`).join("");
+  }
+  qualityTabs.addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-quality]");
+    if (tab) filters.setQuality(tab.dataset.quality);
+  });
 
   // --- panel de filtros de celular ------------------------------------------
   const sheet = document.createElement("dialog");
@@ -192,7 +208,9 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
     // La fila de marcas se desplaza hasta la marca elegida.
     const pressed = brandStrip.querySelector('[aria-pressed="true"]');
     if (pressed) brandStrip.scrollLeft = pressed.offsetLeft - brandStrip.offsetLeft - 16;
-    catalogView.setCount(countText(shown, catalogView.totalCount(), filters.hasAny(), config.catalogHeader));
+    catalogView.setCount(countText(shown, filters.total(), filters.hasAny(), config.catalogHeader));
+    renderQualityTabs();
+    renderBrandAccess();
     sheet.querySelector("[data-sheet-results]").textContent = shown ? `Ver ${plural(shown, "modelo", "modelos")}` : "Sin resultados";
 
     if (shown > 0) {
