@@ -67,6 +67,10 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
 
   // --- secciones (se usan igual en el panel lateral y en el de celular) --------
   function sectionsHtml(options) {
+    // Las categorías salen en el orden de la configuración, con "Calidad G5" al final.
+    const order = Object.keys(categoryNames).filter((c) => c !== "g5").concat("g5");
+    const rank = (value) => (order.includes(value) ? order.indexOf(value) : order.length);
+    options = { ...options, categories: [...options.categories].sort((a, b) => rank(a.value) - rank(b.value)) };
     const categories = options.categories.length > 1 ? `
       <fieldset class="filter-group">
         <legend class="filter-group__title">Categoría</legend>

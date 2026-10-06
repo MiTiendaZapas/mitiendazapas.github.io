@@ -15,6 +15,7 @@ function compileList(list) {
       contains: (rule.contains ?? []).map(normalize),
       containsAll: (rule.containsAll ?? []).map(normalize),
       startsWith: (rule.startsWith ?? []).map(normalize),
+      category: rule.category ?? [],
     })),
   };
 }
@@ -36,14 +37,16 @@ function withoutBrand(key, brand) {
   return key;
 }
 
-function matches(rule, key, shortKey) {
+function matches(rule, key, shortKey, category) {
+  // Regla por categoría (ej. todas las G5): no depende del nombre.
+  if (rule.category.length) return rule.category.includes(category);
   if (rule.startsWith.some((text) => key.startsWith(text) || shortKey.startsWith(text))) return true;
   if (rule.contains.some((text) => key.includes(text))) return true;
   return rule.containsAll.length > 0 && rule.containsAll.every((text) => key.includes(text));
 }
 
-function findRule(list, key, shortKey = key) {
-  return list.rules.find((rule) => matches(rule, key, shortKey)) ?? null;
+function findRule(list, key, shortKey = key, category = "") {
+  return list.rules.find((rule) => matches(rule, key, shortKey, category)) ?? null;
 }
 
 export function createPricing(table) {
@@ -61,12 +64,12 @@ export function createPricing(table) {
     const key = normalize(product.name);
     const shortKey = withoutBrand(key, product.brand);
     const override = overrides[product.slug] ?? overrides[product.id] ?? {};
-    const unitRule = findRule(unitList, key, shortKey);
+    const unitRule = findRule(unitList, key, shortKey, product.category);
     const unit = Number(override.unit) || unitRule?.price || unitList.default;
     const bulk = unitRule?.bulk ?? null;
     let wholesale = null;
     if (hasWholesale && !bulk && product.category !== "indumentaria") {
-      wholesale = Number(override.wholesale) || findRule(wholesaleList, key, shortKey)?.price || wholesaleList.default;
+      wholesale = Number(override.wholesale) || findRule(wholesaleList, key, shortKey, product.category)?.price || wholesaleList.default;
       if (wholesale >= unit) wholesale = null;   // nunca mostrar un "precio por mayor" que no conviene
     }
     const result = { unit, wholesale, bulk };

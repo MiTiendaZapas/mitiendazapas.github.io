@@ -28,7 +28,9 @@ export function buildOrderMessage({ config, channel, quote }) {
   lines.push("");
   for (const line of quote.lines) {
     const many = line.qty > 1 ? ` x${line.qty} = ${money(line.subtotal)}` : "";
-    lines.push(`${line.product.name} (${line.size}) ${money(line.price)}${many}`);
+    // Las G5 se aclaran en el pedido: vienen de otro proveedor.
+    const quality = line.product.category === "g5" ? " - G5" : "";
+    lines.push(`${line.product.name}${quality} (${line.size}) ${money(line.price)}${many}`);
   }
   lines.push("");
   const count = quote.lines.reduce((sum, line) => sum + line.qty, 0);

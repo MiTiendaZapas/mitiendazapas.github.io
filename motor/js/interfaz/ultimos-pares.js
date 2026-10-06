@@ -7,7 +7,7 @@ import { escapeHtml, money, plural } from "../utils.js";
 
 const MAX_STOCK = 3;      // "pocos" = 3 pares o menos en total
 const MAX_CARDS = 10;
-const CATEGORIES = new Set(["zapatillas", "ninos", "ojotas"]);
+const CATEGORIES = new Set(["zapatillas", "ninos", "ojotas", "g5"]);
 
 function totalStock(product) {
   return product.sizes.reduce((sum, s) => sum + (s.stock > 0 ? s.stock : 0), 0);

@@ -5,7 +5,7 @@
 import { escapeHtml, plural } from "../utils.js";
 import { icon } from "./icons.js";
 import { countText } from "./filters-view.js";
-import { priceHtml, sizeButtonsHtml, stockStatus } from "./product-parts.js";
+import { priceHtml, sizeButtonsHtml, stockStatus, qualityBadgeHtml } from "./product-parts.js";
 
 const ADDED_FEEDBACK_MS = 1600;
 const EAGER_IMAGES = 4;
@@ -154,7 +154,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
         <article class="product-card" data-product-id="${escapeHtml(product.id)}" aria-labelledby="${nameId}">
           ${mediaHtml(product, index)}
           <div class="product-card__body">
-            ${product.brand ? `<p class="product-card__brand">${escapeHtml(product.brand)}</p>` : ""}
+            ${product.brand || product.category === "g5" ? `<p class="product-card__brand">${escapeHtml(product.brand ?? "")}${qualityBadgeHtml(product)}</p>` : ""}
             <h3 class="product-card__name" id="${nameId}">
               <a href="#p/${encodeURIComponent(product.slug)}">${escapeHtml(product.name)}</a>
             </h3>

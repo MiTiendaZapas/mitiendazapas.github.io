@@ -23,6 +23,10 @@ window.STORE_CONFIG = {
   // "clasico" (la versión anterior, con "Stock disponible" arriba).
   catalogHeader: "compacto",
 
+  // Zapatillas calidad G5 (tienda de Beto): se muestran con su etiqueta y su categoría.
+  // Las tiendas de clientes no las ven mientras no tengan showG5: true.
+  showG5: true,
+
   logo: {
     small: "marca/logo-160.webp",
     large: "marca/logo-512.webp",
@@ -162,7 +166,7 @@ window.STORE_CONFIG = {
   // las categorías indicadas (en niños y ojotas no, porque los talles son otros).
   sizeChart: {
     title: "Tabla de talles",
-    categories: ["zapatillas"],
+    categories: ["zapatillas", "g5"],
     hint: "Medí tu pie del talón a la punta del dedo más largo.",
     columns: ["Talle", "Largo del pie"],
     rows: [
@@ -291,6 +295,7 @@ window.STORE_CONFIG = {
 
   categories: {
     zapatillas: "Zapatillas",
+    g5: "Calidad G5",
     ninos: "Niños",
     ojotas: "Ojotas",
     indumentaria: "Indumentaria",

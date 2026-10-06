@@ -430,3 +430,17 @@
 @media (min-width: 1024px) {
   .toast-region { left: auto; right: var(--gutter); bottom: var(--space-5); transform: none; }
 }
+
+/* Etiqueta "Calidad G5": distingue los modelos del proveedor G5 (otra calidad). */
+.quality-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  vertical-align: 1px;
+}

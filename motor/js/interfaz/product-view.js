@@ -7,7 +7,7 @@
 import { escapeHtml, plural } from "../utils.js";
 import { buildOrderMessage, orderLink, productQueryLink } from "../whatsapp.js";
 import { icon } from "./icons.js";
-import { priceHtml, sizeButtonsHtml, stockStatus } from "./product-parts.js";
+import { priceHtml, sizeButtonsHtml, stockStatus, qualityBadgeHtml } from "./product-parts.js";
 import { sizeTableHtml } from "./pages.js";
 import { createSharer, shareButtonHtml } from "./share.js";
 import { attachSwipe } from "./swipe.js";
@@ -212,7 +212,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
     content.innerHTML = `
       ${galleryHtml()}
       <div class="product-view__info">
-        ${product.brand ? `<p class="product-card__brand">${escapeHtml(product.brand)}</p>` : ""}
+        ${product.brand || product.category === "g5" ? `<p class="product-card__brand">${escapeHtml(product.brand ?? "")}${qualityBadgeHtml(product)}</p>` : ""}
         <h2 class="product-view__title" id="pv-title">${escapeHtml(product.name)}</h2>
         ${priceHtml(product, pricing)}
         <fieldset class="size-picker product-view__sizes">

@@ -74,6 +74,7 @@ async function startStore() {
       loadCatalog(fromRoot(config.catalogBase), {
         order: config.catalogOrder,
         includeHouseStock: config.includeHouseStock !== false,
+        showG5: config.showG5 === true,
       }),
       loadJson(fromRoot(channel.prices)),
     ]);

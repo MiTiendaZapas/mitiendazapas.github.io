@@ -24,7 +24,7 @@ function sortProducts(products, order) {
  * proveedor. Se descuenta el stock de casa de cada talle y desaparecen los
  * modelos que eran solo de casa.
  */
-export async function loadCatalog(base, { order = "marca-modelo", includeHouseStock = true } = {}) {
+export async function loadCatalog(base, { order = "marca-modelo", includeHouseStock = true, showG5 = false } = {}) {
   // "no-cache": el navegador pregunta si hay versión nueva (stock actualizado),
   // pero si no cambió no vuelve a descargar el archivo.
   const response = await fetch(`${base}productos.json`, { cache: "no-cache" });
@@ -34,6 +34,8 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
 
   const products = data.products
     .filter((p) => p && typeof p.id === "string" && typeof p.name === "string" && Array.isArray(p.sizes))
+    // Zapatillas calidad G5 (otro proveedor): solo en las tiendas que las activan (showG5: true).
+    .filter((p) => showG5 || p.category !== "g5")
     .map((p) => {
       const sizes = p.sizes
         .filter((s) => s && String(s.size ?? "").trim() !== "")

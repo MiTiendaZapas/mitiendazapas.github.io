@@ -28,6 +28,11 @@ export function sizeButtonsHtml(sizes, selectedSize) {
 }
 
 /** Cuánto queda por agregar de un talle y qué aviso mostrar. */
+/** Etiqueta de calidad para los modelos G5 (se ve en la tarjeta y en el detalle). */
+export function qualityBadgeHtml(product) {
+  return product.category === "g5" ? `<span class="quality-badge">Calidad G5</span>` : "";
+}
+
 export function stockStatus(cart, productId, size) {
   const inCart = cart.qtyOf(productId, size);
   const remaining = cart.maxFor(productId, size) - inCart;

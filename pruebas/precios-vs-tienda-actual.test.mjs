@@ -17,7 +17,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // ClienteA ya no está en este repositorio: sus precios se leen de su propio repositorio (../repositorio-fo).
 const legacy = path.resolve(root, "../TiendaZapasOficial");
 const { createPricing } = await import("../motor/js/pricing.js");
-const catalog = JSON.parse(fs.readFileSync(path.join(root, "catalogo/productos.json"), "utf8")).products;
+const catalog = JSON.parse(fs.readFileSync(path.join(root, "catalogo/productos.json"), "utf8")).products
+  .filter((p) => p.category !== "g5");   // las G5 son nuevas: la tienda vieja no las tenía
 
 function legacyPriceFunctions(file) {
   // Solo se ejecutan las funciones de precio (el resto del archivo usa la página).

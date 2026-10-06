@@ -13,6 +13,7 @@ Este archivo solo actualiza el catálogo en la PC. Publicarlo en GitHub (y
 repetirlo cada 15-20 minutos) lo hace piloto.py.
 """
 import argparse
+import importlib
 import json
 import os
 import sys
@@ -116,6 +117,56 @@ def _photos_folder_index():
             if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")}
 
 
+def build_extra_products(classifier, used_slugs, previous_products):
+    """Modelos de los proveedores extra (settings.EXTRA_PROVIDERS), cada uno con su categoría.
+
+    No se fusionan con el stock de casa ni con el proveedor principal: aunque el
+    nombre se parezca, es otra calidad. Si un proveedor extra falla, se mantienen
+    sus modelos del catálogo anterior ("congelados") para no vaciarlos de golpe.
+    """
+    products = []
+    for name, config in settings.EXTRA_PROVIDERS.items():
+        category = config["category"]
+        try:
+            source = importlib.import_module(f"proveedores.{name}")
+            items = source.list_products()
+        except Exception as error:
+            kept = [dict(p, _frozen=True, _provider_item=None, _manual_photo=None, name_key=normalize(p["name"]))
+                    for p in previous_products if p.get("category") == category]
+            print(f"  ⚠️ {name}: no se pudo leer ({type(error).__name__}: {error}). "
+                  f"Se mantienen sus {len(kept)} modelos del catálogo anterior.")
+            products += kept
+            used_slugs.update(p["slug"] for p in kept)
+            continue
+        count = 0
+        for item in items:
+            sizes = sorted(({"size": s["size"], "stock": s["stock"]} for s in item["sizes"]), key=_size_sort_key)
+            if not any(s["stock"] > 0 for s in sizes):
+                continue
+            clean = clean_name(item["name"])
+            slug = f"{slugify(clean) or item['ref']}-{category}"
+            while slug in used_slugs:
+                slug += "-2"
+            used_slugs.add(slug)
+            products.append({
+                "id": item["ref"],
+                "slug": slug,
+                "name": clean,
+                "brand": classifier.brand(clean, item.get("provider_brand")),
+                "category": category,
+                "sizes": sizes,
+                "origin": [name],
+                "images": [],
+                "name_key": normalize(item["name"]),
+                "_provider_item": item,
+                "_manual_photo": None,
+                "_source": source,
+            })
+            count += 1
+        print(f"Proveedor extra {name}: {count} modelos con stock (categoría {category})")
+    return products
+
+
 def _hidden_photos():
     """Fotos a no mostrar (sincronizador/fotos_ocultas.json): {slug del modelo: [códigos de foto]}."""
     path = Path(__file__).resolve().parent / "fotos_ocultas.json"
@@ -144,13 +195,16 @@ def attach_images(products, provider, store, download):
         codes = hidden.get(product["slug"], set())
         return any(Path(img["lg"]).name[:10] in codes for img in store.current(product["id"]))
 
-    pending = [p for p in products if download and (store.needs_check(p["id"]) or shows_hidden(p))]
+    pending = [p for p in products if download and not p.get("_frozen")
+               and (store.needs_check(p["id"]) or shows_hidden(p))]
     photos_folder = _photos_folder_index() if pending else {}
     for product in products:
-        product["images"] = store.current(product["id"])
+        if not product.get("_frozen"):          # los "congelados" ya traen sus fotos del catálogo anterior
+            product["images"] = store.current(product["id"])
     for number, product in enumerate(pending, 1):
         print(f"  [{number}/{len(pending)}] imágenes de {product['name']}")
-        sources = provider.get_image_urls(product["_provider_item"]) if product["_provider_item"] else []
+        source = product.get("_source") or provider     # proveedor extra (ej. G5) o el principal
+        sources = source.get_image_urls(product["_provider_item"]) if product["_provider_item"] else []
         if hidden.get(product["slug"]):
             sources = [s for s in sources if _photo_code(s) not in hidden[product["slug"]]]
         if not sources and product["_manual_photo"]:
@@ -223,7 +277,12 @@ def run():
     manual_items = manual_stock.load()   # si falta un archivo de stock de casa, corta acá
     print(f"Modelos de stock de casa: {len(manual_items)}")
 
-    products = build_products(provider_items, manual_items, Classifier())
+    classifier = Classifier()
+    products = build_products(provider_items, manual_items, classifier)
+    previous_products = []
+    if settings.PRODUCTS_FILE.exists():
+        previous_products = json.loads(settings.PRODUCTS_FILE.read_text(encoding="utf-8")).get("products", [])
+    products += build_extra_products(classifier, {p["slug"] for p in products}, previous_products)
     if args.only:
         wanted = {normalize(n) for n in args.only.split(";") if n.strip()}
         products = [p for p in products if normalize(p["name"]) in wanted]
@@ -273,9 +332,8 @@ def run():
         return 0
 
     for p in products:
-        p.pop("_provider_item")
-        p.pop("_manual_photo")
-        p.pop("name_key")
+        for key in ("_provider_item", "_manual_photo", "name_key", "_source", "_frozen"):
+            p.pop(key, None)
     write_json_atomic(settings.PRODUCTS_FILE, {
         "version": int(time.time()),
         "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
