@@ -22,13 +22,17 @@ PROVIDERS = {
 # Proveedores que se SUMAN al principal, cada uno con su propia categoría.
 # Si uno falla, se mantienen sus modelos del catálogo anterior (no se borran
 # de golpe) y el resto del catálogo se actualiza igual.
-EXTRA_PROVIDERS = {
+EXTRA_PROVIDERS_PAUSADOS = {
     # Zapatillas calidad G5 de la tienda de Beto (catalogo-app-beto.vercel.app).
     "beto_g5": {
         "url": "https://app-beto-seven.vercel.app/api/catalogo",
         "category": "g5",
     },
 }
+
+# PAUSA (06/10): las G5 no se suben hasta separarlas en su propio archivo,
+# así el bot de WhatsApp de la laptop no las manda mezcladas con las BR.
+EXTRA_PROVIDERS = {}
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 REQUEST_DELAY_SEC = 0.7      # pausa entre pedidos para no castigar al proveedor
