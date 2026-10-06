@@ -161,7 +161,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
             ${priceHtml(product, pricing)}
             <fieldset class="size-picker">
               <legend class="size-picker__legend">Talles disponibles</legend>
-              <div class="size-picker__list">${sizeButtonsHtml(product.available, state?.size)}</div>
+              <div class="size-picker__list">${sizeButtonsHtml(product.available, state?.size, { european: product.category === "g5" })}</div>
             </fieldset>
             <div class="product-card__buy" data-buy></div>
           </div>

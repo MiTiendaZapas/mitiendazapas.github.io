@@ -116,7 +116,7 @@ describe("precios", () => {
     assert.equal(q.total, 43000 + 5 * 78000);
     const msg = buildOrderMessage({ config: { orderShippingNote: false }, channel: { label: "Tienda" }, quote: q });
     assert.ok(msg.includes("CALIDAD BR\nAir force blancas (40) $43.000\nSubtotal BR: 1 par - $43.000"));
-    assert.ok(msg.includes("CALIDAD G5\nAir Max 1 Rojo (40) $78.000 x5 = $390.000\nSubtotal G5: 5 pares por mayor - $390.000"));
+    assert.ok(msg.includes("CALIDAD G5\nAir Max 1 Rojo (40 EU) $78.000 x5 = $390.000\nSubtotal G5: 5 pares por mayor - $390.000"));
     assert.match(msg, /Total: 6 pares - \$433\.000/);
   });
   test("los precios fijos por modelo (overrides) tienen prioridad", () => {

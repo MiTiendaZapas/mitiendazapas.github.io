@@ -166,7 +166,7 @@ window.STORE_CONFIG = {
   // las categorías indicadas (en niños y ojotas no, porque los talles son otros).
   sizeChart: {
     title: "Tabla de talles",
-    categories: ["zapatillas", "g5"],
+    categories: ["zapatillas"],
     hint: "Medí tu pie del talón a la punta del dedo más largo.",
     columns: ["Talle", "Largo del pie"],
     rows: [

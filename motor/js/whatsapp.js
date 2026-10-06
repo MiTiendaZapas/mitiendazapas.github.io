@@ -3,6 +3,7 @@
  * Texto plano, sin emojis que puedan verse mal.
  */
 import { money, plural, whatsappLink } from "./utils.js";
+import { sizeLabel } from "./interfaz/g5.js";
 
 /**
  * Mensaje del pedido (formato pedido por el usuario el 27/09):
@@ -28,7 +29,7 @@ export function buildOrderMessage({ config, channel, quote }) {
   lines.push("");
   const itemLine = (line) => {
     const many = line.qty > 1 ? ` x${line.qty} = ${money(line.subtotal)}` : "";
-    return `${line.product.name} (${line.size}) ${money(line.price)}${many}`;
+    return `${line.product.name} (${sizeLabel(line.product, line.size)}) ${money(line.price)}${many}`;
   };
   const count = quote.lines.reduce((sum, line) => sum + line.qty, 0);
   const onlyFootwear = quote.lines.every((line) => line.product.category !== "indumentaria");

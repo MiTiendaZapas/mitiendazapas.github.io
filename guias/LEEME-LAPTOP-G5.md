@@ -33,6 +33,10 @@ Comprobar después de una vuelta:
 
 ## 2. Bot de WhatsApp (`automatizacion/bot_whatsapp.py`): adaptarlo
 
+En las tiendas, los talles G5 se ven como "40 EU" y tienen su propia tabla de
+talles (europeo, argentino y cm). En WhatsApp también hay que aclarar que son
+europeos.
+
 El usuario quiere que el bot también mande las G5, **separadas** de las BR.
 
 1. **Leer también las G5.** Agregar
@@ -43,8 +47,23 @@ El usuario quiere que el bot también mande las G5, **separadas** de las BR.
 2. **Orden de la tanda diaria:**
    1. Las fotos BR, como hoy.
    2. El mensaje de precios BR (`MENSAJE_FINAL_PRECIOS`), como hoy.
-   3. Un texto separador: `⬇️ ZAPATILLAS CALIDAD G5 ⬇️`.
-   4. Las fotos G5. El texto de cada una, igual que las BR: nombre y talles.
+   3. Un texto separador bien visible. Antes de mandarlo, esperar un poco más que
+      entre fotos, para que quede separado:
+      ```
+      ━━━━━━━━━━━━━━
+      ⬇️ ZAPATILLAS CALIDAD G5 ⬇️
+      (talles europeos)
+      ━━━━━━━━━━━━━━
+      ```
+   4. Las fotos G5. Cada foto tiene que entenderse sola, aunque alguien pase
+      rápido y no vea el separador. Su texto lleva arriba la calidad, y los
+      talles aclaran que son europeos:
+      ```
+      ⭐ CALIDAD G5
+      Adidas Superstar Blanca Full
+      Talles europeos: 36, 39, 40, 42 al 44
+      ```
+      Los talles se arman con la misma `formatear_talles` de las BR.
    5. El mensaje de precios G5, exactamente este texto, que pasó el usuario:
       ```
       Zapas g5

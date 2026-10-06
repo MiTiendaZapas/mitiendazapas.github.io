@@ -14,7 +14,7 @@ const esc = escapeHtml;
 /** Tabla de talles (también la usa la vista de cada modelo). */
 export function sizeTableHtml(chart) {
   return `
-    <div class="size-table" role="table" aria-label="${esc(chart.title)}">
+    <div class="size-table" role="table" aria-label="${esc(chart.title)}" style="grid-template-columns: repeat(${chart.columns.length}, 1fr)">
       <div class="size-table__row size-table__row--head" role="row">
         ${chart.columns.map((c) => `<span role="columnheader">${esc(c)}</span>`).join("")}
       </div>

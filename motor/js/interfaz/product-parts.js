@@ -17,13 +17,16 @@ export function priceHtml(product, pricing) {
  * Botones de talle. En la tarjeta se muestran solo los disponibles; en la
  * vista de detalle se muestra la curva completa con los agotados tachados.
  */
-export function sizeButtonsHtml(sizes, selectedSize) {
+export function sizeButtonsHtml(sizes, selectedSize, { european = false } = {}) {
+  // G5: talles europeos. Un "EU" chiquito abajo del número, sin agrandar el cuadrado.
+  const unit = european ? `<span class="size-chip__unit" aria-hidden="true">EU</span>` : "";
+  const kind = european ? " europeo" : "";
   return sizes.map((s) => {
     const soldOut = s.stock <= 0;
     return `
-      <button class="size-chip${s.size.length > 3 ? " size-chip--wide" : ""}" type="button"
+      <button class="size-chip${s.size.length > 3 ? " size-chip--wide" : ""}${european ? " size-chip--eu" : ""}" type="button"
         data-size="${escapeHtml(s.size)}" aria-pressed="${s.size === selectedSize}"
-        ${soldOut ? `disabled aria-label="Talle ${escapeHtml(s.size)}, agotado"` : ""}>${escapeHtml(s.size)}</button>`;
+        ${soldOut ? `disabled aria-label="Talle ${escapeHtml(s.size)}${kind}, agotado"` : european ? `aria-label="Talle ${escapeHtml(s.size)} europeo"` : ""}>${escapeHtml(s.size)}${unit}</button>`;
   }).join("");
 }
 

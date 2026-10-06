@@ -453,3 +453,18 @@
 .cart-group__hint { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-size: 13px; }
 .cart-group__hint.is-done { color: var(--color-success); font-weight: 600; }
 .cart-group__hint .icon { width: 14px; height: 14px; vertical-align: -2px; }
+
+/* Talle europeo (G5): "EU" chiquito abajo del número, sin cambiar el tamaño del cuadrado. */
+.size-chip--eu { position: relative; padding-bottom: 7px; }
+.size-chip__unit {
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  left: 0;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-align: center;
+  opacity: 0.6;
+}

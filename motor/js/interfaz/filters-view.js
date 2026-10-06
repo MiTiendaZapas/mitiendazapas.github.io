@@ -113,7 +113,7 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
         </div>
       </fieldset>
       <fieldset class="filter-group">
-        <legend class="filter-group__title">Talle <span class="filter-group__hint">con stock</span></legend>
+        <legend class="filter-group__title">${filters.state.quality === "g5" ? "Talle europeo" : "Talle"} <span class="filter-group__hint">con stock</span></legend>
         <div class="filter-sizes">
           ${options.sizes.map((s) => `
             <button class="size-chip" type="button" data-filter-size="${escapeHtml(s.value)}" aria-pressed="${s.selected}"

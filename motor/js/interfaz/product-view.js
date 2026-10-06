@@ -9,6 +9,7 @@ import { buildOrderMessage, orderLink, productQueryLink } from "../whatsapp.js";
 import { icon } from "./icons.js";
 import { priceHtml, sizeButtonsHtml, stockStatus, qualityBadgeHtml } from "./product-parts.js";
 import { sizeTableHtml } from "./pages.js";
+import { G5_SIZE_CHART } from "./g5.js";
 import { createSharer, shareButtonHtml } from "./share.js";
 import { attachSwipe } from "./swipe.js";
 import { createZoomViewer } from "./zoom-viewer.js";
@@ -163,8 +164,9 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
 
   /** Tabla de talles desplegable (solo en las categorías que la usan). */
   function sizeChartHtml() {
-    const chart = config.sizeChart;
-    if (!chart || !chart.categories.includes(product.category)) return "";
+    // Las G5 tienen su propia tabla (talles europeos), en cualquier tienda que las muestre.
+    const chart = product.category === "g5" ? G5_SIZE_CHART : config.sizeChart;
+    if (!chart || (chart !== G5_SIZE_CHART && !chart.categories.includes(product.category))) return "";
     return `
       <details class="size-chart-toggle">
         <summary>${icon("ruler")} <span>${escapeHtml(chart.title)}</span> ${icon("chevronDown")}</summary>
@@ -217,7 +219,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
         ${priceHtml(product, pricing)}
         <fieldset class="size-picker product-view__sizes">
           <legend class="size-picker__legend">Elegí tu talle${soldOutCount ? ` <span class="size-picker__soldout">(tachados: agotados)</span>` : ""}</legend>
-          <div class="size-picker__list" data-sizes>${sizeButtonsHtml(product.sizes, state.size)}</div>
+          <div class="size-picker__list" data-sizes>${sizeButtonsHtml(product.sizes, state.size, { european: product.category === "g5" })}</div>
         </fieldset>
         ${sizeChartHtml()}
         <div class="product-view__buy" data-buy>${buyHtml()}</div>

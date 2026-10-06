@@ -7,6 +7,7 @@
 import { escapeHtml, money, plural, readStorage, whatsappLink, writeStorage } from "../utils.js";
 import { buildOrderMessage, orderLink } from "../whatsapp.js";
 import { icon } from "./icons.js";
+import { sizeLabel } from "./g5.js";
 import { socialLinksHtml } from "./social.js";
 
 const MODE_KEY = "purchase-mode";
@@ -179,7 +180,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
           </button>
           <div class="cart-line__info">
             <p class="cart-line__name"><button class="cart-line__name-btn" type="button" data-line-open>${escapeHtml(line.product.name)}</button></p>
-            <p class="cart-line__meta">Talle <strong>${escapeHtml(line.size)}</strong> · <span class="money">${money(line.price)}</span> c/u</p>
+            <p class="cart-line__meta">Talle <strong>${escapeHtml(sizeLabel(line.product, line.size))}</strong> · <span class="money">${money(line.price)}</span> c/u</p>
             <div class="cart-line__controls">
               <div class="stepper stepper--sm" role="group" aria-label="Cantidad de ${escapeHtml(line.product.name)} talle ${escapeHtml(line.size)}">
                 <button class="stepper__btn" type="button" data-line-step="-1" aria-label="Restar uno" ${line.qty <= 1 ? "disabled" : ""}>${icon("minus")}</button>
