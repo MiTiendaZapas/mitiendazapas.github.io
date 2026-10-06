@@ -31,6 +31,14 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
   if (!response.ok) throw new Error(`No se pudo cargar el catálogo (HTTP ${response.status})`);
   const data = await response.json();
   if (!Array.isArray(data?.products)) throw new Error("El catálogo tiene un formato inesperado");
+  // Las G5 vienen en su propio archivo; solo las tiendas con showG5 lo suman.
+  // Si falta o falla, la tienda sigue con lo demás.
+  if (showG5) {
+    try {
+      const extra = await fetch(`${base}productos-g5.json`, { cache: "no-cache" });
+      if (extra.ok) data.products = data.products.concat((await extra.json()).products ?? []);
+    } catch { /* sin G5 por ahora */ }
+  }
 
   const products = data.products
     .filter((p) => p && typeof p.id === "string" && typeof p.name === "string" && Array.isArray(p.sizes))

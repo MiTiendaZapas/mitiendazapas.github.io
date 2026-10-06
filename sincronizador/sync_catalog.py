@@ -117,6 +117,19 @@ def _photos_folder_index():
             if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")}
 
 
+def extra_file(config):
+    """Archivo propio de cada proveedor extra (ej. catalogo/productos-g5.json).
+
+    Van aparte del catálogo principal para que lo que ya lee productos.json (el bot
+    de WhatsApp, las tiendas sin G5) no cambie: solo las tiendas con showG5 lo suman.
+    """
+    return settings.CATALOG_DIR / config.get("file", f"productos-{config['category']}.json")
+
+
+def _read_products(path):
+    return json.loads(path.read_text(encoding="utf-8")).get("products", []) if path.exists() else []
+
+
 def build_extra_products(classifier, used_slugs, previous_products):
     """Modelos de los proveedores extra (settings.EXTRA_PROVIDERS), cada uno con su categoría.
 
@@ -279,10 +292,11 @@ def run():
 
     classifier = Classifier()
     products = build_products(provider_items, manual_items, classifier)
-    previous_products = []
-    if settings.PRODUCTS_FILE.exists():
-        previous_products = json.loads(settings.PRODUCTS_FILE.read_text(encoding="utf-8")).get("products", [])
+    previous_products = _read_products(settings.PRODUCTS_FILE)
+    for config in settings.EXTRA_PROVIDERS.values():
+        previous_products += _read_products(extra_file(config))
     products += build_extra_products(classifier, {p["slug"] for p in products}, previous_products)
+    extra_categories = {config["category"]: config for config in settings.EXTRA_PROVIDERS.values()}
     if args.only:
         wanted = {normalize(n) for n in args.only.split(";") if n.strip()}
         products = [p for p in products if normalize(p["name"]) in wanted]
@@ -295,8 +309,9 @@ def run():
 
     if not args.only and not args.force and settings.PRODUCTS_FILE.exists():
         previous = json.loads(settings.PRODUCTS_FILE.read_text(encoding="utf-8")).get("count", 0)
-        if previous and len(products) < previous * settings.MIN_RATIO_VS_PREVIOUS:
-            print(f"❌ Se detectaron {len(products)} modelos contra {previous} del catálogo anterior. "
+        main_count = sum(1 for p in products if p["category"] not in extra_categories)
+        if previous and main_count < previous * settings.MIN_RATIO_VS_PREVIOUS:
+            print(f"❌ Se detectaron {main_count} modelos contra {previous} del catálogo anterior. "
                   "No se pisa el catálogo (¿caída o cambio del proveedor?). "
                   "Si el achique es real, correr con --force.")
             return 1
@@ -334,12 +349,17 @@ def run():
     for p in products:
         for key in ("_provider_item", "_manual_photo", "name_key", "_source", "_frozen"):
             p.pop(key, None)
-    write_json_atomic(settings.PRODUCTS_FILE, {
-        "version": int(time.time()),
-        "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "count": len(products),
-        "products": products,
-    })
+    def write_catalog(path, items):
+        write_json_atomic(path, {
+            "version": int(time.time()),
+            "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "count": len(items),
+            "products": items,
+        })
+
+    write_catalog(settings.PRODUCTS_FILE, [p for p in products if p["category"] not in extra_categories])
+    for category, config in extra_categories.items():
+        write_catalog(extra_file(config), [p for p in products if p["category"] == category])
     store.mark_seen(p["id"] for p in products)
     if not args.only and not args.no_images:
         store.cleanup({p["id"] for p in products})
