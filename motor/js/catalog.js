@@ -27,7 +27,10 @@ function sortProducts(products, order) {
 export async function loadCatalog(base, { order = "marca-modelo", includeHouseStock = true, showG5 = false } = {}) {
   // "no-cache": el navegador pregunta si hay versión nueva (stock actualizado),
   // pero si no cambió no vuelve a descargar el archivo.
-  const response = await fetch(`${base}productos.json`, { cache: "no-cache" });
+  // GitHub deja guardar estos archivos 10 minutos (en el navegador y en sus servidores).
+  // Con "?t=" cambiando cada minuto, siempre llega el stock que publicó el piloto.
+  const fresh = `?t=${Math.floor(Date.now() / 60000)}`;
+  const response = await fetch(`${base}productos.json${fresh}`, { cache: "no-cache" });
   if (!response.ok) throw new Error(`No se pudo cargar el catálogo (HTTP ${response.status})`);
   const data = await response.json();
   if (!Array.isArray(data?.products)) throw new Error("El catálogo tiene un formato inesperado");
@@ -35,7 +38,7 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
   // Si falta o falla, la tienda sigue con lo demás.
   if (showG5) {
     try {
-      const extra = await fetch(`${base}productos-g5.json`, { cache: "no-cache" });
+      const extra = await fetch(`${base}productos-g5.json${fresh}`, { cache: "no-cache" });
       if (extra.ok) data.products = data.products.concat((await extra.json()).products ?? []);
     } catch { /* sin G5 por ahora */ }
   }
