@@ -67,7 +67,7 @@ falla, usa la copia local del piloto. De cada producto usa **solo**:
 - Los ids de las G5 empiezan con `g5-` (el bot guarda lo ya enviado por id para no repetir si retoma).
 - Un modelo sin stock o sin foto no se manda.
 
-Orden de lo que manda por día: fotos BR → mensaje de precios BR → separador G5 → fotos G5 (con "⭐ CALIDAD G5" y
+Orden de lo que manda por día: saludo («Buen día gente / Les dejo el stock de hoy 👇👇👇») → fotos BR → mensaje de precios BR → separador G5 → fotos G5 (con "⭐ CALIDAD G5" y
 "Talles europeos") → mensaje de precios G5. Domingos no manda. Si falta `productos-g5.json`, manda solo BR.
 
 ## 5. Lo que NO hay que hacer
