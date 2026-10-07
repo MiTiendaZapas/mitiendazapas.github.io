@@ -18,8 +18,20 @@ def _unescape(js_string):
     return re.sub(r"\\(.)", r"\1", js_string)
 
 
+def _traer_stock_de_la_app():
+    """El stock de casa ahora se maneja desde AppPedidos > Stock de casa (Firebase).
+    Antes de leer los archivos se los actualiza con eso. Si algo falla (sin internet,
+    Firebase caído, módulo ausente), NO pasa nada: se leen los archivos como estaban."""
+    try:
+        import stock_casa_sync  # está en esta misma carpeta (sincronizador/)
+        stock_casa_sync.sincronizar_seguro()
+    except Exception as e:  # incluye ImportError si faltara el módulo
+        print(f"  ⚠️ No se pudo traer el stock de casa de la app ({e}); se usan los archivos que hay.")
+
+
 def load():
     """Devuelve [(kind, {name, sizes, photo})]; kind es 'zapatillas' o 'indumentaria'."""
+    _traer_stock_de_la_app()
     items = []
     for kind, path in settings.MANUAL_STOCK_FILES.items():
         if not path.exists():
