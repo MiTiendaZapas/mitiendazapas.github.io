@@ -1,4 +1,4 @@
-"""Piloto automático: actualiza el catálogo cada 15-20 minutos y lo publica.
+"""Piloto automático: actualiza el catálogo cada 10-15 minutos y lo publica.
 
 Reemplaza a Automatizacion/piloto_automatico.py de la tienda anterior, con el
 mismo comportamiento de fondo:
@@ -41,8 +41,8 @@ PID_FILE = SYNC_DIR / "estado" / "piloto.pid"
 LOG_FILE = SYNC_DIR / "informes" / "piloto.log"
 LOG_MAX_BYTES = 2_000_000
 
-WAIT_MIN_MINUTES = 15
-WAIT_MAX_MINUTES = 20
+WAIT_MIN_MINUTES = 10
+WAIT_MAX_MINUTES = 15
 WAIT_AFTER_FAILURE_MINUTES = 30
 ALERT_AFTER_HOURS = 2          # aviso bien visible si pasan estas horas sin una vuelta buena
 # Descanso nocturno (igual que el piloto de la laptop): de 00:00 a 07:30.

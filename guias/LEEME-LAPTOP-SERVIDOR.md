@@ -13,7 +13,7 @@ Inicio de Windows):
 
 | Programa | Qué hace | Dónde |
 |---|---|---|
-| **Piloto** `sincronizador/piloto.py --publicar` | Vuelta cada ~17 min: baja de GitHub, corre `sync_catalog.py`, publica `catalogo/` y el stock de casa. Descansa de 00:00 a 07:30. | `Desktop/mitiendazapas.github.io` |
+| **Piloto** `sincronizador/piloto.py --publicar` | Vuelta cada 10-15 min (antes 15-20; se bajó el 07/10): baja de GitHub, corre `sync_catalog.py`, publica `catalogo/` y el stock de casa. Descansa de 00:00 a 07:30. | `Desktop/mitiendazapas.github.io` |
 | **Bot de WhatsApp** `automatizacion/bot_whatsapp.py` | Todos los días (menos domingos), a una hora al azar entre 07:45 y 08:10, manda el stock al grupo real. | `Desktop/tienda-zapatillas/automatizacion` |
 
 Carpetas en el Escritorio de la laptop:
@@ -47,6 +47,8 @@ Cómo comprobarlo: en la ventana del piloto debe aparecer `[stock de casa] Sin c
 
 Nota: en `zapatillas_manual.js` el modelo «Adidas forum Preto blanco» no tiene foto propia (`Fotos/...jpg` no existe).
 No es problema porque también viene del proveedor y se usa la foto del proveedor.
+
+**Intervalo del piloto:** `WAIT_MIN_MINUTES = 10` / `WAIT_MAX_MINUTES = 15` en `piloto.py`. Se bajó a pedido del usuario (antes 15-20) porque cada vuelta sin novedades dura ~7 s y el proveedor aguanta bien ese ritmo. No lo bajes de 10 sin hablarlo con el usuario: más pedidos aumentan la chance de que el proveedor limite o bloquee. El 07/10 el proveedor devolvió 503 de 11:08 a 12:39; el piloto conservó el catálogo y reintentó cada 30 min (`WAIT_AFTER_FAILURE_MINUTES`).
 
 ## 3. Cuándo hay que reiniciar el piloto
 
