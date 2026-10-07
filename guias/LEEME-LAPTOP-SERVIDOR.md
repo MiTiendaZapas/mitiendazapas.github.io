@@ -68,7 +68,9 @@ falla, usa la copia local del piloto. De cada producto usa **solo**:
 - Un modelo sin stock o sin foto no se manda.
 
 Orden de lo que manda por día: saludo («Buen día gente / Les dejo el stock de hoy 👇👇👇») → fotos BR → mensaje de precios BR → separador G5 → fotos G5 (con "⭐ CALIDAD G5" y
-"Talles europeos") → mensaje de precios G5. Domingos no manda. Si falta `productos-g5.json`, manda solo BR.
+"Talles europeos") → mensaje de precios G5. → separador de indumentaria → prendas de indumentaria → precios de indumentaria. Domingos no manda. Si falta `productos-g5.json`, manda solo BR y, si falla la lectura de indumentaria, sigue sin ella.
+
+La **indumentaria** no pasa por el piloto ni por `catalogo/`: el bot la lee directo de la API pública de la tienda de Beto (`https://app-beto-seven.vercel.app/api/catalogo`, `categoria: Indumentaria`; las fotos son URLs públicas de Supabase). El texto de precios de indumentaria es fijo en `bot_whatsapp.py` (`MENSAJE_PRECIOS_INDUMENTARIA`). Si algún día la indumentaria se agrega al catalogo del piloto, avisalo en una guía para pasar el bot a leerla de ahí.
 
 ## 5. Lo que NO hay que hacer
 
