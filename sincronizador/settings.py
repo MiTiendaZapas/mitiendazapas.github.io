@@ -45,7 +45,10 @@ EXCLUDE_KEYWORDS = ["remera", "baggy"]
 # El Panel Admin sigue guardando el stock de casa en el repositorio de la tienda
 # anterior (TiendaZapasOficial), que tiene que estar en la misma carpeta que este.
 # El piloto trae lo último de ahí antes de cada vuelta.
-LEGACY_REPO = ROOT.parent / "TiendaZapasOficial"
+# La carpeta se llama "TiendaZapasOficial" en la PC principal y "tienda-zapatillas" en la laptop
+# del piloto y del bot de WhatsApp: se usa la que exista (la primera de la lista).
+LEGACY_REPO = next((c for c in (ROOT.parent / "TiendaZapasOficial", ROOT.parent / "tienda-zapatillas")
+                    if (c / ".git").exists()), ROOT.parent / "TiendaZapasOficial")
 MANUAL_STOCK_FILES = {
     "zapatillas": LEGACY_REPO / "zapatillas_manual.js",
     "indumentaria": LEGACY_REPO / "indumentaria.js",

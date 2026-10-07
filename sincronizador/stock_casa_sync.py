@@ -30,9 +30,22 @@ from pathlib import Path
 import os
 
 AQUI = Path(__file__).resolve().parent                     # .../plataforma-zapas/sincronizador
-# TiendaZapasOficial (donde viven zapatillas_manual.js, indumentaria.js y Fotos/): la misma
-# carpeta que settings.LEGACY_REPO, hermana de plataforma-zapas.
-REPO = Path(os.environ.get("STOCK_CASA_REPO") or (AQUI.parents[1] / "TiendaZapasOficial"))
+# Carpeta donde viven zapatillas_manual.js, indumentaria.js y Fotos/: la misma que
+# settings.LEGACY_REPO ("TiendaZapasOficial" en la PC principal, "tienda-zapatillas" en la laptop
+# del piloto). Antes el nombre estaba escrito a mano y en la laptop no existía: el stock de la app
+# nunca llegaba. Se puede forzar con la variable de entorno STOCK_CASA_REPO.
+def _carpeta_stock_casa():
+    if os.environ.get("STOCK_CASA_REPO"):
+        return Path(os.environ["STOCK_CASA_REPO"])
+    try:
+        sys.path.insert(0, str(AQUI))
+        import settings
+        return Path(settings.LEGACY_REPO)
+    except Exception:
+        return AQUI.parents[1] / "TiendaZapasOficial"
+
+
+REPO = _carpeta_stock_casa()
 # Copias de seguridad y estado: dentro de Automatizacion/, que git ignora (queda solo en cada PC).
 LOCAL = REPO / "Automatizacion"
 BACKUPS = LOCAL / "backups_stock"
