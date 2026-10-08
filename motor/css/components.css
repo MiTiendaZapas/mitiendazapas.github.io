@@ -468,3 +468,12 @@
   text-align: center;
   opacity: 0.6;
 }
+
+/* Celular: en las tarjetas del catálogo, los talles van de a 4 por fila y ocupan
+   todo el ancho (antes entraban 3 y quedaba un hueco a la derecha). Los talles
+   dobles de ojotas (41/42) ocupan dos lugares. En el detalle del modelo no cambia. */
+@media (max-width: 639px) {
+  .product-card .size-picker__list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  .product-card .size-picker__list .size-chip { min-width: 0; padding: 0 2px; }
+  .product-card .size-picker__list .size-chip--wide { grid-column: span 2; }
+}
