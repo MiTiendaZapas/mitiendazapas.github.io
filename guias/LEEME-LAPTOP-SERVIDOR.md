@@ -69,6 +69,8 @@ falla, usa la copia local del piloto. De cada producto usa **solo**:
 - Los ids de las G5 empiezan con `g5-` (el bot guarda lo ya enviado por id para no repetir si retoma).
 - Un modelo sin stock o sin foto no se manda.
 
+El bot abre WhatsApp Web **12 minutos antes** de la hora sorteada (tarda ~5 min en cargar y otro rato en asentarse) y lo deja esperando, así el primer mensaje sale a la hora. Lee el catálogo recién a la hora de enviar. Si no logra abrirlo de antemano, espera la hora y lo abre entonces.
+
 Orden de lo que manda por día: saludo («Buen día gente / Les dejo el stock de hoy 👇👇👇») → fotos BR → mensaje de precios BR → separador G5 → fotos G5 (con "⭐ CALIDAD G5" y
 "Talles europeos") → mensaje de precios G5. → separador de indumentaria → prendas de indumentaria → precios de indumentaria. Domingos no manda. Si falta `productos-g5.json`, manda solo BR y, si falla la lectura de indumentaria, sigue sin ella.
 
