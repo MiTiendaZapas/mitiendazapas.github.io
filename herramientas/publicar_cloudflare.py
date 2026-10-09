@@ -83,12 +83,12 @@ def main():
         return 0
     env = dict(os.environ)
     if not env.get("CLOUDFLARE_API_TOKEN"):
-        # Sesión de wrangler de esta PC: "whoami" renueva la llave temporal (dura una hora).
-        subprocess.run(["npx", "wrangler", "whoami"], capture_output=True, shell=(sys.platform == "win32"))
-        config = Path(os.environ.get("APPDATA", "")) / "xdg.config" / ".wrangler" / "config" / "default.toml"
-        token = re.search(r'^oauth_token\s*=\s*"([^"]+)"', config.read_text(encoding="utf-8"), re.M) if config.exists() else None
-        if token:
-            env["CLOUDFLARE_API_TOKEN"] = token.group(1)
+        # Sesión de wrangler de esta PC ("wrangler login"): "auth token" la renueva si venció
+        # (dura una hora) y devuelve la llave en la última línea.
+        output = subprocess.run(["npx", "wrangler", "auth", "token"], capture_output=True, text=True,
+                                shell=(sys.platform == "win32")).stdout.strip().splitlines()
+        if output and re.fullmatch(r"[\w.-]{30,}", output[-1].strip()):
+            env["CLOUDFLARE_API_TOKEN"] = output[-1].strip()
     env.setdefault("CLOUDFLARE_ACCOUNT_ID", ACCOUNT_ID)
     result = subprocess.run(["npx", "wrangler", "pages", "deploy", str(dist), "--project-name", PROJECT_NAME,
                              "--branch", "main", "--commit-dirty=true"], shell=(sys.platform == "win32"), env=env)
