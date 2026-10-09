@@ -369,7 +369,26 @@ def run():
     if size_mb > settings.IMAGES_WARN_MB:
         print(f"⚠️ Las imágenes superan {settings.IMAGES_WARN_MB} MB: conviene evaluar la opción C (Cloudflare R2).")
     print(f"✅ Catálogo escrito: {settings.PRODUCTS_FILE} ({time.time() - started:.0f}s)")
+    if not args.only:
+        upload_to_r2()
     return 0
+
+
+def upload_to_r2():
+    """Sube a Cloudflare (catalogo.mitiendastock.com) lo que cambió del catálogo.
+
+    Si esta PC no tiene el token de Cloudflare, no hace nada. Si falla (internet,
+    Cloudflare), avisa y sigue: en la próxima vuelta sube lo que haya quedado pendiente.
+    """
+    import r2
+    if not (os.environ.get("CLOUDFLARE_API_TOKEN") or r2.TOKEN_FILE.exists()):
+        print("ℹ️ Cloudflare: esta PC no tiene token, no se sube el catálogo a mitiendastock.com.")
+        return
+    try:
+        uploaded, deleted = r2.sync()
+        print(f"☁️ Cloudflare: {len(uploaded)} archivos subidos, {len(deleted)} borrados (catalogo.mitiendastock.com).")
+    except Exception as error:
+        print(f"⚠️ Cloudflare: no se pudo subir el catálogo ({type(error).__name__}: {error}). Se reintenta en la próxima vuelta.")
 
 
 if __name__ == "__main__":
