@@ -8,7 +8,7 @@ y la sube con wrangler al proyecto "mitiendastock". El stock y las fotos NO van 
 viven en el depósito R2 (catalogo.mitiendastock.com) y los sube el piloto.
 
 Uso (desde la carpeta del proyecto):
-    python herramientas/publicar_cloudflare.py            publica
+    bash herramientas/publicar_cloudflare.sh              publica (toma la llave de "wrangler login")
     python herramientas/publicar_cloudflare.py --armar    solo arma la carpeta, sin subir
 """
 import os
@@ -83,12 +83,9 @@ def main():
         return 0
     env = dict(os.environ)
     if not env.get("CLOUDFLARE_API_TOKEN"):
-        # Sesión de wrangler de esta PC ("wrangler login"): "auth token" la renueva si venció
-        # (dura una hora) y devuelve la llave en la última línea.
-        output = subprocess.run(["npx", "wrangler", "auth", "token"], capture_output=True, text=True,
-                                shell=(sys.platform == "win32")).stdout.strip().splitlines()
-        if output and re.fullmatch(r"[\w.-]{30,}", output[-1].strip()):
-            env["CLOUDFLARE_API_TOKEN"] = output[-1].strip()
+        # El Python de la tienda de Windows no ve la sesión de wrangler: usar el .sh, que la pasa.
+        print("Falta CLOUDFLARE_API_TOKEN: publicar con  bash herramientas/publicar_cloudflare.sh")
+        return 1
     env.setdefault("CLOUDFLARE_ACCOUNT_ID", ACCOUNT_ID)
     result = subprocess.run(["npx", "wrangler", "pages", "deploy", str(dist), "--project-name", PROJECT_NAME,
                              "--branch", "main", "--commit-dirty=true"], shell=(sys.platform == "win32"), env=env)
