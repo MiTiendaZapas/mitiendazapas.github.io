@@ -59,8 +59,7 @@ No es problema porque también viene del proveedor y se usa la foto del proveedo
 
 ## 4. Lo que el bot de WhatsApp espera del catálogo (para no romperlo)
 
-El bot lee `https://mitiendazapas.github.io/catalogo/productos.json` (BR) y `.../productos-g5.json` (G5); si la web
-falla, usa la copia local del piloto. De cada producto usa **solo**:
+Desde el 09/10 el bot lee el catálogo de **Cloudflare** (`https://catalogo.mitiendastock.com/productos.json` y `productos-g5.json`) y también de GitHub (`https://mitiendazapas.github.io/catalogo/...`): mira las dos y usa la que tenga el `generatedAt` más reciente (si empatan, Cloudflare). Las fotos las baja de Cloudflare y, si falla, de GitHub; si las dos fallan usa la copia local del piloto. Mientras el piloto siga publicando en los dos lados, cualquiera de las dos que se atrase no afecta al bot. **Si algún día se deja de publicar en GitHub**, el bot ya está preparado (usa Cloudflare). De cada producto usa **solo**:
 `id`, `name`, `sizes[{size, stock}]`, `images[0].lg`; y del archivo, `generatedAt` y `products`.
 
 - Si cambia ese formato, avisalo en una guía antes de publicarlo: el bot tiene que adaptarse a la vez.
