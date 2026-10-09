@@ -80,6 +80,7 @@ La **indumentaria** no pasa por el piloto ni por `catalogo/`: el bot la lee dire
 
 - No abrir ni correr el bot de WhatsApp desde otra PC: dos bots mandarían todo duplicado al mismo grupo.
 - No tocar `automatizacion/sesion_wsp` (la sesión de WhatsApp de la laptop) ni `bot_config.json` (nombres de los grupos).
+- No lanzar el piloto ni el bot desde una sesión de Claude (`Start-Process`, `start`, etc.): quedan colgando del proceso de la app y mueren cuando la app se reinicia (pasó el 08/10 ~20:46: se cerraron los dos sin que el usuario tocara nada). Se abren con los accesos directos de la carpeta Inicio de Windows (`Piloto Catalogo Nuevo.lnk` y `Bot WhatsApp Tienda.lnk`), por ejemplo con `explorer.exe "<ruta del .lnk>"`.
 - Los `.js` de stock de casa no se editan a mano: se pisan en cada vuelta. Todo se hace desde la app.
 
 ## 6. Pendientes / ideas para vos
