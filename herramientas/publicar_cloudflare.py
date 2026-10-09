@@ -11,6 +11,7 @@ Uso (desde la carpeta del proyecto):
     python herramientas/publicar_cloudflare.py            publica
     python herramientas/publicar_cloudflare.py --armar    solo arma la carpeta, sin subir
 """
+import os
 import re
 import shutil
 import subprocess
@@ -21,6 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROJECTS = ROOT.parent
 PROJECT_NAME = "mitiendastock"
+ACCOUNT_ID = "a5674ec6250ba14982dd00982b69e421"
 OLD_URL = "https://mitiendazapas.github.io/"
 NEW_URL = "https://mitiendastock.com/"
 
@@ -79,8 +81,17 @@ def main():
     print(f"Armado en {dist}: tienda principal + {len(clients)} clientes ({', '.join(clients)}), {files} archivos.")
     if "--armar" in sys.argv:
         return 0
+    env = dict(os.environ)
+    if not env.get("CLOUDFLARE_API_TOKEN"):
+        # Sesión de wrangler de esta PC: "whoami" renueva la llave temporal (dura una hora).
+        subprocess.run(["npx", "wrangler", "whoami"], capture_output=True, shell=(sys.platform == "win32"))
+        config = Path(os.environ.get("APPDATA", "")) / "xdg.config" / ".wrangler" / "config" / "default.toml"
+        token = re.search(r'^oauth_token\s*=\s*"([^"]+)"', config.read_text(encoding="utf-8"), re.M) if config.exists() else None
+        if token:
+            env["CLOUDFLARE_API_TOKEN"] = token.group(1)
+    env.setdefault("CLOUDFLARE_ACCOUNT_ID", ACCOUNT_ID)
     result = subprocess.run(["npx", "wrangler", "pages", "deploy", str(dist), "--project-name", PROJECT_NAME,
-                             "--branch", "main", "--commit-dirty=true"], shell=(sys.platform == "win32"))
+                             "--branch", "main", "--commit-dirty=true"], shell=(sys.platform == "win32"), env=env)
     return result.returncode
 
 
