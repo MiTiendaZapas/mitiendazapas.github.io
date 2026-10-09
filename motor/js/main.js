@@ -23,6 +23,15 @@ import { renderLastPairs } from "./interfaz/ultimos-pares.js";
 
 const OPEN_CART_HASH = "#pedido";
 
+// En Cloudflare (mitiendastock.com) el stock y las fotos están en su depósito R2;
+// en GitHub siguen al lado de la tienda (/catalogo/).
+const R2_CATALOG = "https://catalogo.mitiendastock.com/";
+function catalogBase(config) {
+  const host = location.hostname;
+  const onCloudflare = host === "mitiendastock.com" || host.endsWith(".mitiendastock.com") || host.endsWith("mitiendastock.pages.dev");
+  return onCloudflare ? R2_CATALOG : fromRoot(config.catalogBase);
+}
+
 const config = window.STORE_CONFIG;
 const { key: channelKey, channel, isDefault } = resolveChannel(config);
 const links = createLinks(config, { key: channelKey, channel, isDefault });
@@ -71,7 +80,7 @@ async function startStore() {
 
   try {
     const [catalog, priceTable] = await Promise.all([
-      loadCatalog(fromRoot(config.catalogBase), {
+      loadCatalog(catalogBase(config), {
         order: config.catalogOrder,
         includeHouseStock: config.includeHouseStock !== false,
         showG5: config.showG5 === true,

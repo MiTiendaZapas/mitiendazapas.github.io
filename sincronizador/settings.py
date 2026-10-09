@@ -55,6 +55,15 @@ MANUAL_STOCK_FILES = {
 }
 LEGACY_PHOTOS_DIR = LEGACY_REPO   # las rutas del JS ya incluyen "Fotos/..."
 
+# --- Cloudflare R2 (catalogo.mitiendastock.com) -------------------------------
+# Depósito donde el piloto deja el stock y las fotos (ver sincronizador/r2.py).
+# El token NO va acá: va en estado/cloudflare_token.txt (no se sube a GitHub).
+CLOUDFLARE_R2 = {
+    "account_id": "a5674ec6250ba14982dd00982b69e421",
+    "bucket": "mitiendastock-catalogo",
+    "public_url": "https://catalogo.mitiendastock.com/",
+}
+
 # --- Salida ----------------------------------------------------------------
 CATALOG_DIR = ROOT / "catalogo"
 PRODUCTS_FILE = CATALOG_DIR / "productos.json"
