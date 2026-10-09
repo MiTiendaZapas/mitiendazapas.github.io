@@ -73,13 +73,17 @@ def build(dist):
     # Links de mitiendastock.com que se usaron antes de mover la tienda a /laimp/ (09/10).
     redirects = [line for page in MAIN_PAGES for line in (
         f"/{page} /{MAIN_STORE}/{page}/ 301", f"/{page}/* /{MAIN_STORE}/{page}/:splat 301")]
-    (dist / "_redirects").write_text("\n".join(redirects) + "\n", encoding="utf-8")
     clients = client_repos()
     for name, folder in clients.items():
         if (dist / name).exists():
             raise RuntimeError(f"El cliente '{name}' choca con una carpeta ya usada.")
         (dist / name).mkdir()
         copy_tree(folder, dist / name, SKIP_CLIENT)
+    # Cada página sin la barra final ("/emma") pasa a "/emma/" con un 301. Cloudflare lo hace
+    # solo con un 308, que la vista previa de WhatsApp a veces no sigue (link sin imagen).
+    pages = sorted({html.parent.relative_to(dist).as_posix() for html in dist.rglob("index.html")} - {"."})
+    redirects += [f"/{page} /{page}/ 301" for page in pages]
+    (dist / "_redirects").write_text("\n".join(redirects) + "\n", encoding="utf-8")
     # Las imágenes para compartir (og:image) apuntan a la dirección nueva.
     for html in dist.rglob("*.html"):
         text = html.read_text(encoding="utf-8")
