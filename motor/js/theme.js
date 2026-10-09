@@ -8,6 +8,13 @@
  *     sigue la configuración del celular o la computadora;
  *   - el botón del header lo cambia a mano y la elección queda guardada.
  */
+// Mudanza (10/10/2026): las tiendas viven en mitiendastock.com (Cloudflare). Quien entra
+// por un link viejo de GitHub va a la misma tienda, con el mismo modelo o filtro.
+// El stock de GitHub (/catalogo/) sigue disponible para el bot mientras dure el cambio.
+if (location.hostname === "mitiendazapas.github.io") {
+  location.replace("https://mitiendastock.com" + location.pathname + location.search + location.hash);
+}
+
 (function applyStoreTheme() {
   var config = window.STORE_CONFIG;
   if (!config || !config.theme) return;
