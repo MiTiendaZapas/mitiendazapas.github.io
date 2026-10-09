@@ -1,7 +1,8 @@
 """Publica TODAS las tiendas en Cloudflare Pages (mitiendastock.com).
 
 Junta en una carpeta:
-  - la tienda principal (este repositorio) en la raíz: /, /mayorista, /talles, /motor...
+  - una portada neutra en la raíz (herramientas/portada.html) y /motor/ para todas las tiendas
+  - la tienda de L.A IMP (este repositorio) en /laimp/: /laimp, /laimp/mayorista, /laimp/talles...
   - cada tienda de cliente (carpetas ../repositorio-*) en /<nombre del repo de GitHub>/
 
 y la sube con wrangler al proyecto "mitiendastock". El stock y las fotos NO van acá:
@@ -25,6 +26,9 @@ PROJECT_NAME = "mitiendastock"
 ACCOUNT_ID = "a5674ec6250ba14982dd00982b69e421"
 OLD_URL = "https://mitiendazapas.github.io/"
 NEW_URL = "https://mitiendastock.com/"
+MAIN_STORE = "laimp"   # la tienda de L.A IMP: mitiendastock.com/laimp (y /laimp/mayorista)
+# Páginas de la tienda de L.A IMP (carpetas con su index.html), para redirigir los links viejos.
+MAIN_PAGES = ["mayorista", "como-comprar", "talles", "envios", "cambios", "preguntas", "nosotros", "revender", "paginas"]
 
 # Lo que no se publica de la tienda principal (programas internos, pruebas, guías, stock).
 SKIP_MAIN = {".git", ".github", "catalogo", "sincronizador", "pruebas", "guias", "herramientas",
@@ -58,18 +62,30 @@ def copy_tree(source, target, skip):
 
 
 def build(dist):
-    copy_tree(ROOT, dist, SKIP_MAIN)
+    # La tienda de L.A IMP va en /laimp/ (entera: sus rutas son relativas). La raíz es una
+    # portada neutra: quien corta el link de un cliente no llega a la tienda ni a los precios
+    # de L.A IMP. /motor/ también va en la raíz, porque lo usan las tiendas de clientes.
+    main_store = dist / MAIN_STORE
+    main_store.mkdir()
+    copy_tree(ROOT, main_store, SKIP_MAIN)
+    shutil.copytree(ROOT / "motor", dist / "motor")
+    shutil.copy2(ROOT / "herramientas" / "portada.html", dist / "index.html")
+    # Links de mitiendastock.com que se usaron antes de mover la tienda a /laimp/ (09/10).
+    redirects = [line for page in MAIN_PAGES for line in (
+        f"/{page} /{MAIN_STORE}/{page}/ 301", f"/{page}/* /{MAIN_STORE}/{page}/:splat 301")]
+    (dist / "_redirects").write_text("\n".join(redirects) + "\n", encoding="utf-8")
     clients = client_repos()
     for name, folder in clients.items():
         if (dist / name).exists():
-            raise RuntimeError(f"El cliente '{name}' choca con una carpeta de la tienda principal.")
+            raise RuntimeError(f"El cliente '{name}' choca con una carpeta ya usada.")
         (dist / name).mkdir()
         copy_tree(folder, dist / name, SKIP_CLIENT)
     # Las imágenes para compartir (og:image) apuntan a la dirección nueva.
     for html in dist.rglob("*.html"):
         text = html.read_text(encoding="utf-8")
         if OLD_URL in text:
-            html.write_text(text.replace(OLD_URL, NEW_URL), encoding="utf-8")
+            new_base = NEW_URL + MAIN_STORE + "/" if main_store in html.parents else NEW_URL
+            html.write_text(text.replace(OLD_URL, new_base), encoding="utf-8")
     return clients
 
 

@@ -8,11 +8,18 @@
  *     sigue la configuración del celular o la computadora;
  *   - el botón del header lo cambia a mano y la elección queda guardada.
  */
-// Mudanza (10/10/2026): las tiendas viven en mitiendastock.com (Cloudflare). Quien entra
+// Mudanza (09/10/2026): las tiendas viven en mitiendastock.com (Cloudflare). Quien entra
 // por un link viejo de GitHub va a la misma tienda, con el mismo modelo o filtro.
-// El stock de GitHub (/catalogo/) sigue disponible para el bot mientras dure el cambio.
+// Las tiendas de clientes conservan su nombre; la de L.A IMP pasó a /laimp (la raíz de
+// mitiendastock.com es una portada neutra). El stock de GitHub (/catalogo/) sigue
+// disponible para el bot mientras dure el cambio.
 if (location.hostname === "mitiendazapas.github.io") {
-  location.replace("https://mitiendastock.com" + location.pathname + location.search + location.hash);
+  (function moveToNewDomain() {
+    var clients = ["fo", "importalestore", "emma", "erii-importados", "importados-more", "deuna-imp", "importados-flor"];
+    var first = location.pathname.split("/")[1] || "";
+    var path = clients.indexOf(first) >= 0 ? location.pathname : "/laimp" + location.pathname;
+    location.replace("https://mitiendastock.com" + path + location.search + location.hash);
+  })();
 }
 
 (function applyStoreTheme() {
