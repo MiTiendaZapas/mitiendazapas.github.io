@@ -90,6 +90,17 @@ describe("precios", () => {
     // Otra marca adelante no se saca: "Adidas mind" no es una Mind de Nike.
     assert.equal(prices.forProduct(product("m4", "Adidas mind x", [], { brand: "Nike" })).unit, 43000);
   });
+  test("el número pegado o separado no cambia el precio (TL1 = TL 1 = TL-1)", () => {
+    const prices = createPricing({
+      unit: { default: 43000, rules: [{ price: 60000, contains: ["tl1"] }, { price: 70000, startsWith: ["air max 90"] }] },
+      wholesalePrice: { default: 37000, rules: [{ price: 42000, contains: ["tl 1"] }] },
+    });
+    const expected = { unit: 60000, wholesale: 42000, bulk: null };
+    for (const [id, name] of [["t1", "TL1 negras", []], ["t2", "TL 1 blancas", []], ["t3", "Nike TL-1 rojas", []]]) {
+      assert.deepEqual(prices.forProduct(product(id, name, [])), expected, name);
+    }
+    assert.equal(prices.forProduct(product("t4", "Air max90 blancas", [])).unit, 70000);
+  });
   test("una tienda sin venta por mayor nunca aplica ni muestra precio por mayor", () => {
     const prices = createPricing({ wholesale: false, unit: { default: 65000, rules: [] }, wholesalePrice: { default: 37000, rules: [] } });
     assert.equal(prices.hasWholesale, false);

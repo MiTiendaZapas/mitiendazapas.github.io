@@ -7,15 +7,28 @@
 import { normalize } from "./utils.js";
 import { qualityOf } from "./filters.js";
 
+/**
+ * Texto para comparar nombres con las reglas: "TL1", "TL 1" y "TL-1" quedan
+ * iguales ("tl 1"), porque cada proveedor escribe distinto si el número va
+ * pegado o separado. Se aplica igual al nombre y a la regla.
+ */
+export function priceKey(text) {
+  return normalize(text)
+    .replace(/-/g, " ")
+    .replace(/([a-z])(?=\d)|(\d)(?=[a-z])/g, "$1$2 ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function compileList(list) {
   return {
     default: Number(list?.default) || 0,
     rules: (list?.rules ?? []).map((rule) => ({
       price: Number(rule.price) || 0,
       bulk: rule.bulk ? { min: Number(rule.bulk.min), price: Number(rule.bulk.price) } : null,
-      contains: (rule.contains ?? []).map(normalize),
-      containsAll: (rule.containsAll ?? []).map(normalize),
-      startsWith: (rule.startsWith ?? []).map(normalize),
+      contains: (rule.contains ?? []).map(priceKey),
+      containsAll: (rule.containsAll ?? []).map(priceKey),
+      startsWith: (rule.startsWith ?? []).map(priceKey),
       category: rule.category ?? [],
     })),
   };
@@ -30,7 +43,7 @@ const BRAND_ALIASES = { "new balance": ["nb"] };
  * le agrega la marca al nombre.
  */
 function withoutBrand(key, brand) {
-  const name = normalize(brand);
+  const name = priceKey(brand);
   if (!name) return key;
   for (const prefix of [name, ...(BRAND_ALIASES[name] ?? [])]) {
     if (key.startsWith(`${prefix} `)) return key.slice(prefix.length + 1);
@@ -62,7 +75,7 @@ export function createPricing(table) {
 
   function resolve(product) {
     if (cache.has(product.id)) return cache.get(product.id);
-    const key = normalize(product.name);
+    const key = priceKey(product.name);
     const shortKey = withoutBrand(key, product.brand);
     const override = overrides[product.slug] ?? overrides[product.id] ?? {};
     const unitRule = findRule(unitList, key, shortKey, product.category);
