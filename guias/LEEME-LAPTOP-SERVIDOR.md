@@ -71,7 +71,7 @@ Desde el 09/10 el bot lee el catálogo de **Cloudflare** (`https://catalogo.miti
 El bot abre WhatsApp Web **12 minutos antes** de la hora sorteada (tarda ~5 min en cargar y otro rato en asentarse) y lo deja esperando, así el primer mensaje sale a la hora. Lee el catálogo recién a la hora de enviar. Si no logra abrirlo de antemano, espera la hora y lo abre entonces.
 
 Orden de lo que manda por día: saludo («Buen día gente / Les dejo el stock de hoy 👇👇👇») → fotos BR → mensaje de precios BR → separador G5 → fotos G5 (con "⭐ CALIDAD G5" y
-"Talles europeos") → mensaje de precios G5. → separador de indumentaria → prendas de indumentaria → precios de indumentaria. Domingos no manda. Si falta `productos-g5.json`, manda solo BR y, si falla la lectura de indumentaria, sigue sin ella.
+"Talles europeos") → mensaje de precios G5. → separador de indumentaria → prendas de indumentaria → precios de indumentaria. → **mensaje final de la tienda** (oferta: "si quieren tener una tienda como la nuestra... $25.000 por mes... escribanme al 11 5377-3771"; el texto está en `MENSAJE_PROMO_TIENDA` de `bot_whatsapp.py`). Domingos no manda. Si falta `productos-g5.json`, manda solo BR y, si falla la lectura de indumentaria, sigue sin ella.
 
 La **indumentaria** no pasa por el piloto ni por `catalogo/`: el bot la lee directo de la API pública de la tienda de Beto (`https://app-beto-seven.vercel.app/api/catalogo`, `categoria: Indumentaria`; las fotos son URLs públicas de Supabase). El texto de precios de indumentaria es fijo en `bot_whatsapp.py` (`MENSAJE_PRECIOS_INDUMENTARIA`). Si algún día la indumentaria se agrega al catalogo del piloto, avisalo en una guía para pasar el bot a leerla de ahí.
 
@@ -89,3 +89,7 @@ La **indumentaria** no pasa por el piloto ni por `catalogo/`: el bot la lee dire
   reales de stock, así que no urge, pero es lo que haría que "sin cambios = sin commit" funcione de verdad.
 - El mensaje de precios BR del bot dice "calidad Brasil" y no tiene los modelos de $42.000. El usuario todavía no dijo
   qué texto quiere: no lo cambies sin preguntarle.
+
+## Cambio de número de WhatsApp del bot (11/10)
+
+El usuario quiere que el bot mande desde **otro número**. En la laptop se hace con `automatizacion/Cambiar_Numero_WhatsApp.bat`: vincula el número nuevo en una carpeta aparte (`sesion_wsp_nueva`), comprueba que encuentre los grupos y recién ahí reemplaza `sesion_wsp` (la vieja queda en `sesion_wsp_anterior`). El número nuevo tiene que estar agregado a los grupos del bot. No toques esas carpetas.
