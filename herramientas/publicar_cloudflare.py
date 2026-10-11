@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,6 +62,33 @@ def copy_tree(source, target, skip):
             shutil.copy2(item, destination)
 
 
+PAGE_FILE = re.compile(r'((?:href|src)=")((?!https?:|//)[^"?#]+\.(?:css|js))"')
+JS_IMPORT = re.compile(r'''((?:\bfrom|\bimport)\s*\(?\s*)(["'])(\.{1,2}/[^"'?]+\.js)\2''')
+CSS_IMPORT = re.compile(r'''(@import url\(")([^"?]+\.css)"''')
+
+
+def add_version(dist):
+    """Agrega "?v=<publicación>" a cada estilo y programa de las tiendas.
+
+    Cloudflare les dice a los celulares que guarden estos archivos 4 horas: sin esto,
+    después de publicar un cambio la gente seguía viendo la tienda vieja. Con un
+    número nuevo en cada publicación, el celular baja la versión nueva al toque.
+    """
+    version = str(int(time.time()))
+    for path in dist.rglob("*"):
+        if path.suffix not in {".html", ".js", ".css"} or not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if path.suffix == ".html":
+            new = PAGE_FILE.sub(rf'\1\2?v={version}"', text)
+        elif path.suffix == ".js":
+            new = JS_IMPORT.sub(rf"\1\2\3?v={version}\2", text)
+        else:
+            new = CSS_IMPORT.sub(rf'\1\2?v={version}"', text)
+        if new != text:
+            path.write_text(new, encoding="utf-8")
+
+
 def build(dist):
     # La tienda de L.A IMP va en /laimp/ (entera: sus rutas son relativas). La raíz es una
     # portada neutra: quien corta el link de un cliente no llega a la tienda ni a los precios
@@ -84,6 +112,7 @@ def build(dist):
     pages = sorted({html.parent.relative_to(dist).as_posix() for html in dist.rglob("index.html")} - {"."})
     redirects += [f"/{page} /{page}/ 301" for page in pages]
     (dist / "_redirects").write_text("\n".join(redirects) + "\n", encoding="utf-8")
+    add_version(dist)
     # Las imágenes para compartir (og:image) apuntan a la dirección nueva.
     for html in dist.rglob("*.html"):
         text = html.read_text(encoding="utf-8")
