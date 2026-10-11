@@ -138,6 +138,14 @@ window.STORE_CONFIG = {
       // "Compartir" de cada modelo: las fotos con nombre y talles, sin precio ni link,
       // para que el revendedor se las mande a su cliente.
       share: "fotos",
+      // Al pie: aviso para que el revendedor tenga su propia tienda (solo calidad BR).
+      platformPromo: {
+        title: "¿Querés tu propia tienda para revender?",
+        text: "Te armamos una tienda como esta con tu nombre, tu logo y tus precios. El stock de calidad BR se actualiza solo y los pedidos te llegan a tu WhatsApp.",
+        whatsapp: "5491153773771",
+        ctaLabel: "Quiero mi tienda",
+        message: "¡Hola! Vi la tienda de revendedores de {tienda} y quiero mi propia tienda con el stock BR.",
+      },
       // Versión para revendedores: sin portada, directo al catálogo. Solo una
       // franja finita con lo que hay que saber para comprar.
       hero: {
@@ -278,14 +286,13 @@ window.STORE_CONFIG = {
     { q: "¿Cómo puedo empezar a revender?", a: "Entrá a “Quiero revender” (en el menú o al pie de la página), escribinos desde ahí y te asesoramos para armar tu primer pedido." },
   ],
 
-  // Servicio de tiendas por internet (queda al final, discreto, sin interferir con la compra).
-  platformPromo: {
+  // Servicio de tiendas por internet: pregunta chiquita al pie (como en las tiendas de clientes).
+  // En la versión de revendedores va en cambio el aviso "tu propia tienda" (ver channels.mayorista).
+  platformCredit: {
     enabled: true,
-    title: "¿Querés una tienda así para tu negocio?",
-    text: "Armamos catálogos por internet a medida para emprendimientos: con tu marca, tus precios y los pedidos directo a tu WhatsApp.",
+    text: "¿Querés una tienda así?",
     whatsapp: "5491153773771",
-    ctaLabel: "Consultar",
-    message: "¡Hola! Vi la tienda y me interesa una tienda así para mi negocio.",
+    message: "¡Hola! Vi la tienda de {tienda} y quiero una tienda así para mi negocio.",
   },
 
   footer: {

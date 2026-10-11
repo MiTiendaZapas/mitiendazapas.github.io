@@ -39,7 +39,7 @@ const storagePrefix = `${config.id}:${channelKey}`;
 const overlays = document.getElementById("overlays");
 
 renderHeader(document.getElementById("site-header"), { config, channel, links });
-renderFooter(document.getElementById("site-footer"), { config, links });
+renderFooter(document.getElementById("site-footer"), { config, channel, links });
 
 if (links.isStorePage) {
   await startStore();

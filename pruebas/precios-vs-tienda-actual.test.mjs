@@ -43,6 +43,8 @@ const SAMBAS_42 = { "Samba tejida": 42000, "Samba brillitos": 42000, "Súper sta
 // 02/10: "Nike mind negras" cobraba otro precio porque tiene la marca adelante; ahora es igual a las otras Mind.
 const MIND = { "L.A IMP revendedores": [37000, 35000], "L.A IMP minorista": [40000, 35000],
   "ClienteA revendedores": [37000, 35000], "ClienteA minorista": [49000, 35000] };
+// 10/10: "TL 1 blancas" (con el 1 separado) cobraba otro precio que las "TL1"; ahora es el mismo.
+const SAME_AS = { "TL 1 blancas": "TL1 negras" };
 const intentional = { "L.A IMP revendedores": SAMBAS_42, "L.A IMP minorista": SAMBAS_42 };
 
 for (const [name, legacyFile, pricesFile] of cases) {
@@ -54,7 +56,8 @@ for (const [name, legacyFile, pricesFile] of cases) {
       const nowWholesale = now.wholesale ?? now.unit;
       const before = product.name === "Nike mind negras" && MIND[name]
         ? MIND[name]
-        : [old.unit(product.name), intentional[name]?.[product.name] ?? old.wholesale(product.name)];
+        : [old.unit(SAME_AS[product.name] ?? product.name),
+          intentional[name]?.[product.name] ?? old.wholesale(SAME_AS[product.name] ?? product.name)];
       return before[0] === now.unit && before[1] === nowWholesale
         ? []
         : [`${product.name}: antes ${before.join("/")} ahora ${now.unit}/${nowWholesale}`];

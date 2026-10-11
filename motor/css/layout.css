@@ -116,7 +116,7 @@
 /* Versión compacta (revendedores): una franja finita, directo al catálogo. */
 .hero--compact { background: var(--color-surface); }
 .hero--compact .hero__inner { padding-block: var(--space-3); gap: 0; }
-.hero--compact .hero__points { gap: var(--space-1) var(--space-4); }
+.hero--compact .hero__points { justify-content: center; gap: var(--space-1) var(--space-4); }
 .hero--compact .hero__point { padding: 2px 0; border: 0; background: none; font-size: 13px; }
 @media (min-width: 768px) {
   .hero--compact .hero__inner { padding-block: var(--space-3); }

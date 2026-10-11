@@ -186,9 +186,16 @@ export function renderInfoPage(root, { config, channel, channelKey, links }) {
 
 // --- footer (incluye, discreta, la promo de tiendas a medida) --------------------
 
-function platformPromo(config) {
-  const c = config.platformPromo;
-  if (!c || c.enabled === false) return "";
+// Cada versión de la tienda puede tener su propio aviso (ej. revendedores: "tu propia tienda").
+function promoOf(config, channel) {
+  const c = channel?.platformPromo ?? config.platformPromo;
+  return c && c.enabled !== false ? c : null;
+}
+
+function platformPromo(config, channel) {
+  const c = promoOf(config, channel);
+  if (!c) return "";
+  const message = (c.message ?? "").replace("{tienda}", config.name);
   return `
     <aside class="platform-promo" aria-labelledby="tu-tienda-title" id="tu-tienda">
       <div class="container platform-promo__inner">
@@ -197,25 +204,25 @@ function platformPromo(config) {
           <h2 class="platform-promo__title" id="tu-tienda-title">${esc(c.title)}</h2>
           <p class="platform-promo__text">${esc(c.text)}</p>
         </div>
-        <a class="btn btn--outline" href="${whatsappLink(c.whatsapp, c.message)}" target="_blank" rel="noopener">${esc(c.ctaLabel)} ${icon("arrowRight")}</a>
+        <a class="btn btn--outline" href="${whatsappLink(c.whatsapp, message)}" target="_blank" rel="noopener">${esc(c.ctaLabel)} ${icon("arrowRight")}</a>
       </div>
     </aside>`;
 }
 
-/** Pregunta chiquita al pie (tiendas de clientes): "¿Querés una tienda así?" con link a WhatsApp. */
-function platformCredit(config) {
+/** Pregunta chiquita al pie: "¿Querés una tienda así?" (no va si arriba ya está el aviso grande). */
+function platformCredit(config, channel) {
   const c = config.platformCredit;
-  if (!c || c.enabled === false) return "";
+  if (!c || c.enabled === false || promoOf(config, channel)) return "";
   const message = (c.message ?? "").replace("{tienda}", config.name);
   return `<p class="platform-credit"><a href="${whatsappLink(c.whatsapp, message)}" target="_blank" rel="noopener">${esc(c.text)}</a></p>`;
 }
 
-export function renderFooter(root, { config, links }) {
+export function renderFooter(root, { config, channel, links }) {
   const infoPages = links.pages.map((p) => `<li><a href="${esc(links.page(p))}">${esc(p.label)}</a></li>`).join("");
   const year = new Date().getFullYear();
 
   root.innerHTML = `
-    ${platformPromo(config)}
+    ${platformPromo(config, channel)}
     <div class="container site-footer__main">
       <div class="site-footer__grid">
         <div class="site-footer__brand">
@@ -242,7 +249,7 @@ export function renderFooter(root, { config, links }) {
       <div class="site-footer__bottom">
         <p>© ${year} ${esc(config.name)}. Todos los derechos reservados.</p>
         <p>${esc(config.footer?.legal ?? "")}</p>
-        ${platformCredit(config)}
+        ${platformCredit(config, channel)}
       </div>
     </div>`;
 }
