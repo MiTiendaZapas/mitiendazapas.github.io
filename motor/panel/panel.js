@@ -112,8 +112,8 @@ function renderTop({ loggedIn }) {
       loggedIn ? h("div", { class: "panel-top__actions" },
         h("a", { class: "btn btn--outline btn--sm", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda"),
         h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: logout }, "Salir")) : null),
-    loggedIn ? h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
-      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id || (t.id === "productos" && ["editar", "nuevo"].includes(current)) ? "page" : null }, t.label))) : null);
+    ...(loggedIn ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
+      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id || (t.id === "productos" && ["editar", "nuevo"].includes(current)) ? "page" : null }, t.label)))] : []));
 }
 
 // --- ingreso ---------------------------------------------------------------------
