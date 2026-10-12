@@ -18,7 +18,7 @@ export async function onRequestPost({ request, env, data }) {
       for (let n = 2; taken.has(slug); n++) slug = `${original.slug}-copia-${n}`;
       const product = {
         ...structuredClone(original),
-        id: `m-${crypto.randomUUID()}`, slug, name, hidden: true,
+        id: `m-${crypto.randomUUID()}`, slug, name, hidden: true, createdAt: new Date().toISOString(),
         images: await copyPhotos(env, store, original.images),
       };
       catalog.products.splice(index + 1, 0, product);

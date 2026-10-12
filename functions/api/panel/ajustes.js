@@ -13,7 +13,8 @@ export async function onRequestPost({ request, env, data }) {
   try {
     const current = await readSettings(env, store);
     // El logo no se cambia desde acá: se conserva el que ya estaba.
-    const settings = cleanSettings({ ...input, logo: current.logo ?? null }, current);
+    // Lo que no se manda se conserva (por ejemplo, el orden elegido en Categorías).
+    const settings = cleanSettings({ ...current, ...input, logo: current.logo ?? null }, current);
     await saveSettings(env, store, settings);
     return json({ ok: true, settings });
   } catch (error) {

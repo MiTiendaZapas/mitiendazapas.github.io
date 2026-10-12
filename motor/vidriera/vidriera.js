@@ -13,6 +13,7 @@ import { createPricing } from "../js/pricing.js";
 import { buildOrderMessage } from "../js/whatsapp.js";
 import { escapeHtml, money, plural, whatsappLink } from "../js/utils.js";
 import { icon } from "../js/interfaz/icons.js";
+import { orderedCategories, sortProducts } from "./orden.js";
 
 const config = window.STORE_CONFIG ?? {};
 const STORE = config.manualStore;
@@ -44,6 +45,7 @@ function prepareProducts(data) {
       return {
         id: p.id, slug: String(p.slug || p.id), name: p.name, brand: p.brand || null,
         category: p.category, price: Number(p.price) || 0, wholesalePrice: Number(p.wholesalePrice) || null,
+        createdAt: p.createdAt ?? null,
         sizes, available: sizes.filter((s) => s.stock > 0), total: sizes.reduce((n, s) => n + s.stock, 0),
         images: (p.images ?? []).map((img) => ({ sm: photo(img.sm), lg: photo(img.lg), w: img.w, h: img.h })),
       };
@@ -66,6 +68,7 @@ function storeInfo(settings) {
     color: s.color || "#18181b",
     wholesale: s.name ? s.wholesale === true : true,
     wholesaleMin: s.wholesaleMin || 5,
+    order: { categoryOrder: s.categoryOrder, productOrder: s.productOrder },
     social: Object.entries(NETWORKS).filter(([key]) => s[key]).map(([key, n]) => ({ network: key, label: n.label, url: n.url(s[key]) })),
   };
 }
@@ -210,8 +213,11 @@ async function start() {
   applyColor(info.color);
   document.title = `${info.name} · Catálogo`;
 
-  const products = prepareProducts(data);
-  const categories = Object.entries(data.categories ?? {}).filter(([id]) => products.some((p) => p.category === id));
+  // Orden: categorías y productos como lo eligió el cliente (por defecto, todo de la A a la Z).
+  const products = sortProducts(prepareProducts(data), data.categories ?? {}, info.order);
+  const categories = orderedCategories(data.categories ?? {}, info.order)
+    .filter((id) => products.some((p) => p.category === id))
+    .map((id) => [id, data.categories[id]]);
   const byId = new Map(products.map((p) => [p.id, p]));
   const catalog = {
     get: (id) => byId.get(id),
@@ -248,7 +254,7 @@ async function start() {
             <h2 class="v-section-title" id="v-catalog-title">Productos</h2>
             <p class="v-muted" data-count aria-live="polite"></p>
           </div>
-          <ul class="v-grid" data-grid></ul>
+          <div data-grid></div>
           <p class="v-empty" data-empty hidden></p>
         </div>
       </section>
@@ -278,7 +284,18 @@ async function start() {
     const term = state.search.trim().toLowerCase();
     const shown = products.filter((p) => (!state.category || p.category === state.category)
       && (!term || `${p.name} ${p.brand ?? ""}`.toLowerCase().includes(term)));
-    grid.innerHTML = shown.map((p) => cardHtml(p, pricing)).join("");
+    // En "Todo" (sin buscar) los productos se ven separados por categoría, con su título.
+    const grouped = !state.category && !term && categories.length > 1;
+    grid.innerHTML = grouped
+      ? categories.map(([id, label]) => {
+        const items = shown.filter((p) => p.category === id);
+        return items.length ? `
+          <section class="v-group" aria-label="${esc(label)}">
+            <h3 class="v-group__title">${esc(label)} <span class="v-muted">${items.length}</span></h3>
+            <ul class="v-grid">${items.map((p) => cardHtml(p, pricing)).join("")}</ul>
+          </section>` : "";
+      }).join("")
+      : `<ul class="v-grid">${shown.map((p) => cardHtml(p, pricing)).join("")}</ul>`;
     $("[data-count]").textContent = plural(shown.length, "producto");
     const empty = $("[data-empty]");
     empty.hidden = shown.length > 0;

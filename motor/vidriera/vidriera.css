@@ -133,6 +133,9 @@ h1, h2, h3, p { margin: 0; }
 .v-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 12px; margin: 0; padding: 0; list-style: none; }
 @media (min-width: 720px) { .v-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 20px; } }
 @media (min-width: 1040px) { .v-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.v-group + .v-group { margin-top: 36px; }
+.v-group__title { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.v-group__title .v-muted { font-size: 13px; font-weight: 500; }
 .v-card { display: grid; gap: 10px; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
 .v-card__media { position: relative; display: block; aspect-ratio: 4 / 5; overflow: hidden; border-radius: var(--v-radius); background: var(--v-surface); }
 .v-card__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 500ms var(--v-ease); }

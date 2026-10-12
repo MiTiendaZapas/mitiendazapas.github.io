@@ -187,6 +187,8 @@ export function cleanProduct(input, current, data) {
     sizes, images: cleanImages,
     // Pausado: no se ve en la tienda, pero no se borra (por ejemplo, mientras llega mercadería).
     hidden: input.hidden === true,
+    // Cuándo se cargó (para el orden "lo más nuevo primero").
+    createdAt: current?.createdAt ?? new Date().toISOString(),
   };
 }
 
@@ -351,6 +353,9 @@ export function cleanSettings(input, current = {}) {
     color: COLORS.has(color) ? color : "#18181b",
     wholesale: input?.wholesale === true,
     wholesaleMin: Number.isInteger(min) && min >= 2 && min <= 100 ? min : 5,
+    // Orden de la tienda: categorías (alfabético o el que eligió) y productos dentro de cada una.
+    categoryOrder: input?.categoryOrder === "manual" ? "manual" : "alfabetico",
+    productOrder: ["alfabetico", "nuevos", "precio", "manual"].includes(input?.productOrder) ? input.productOrder : "alfabetico",
     logo,
   };
 }

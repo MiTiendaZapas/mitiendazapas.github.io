@@ -8,6 +8,8 @@
  * Habla con el programa del panel (functions/api/panel/). Todo se arma con textContent
  * (nunca HTML con datos), así nada de lo cargado puede meter código en la página.
  */
+import { CATEGORY_ORDERS, PRODUCT_ORDERS, sortProducts } from "../vidriera/orden.js";
+
 const config = window.STORE_CONFIG ?? {};
 const root = document.getElementById("panel");
 const top = document.getElementById("panel-top");
@@ -174,10 +176,11 @@ function renderProducts() {
   }
   function renderItems() {
     const term = state.search.trim().toLowerCase();
-    const shown = state.products.filter((p) => matchesFilter(p)
+    // La lista sale en el mismo orden que la tienda.
+    const shown = sortProducts(state.products, state.categories, state.settings).filter((p) => matchesFilter(p)
       && (!term || `${p.name} ${p.brand ?? ""} ${categoryName(p.category)}`.toLowerCase().includes(term)));
-    // Ordenar solo tiene sentido viendo todos (si no, "subir" sería confuso).
-    const canOrder = state.filter === "todos" && !term;
+    // Subir / bajar solo si eligió ordenar a mano, y viendo todos (si no, sería confuso).
+    const canOrder = state.settings.productOrder === "manual" && state.filter === "todos" && !term;
     list.replaceChildren(...(shown.length
       ? shown.map((p) => itemView(p, canOrder, renderAll))
       : [h("li", { class: "panel-empty" }, state.products.length ? "No hay productos con ese filtro." : "Todavía no cargaste productos. Tocá “Nuevo producto” para empezar.")]));
@@ -196,7 +199,10 @@ function renderProducts() {
 
 function itemView(product, canOrder, refresh) {
   const total = totalStock(product);
-  const index = state.products.indexOf(product);
+  // Vecinos de la MISMA categoría en el orden de la tienda (subir/bajar no cruza categorías).
+  const ordered = sortProducts(state.products, state.categories, state.settings);
+  const position = ordered.indexOf(product);
+  const neighbor = (delta) => (ordered[position + delta]?.category === product.category ? ordered[position + delta] : null);
   const stockBox = h("div", { class: "panel-quick", hidden: true });
   const thumb = product.images[0]
     ? h("img", { src: storeUrl(product.images[0].sm), alt: "", width: 64, height: 80, loading: "lazy" })
@@ -210,12 +216,12 @@ function itemView(product, canOrder, refresh) {
     } }, total === 0 ? "Sin stock" : `${total} en stock`);
 
   const move = (delta) => async (event) => busy(event.currentTarget, async () => {
-    const ids = state.products.map((p) => p.id);
-    const [moved] = ids.splice(index, 1);
-    ids.splice(index + delta, 0, moved);
-    await api("/orden", { method: "POST", body: { ids } });
-    const [p] = state.products.splice(index, 1);
-    state.products.splice(index + delta, 0, p);
+    const list = [...state.products];
+    const a = list.indexOf(product);
+    const b = list.indexOf(neighbor(delta));
+    [list[a], list[b]] = [list[b], list[a]];
+    await api("/orden", { method: "POST", body: { ids: list.map((p) => p.id) } });
+    state.products = list;
     refresh();
   });
   const togglePause = async (event) => busy(event.currentTarget, async () => {
@@ -247,8 +253,8 @@ function itemView(product, canOrder, refresh) {
           h("div", { class: "panel-more__menu" },
             h("button", { type: "button", onclick: togglePause }, product.hidden ? "Mostrar en la tienda" : "Pausar (ocultar)"),
             h("button", { type: "button", onclick: copy }, "Copiar (otro color)"),
-            canOrder && index > 0 ? h("button", { type: "button", onclick: move(-1) }, "Subir un lugar") : null,
-            canOrder && index < state.products.length - 1 ? h("button", { type: "button", onclick: move(1) }, "Bajar un lugar") : null)))),
+            canOrder && neighbor(-1) ? h("button", { type: "button", onclick: move(-1) }, "Subir un lugar") : null,
+            canOrder && neighbor(1) ? h("button", { type: "button", onclick: move(1) }, "Bajar un lugar") : null)))),
     stockBox);
 }
 
@@ -436,11 +442,19 @@ async function removeProduct(product) {
 // --- categorías -------------------------------------------------------------------
 function renderCategories() {
   const rows = Object.entries(state.categories).map(([id, label]) => ({ id, label }));
+  const select = (id, options, value) => h("select", { id, class: "panel-input" },
+    options.map((o) => h("option", { value: o.value, selected: o.value === value }, o.label)));
+  const categoryOrder = select("o-categories", CATEGORY_ORDERS, state.settings.categoryOrder ?? "alfabetico");
+  const productOrder = select("o-products", PRODUCT_ORDERS, state.settings.productOrder ?? "alfabetico");
+  const manual = () => categoryOrder.value === "manual";
+  categoryOrder.addEventListener("change", () => renderRows());
   const used = (id) => state.products.filter((p) => p.category === id).length;
   const list = h("div", { class: "panel-cats" });
-  const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "button" }, "Guardar categorías");
+  const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "button" }, "Guardar");
 
   function renderRows() {
+    // En "De la A a la Z" se muestran ordenadas así y las flechas no se usan.
+    if (!manual()) rows.sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
     list.replaceChildren(...rows.map((row, i) => {
       const count = row.id ? used(row.id) : 0;
       return h("div", { class: "panel-cat" },
@@ -448,8 +462,8 @@ function renderCategories() {
           oninput: (e) => { row.label = e.target.value; } }),
         h("span", { class: "panel-muted panel-cat__count" }, count === 1 ? "1 producto" : `${count} productos`),
         h("div", { class: "panel-cat__actions" },
-          h("button", { type: "button", "aria-label": "Subir", disabled: i === 0, onclick: () => { rows.splice(i - 1, 0, ...rows.splice(i, 1)); renderRows(); } }, "↑"),
-          h("button", { type: "button", "aria-label": "Bajar", disabled: i === rows.length - 1, onclick: () => { rows.splice(i + 1, 0, ...rows.splice(i, 1)); renderRows(); } }, "↓"),
+          h("button", { type: "button", "aria-label": "Subir", disabled: !manual() || i === 0, onclick: () => { rows.splice(i - 1, 0, ...rows.splice(i, 1)); renderRows(); } }, "↑"),
+          h("button", { type: "button", "aria-label": "Bajar", disabled: !manual() || i === rows.length - 1, onclick: () => { rows.splice(i + 1, 0, ...rows.splice(i, 1)); renderRows(); } }, "↓"),
           h("button", { type: "button", "aria-label": `Borrar ${row.label}`, disabled: count > 0, title: count > 0 ? "Tiene productos: cambiales la categoría antes de borrarla" : null,
             onclick: () => { rows.splice(i, 1); renderRows(); } }, "×")));
     }), ...(rows.length ? [] : [h("p", { class: "panel-muted" }, "Todavía no tenés categorías. Agregá la primera.")]));
@@ -457,13 +471,25 @@ function renderCategories() {
   saveButton.addEventListener("click", () => busy(saveButton, async () => {
     const { categories } = await api("/categorias", { method: "POST", body: { categories: rows.map((r) => ({ id: r.id, label: r.label })) } });
     state.categories = categories;
-    toast("Categorías guardadas.");
+    const { settings } = await api("/ajustes", { method: "POST", body: {
+      ...state.settings, name: state.settings.name || config.name, categoryOrder: categoryOrder.value, productOrder: productOrder.value,
+    } });
+    state.settings = settings;
+    toast("Listo: la tienda ya usa este orden.");
     renderCategories();
   }));
 
-  root.replaceChildren(h("section", { class: "panel-card" },
-    h("h1", {}, "Categorías"),
-    h("p", { class: "panel-muted" }, "Así se agrupan tus productos en la tienda, en este orden. Solo se puede borrar una categoría sin productos."),
+  root.replaceChildren(
+    h("section", { class: "panel-card" },
+      h("h1", {}, "Orden de tu tienda"),
+      h("p", { class: "panel-muted" }, "Los productos se ven agrupados por categoría. Elegí en qué orden van las categorías y cómo se ordenan los productos dentro de cada una."),
+      h("div", { class: "panel-two" },
+        field("o-categories", "Categorías", categoryOrder),
+        field("o-products", "Productos dentro de cada categoría", productOrder,
+          "“En el orden que yo elijo”: en Productos → Más → Subir o Bajar."))),
+    h("section", { class: "panel-card" },
+    h("h2", {}, "Categorías"),
+    h("p", { class: "panel-muted" }, "Creá, renombrá o borrá categorías (solo se puede borrar una sin productos). Con “En el orden que yo elijo”, ordenalas con las flechas."),
     list,
     h("button", { class: "btn btn--outline", type: "button", onclick: () => { rows.push({ id: null, label: "" }); renderRows(); list.querySelector(".panel-cat:last-child input")?.focus(); } }, "+ Nueva categoría")),
     h("div", { class: "panel-savebar" }, saveButton));
@@ -587,7 +613,7 @@ function renderHelp() {
     ["Cuando vendés algo", "En la lista tocá el cartel verde “… en stock” y restá con “−” el talle que vendiste. Se guarda solo. Lo que llega a 0 deja de verse en la tienda."],
     ["El mismo modelo en otro color", "Tocá “Más” → “Copiar”. Se crea una copia pausada con las mismas fotos y talles: cambiale el nombre, las fotos y las cantidades, y tildá “Se ve en la tienda”."],
     ["Pausar sin borrar", "“Más” → “Pausar” lo esconde de la tienda (por ejemplo, mientras esperás mercadería). Con “Mostrar” vuelve a aparecer."],
-    ["Ordenar", "“Más” → “Subir” o “Bajar” cambia el lugar del producto en la tienda: lo de arriba se ve primero. Las categorías se ordenan en “Categorías”."],
+    ["Orden de la tienda", "Por defecto, las categorías y los productos van de la A a la Z. En “Categorías” → “Orden de tu tienda” podés elegir otro orden: lo último que cargás primero, del más barato al más caro, o el que vos armes (con las flechas en Categorías y con “Más” → “Subir / Bajar” en Productos)."],
     ["Tu tienda", "En “Mi tienda” cambiás el nombre, el logo, tu WhatsApp, tus redes, los textos de la portada, el color y la venta por mayor. También tu clave."],
     ["Los pedidos", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
   ];
