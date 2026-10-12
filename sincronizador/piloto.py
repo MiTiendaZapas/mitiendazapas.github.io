@@ -2,7 +2,7 @@
 
 Reemplaza a Automatizacion/piloto_automatico.py de la tienda anterior, con el
 mismo comportamiento de fondo:
-  - descansa de 00:00 a 07:30 (no consulta al proveedor de noche),
+  - descansa de 00:00 a 05:15 (no consulta al proveedor de noche),
   - si el proveedor falla, espera más antes de reintentar,
   - reintenta git si se corta internet un momento.
 
@@ -45,11 +45,11 @@ WAIT_MIN_MINUTES = 10
 WAIT_MAX_MINUTES = 15
 WAIT_AFTER_FAILURE_MINUTES = 30
 ALERT_AFTER_HOURS = 2          # aviso bien visible si pasan estas horas sin una vuelta buena
-# Descanso nocturno (igual que el piloto de la laptop): de 00:00 a 07:30.
-# Termina 7:30 para que a las 8, cuando se usa el bot de WhatsApp, ya estén
+# Descanso nocturno (igual que el piloto de la laptop): de 00:00 a 05:15.
+# Termina 5:15 para que a las 6, cuando se usa el bot de WhatsApp, ya estén
 # las novedades del día.
 REST_START_MINUTE = 0          # 00:00
-REST_END_MINUTE = 7 * 60 + 30  # 07:30
+REST_END_MINUTE = 5 * 60 + 15  # 05:15
 
 # Qué se sube a GitHub en cada ciclo (lo que no exista se saltea).
 FILES_TO_PUBLISH = ["catalogo"]                                          # a este repositorio
@@ -238,7 +238,7 @@ def main():
         while True:
             rest = seconds_until_rest_ends()
             if rest and not args.una_vez:
-                log(f"😴 Horario de descanso (00:00-07:30). Durmiendo {rest / 3600:.1f} h.")
+                log(f"😴 Horario de descanso (00:00-05:15). Durmiendo {rest / 3600:.1f} h.")
                 time.sleep(rest)
                 last_ok = time.time()   # la noche no cuenta como tiempo sin actualizar
                 continue

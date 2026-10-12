@@ -13,7 +13,7 @@ Inicio de Windows):
 
 | Programa | Qué hace | Dónde |
 |---|---|---|
-| **Piloto** `sincronizador/piloto.py --publicar` | Vuelta cada 10-15 min (antes 15-20; se bajó el 07/10): baja de GitHub, corre `sync_catalog.py`, publica `catalogo/` y el stock de casa. Descansa de 00:00 a 07:30. | `Desktop/mitiendazapas.github.io` |
+| **Piloto** `sincronizador/piloto.py --publicar` | Vuelta cada 10-15 min (antes 15-20; se bajó el 07/10): baja de GitHub, corre `sync_catalog.py`, publica `catalogo/` y el stock de casa. Descansa de 00:00 a 05:15. | `Desktop/mitiendazapas.github.io` |
 | **Bot de WhatsApp** `automatizacion/bot_whatsapp.py` | Todos los días (menos domingos), a una hora al azar entre 05:45 y 06:10, manda el stock al grupo real. | `Desktop/tienda-zapatillas/automatizacion` |
 
 Carpetas en el Escritorio de la laptop:
@@ -63,8 +63,8 @@ Desde el 09/10 el bot lee el catálogo de **Cloudflare** (`https://catalogo.miti
 `id`, `name`, `sizes[{size, stock}]`, `images[0].lg`; y del archivo, `generatedAt` y `products`.
 
 - Si cambia ese formato, avisalo en una guía antes de publicarlo: el bot tiene que adaptarse a la vez.
-- Desde el 13/10 el bot envía a las ~06:00 y **ya no espera** el catálogo del día: manda con el último que haya publicado el
-  piloto (el de la noche anterior, porque el piloto descansa de 00:00 a 07:30). `generatedAt` ya no se exige de hoy.
+- El bot envía a las ~06:00 y pide un catálogo con `generatedAt` de hoy desde las 05:15: espera hasta 10 min a que el piloto
+  publique y, si no llega, manda con el último que haya (el de la noche anterior).
 - Los ids de las G5 empiezan con `g5-` (el bot guarda lo ya enviado por id para no repetir si retoma).
 - Un modelo sin stock o sin foto no se manda.
 
@@ -96,4 +96,4 @@ El usuario quiere que el bot mande desde **otro número**. En la laptop se hace 
 
 ## Cambio de horario (12/10)
 
-A pedido del usuario, desde el 13/10 el bot envía entre **05:45 y 06:10** (antes 07:45-08:10). **El piloto no cambió**: sigue descansando de 00:00 a 07:30. Como a esa hora todavía no hay catálogo del día, el bot dejó de esperarlo (`ESPERA_CATALOGO_FRESCO_MIN = 0`) y manda con el último publicado. El usuario aclaró que no le importa que sea el stock de la noche anterior. Si se vuelve a mover el horario del bot, mover juntos `HORA_DESDE` y `HORA_HASTA`.
+A pedido del usuario, desde el 13/10 el bot envía entre **05:45 y 06:10** (antes 07:45-08:10). Para que a esa hora tenga el stock más actualizado posible, el piloto ahora descansa de **00:00 a 05:15** (antes hasta 07:30): `REST_END_MINUTE` en `piloto.py`. Por qué 05:15: el bot lee el catálogo al enviar, y con esa hora quedan 2 o 3 vueltas antes, lo que absorbe una falla del proveedor (503, ~1,6 % de las vueltas; reintenta a los 30 min). De noche el stock casi no cambia (~3 modelos de ~110 por noche), así que el beneficio es chico pero el costo también. Si se vuelve a mover el horario del bot, mover juntos `HORA_DESDE`, `HORA_HASTA` y `CATALOGO_FRESCO_DESDE`, y el descanso del piloto ~30 min antes de la ventana.
