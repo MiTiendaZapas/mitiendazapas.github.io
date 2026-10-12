@@ -500,7 +500,7 @@ function renderStoreSettings() {
     e.target.value = "";
     if (!file) return;
     await busy(null, async () => {
-      const { logo } = await uploadImage(file, { endpoint: "/logo", sizes: [["grande", 512, 0.85], ["chico", 160, 0.85]], square: true, raw: true });
+      const { logo } = await uploadImage(file, { endpoint: "/logo", sizes: [["grande", 512, 0.88], ["chico", 160, 0.88]], square: true, raw: true, jpg: true });
       state.settings.logo = logo;
       toast("Logo actualizado.");
       renderLogo();
@@ -617,7 +617,7 @@ async function shrink(bitmap, max, quality, type, square) {
  * Achica la foto (WEBP si el celular puede, si no JPG) y la sube.
  * sizes: [[nombre del campo, lado máximo, calidad], ...]. square: recorta al medio (logo).
  */
-async function uploadImage(file, { endpoint, sizes, square = false, raw = false }) {
+async function uploadImage(file, { endpoint, sizes, square = false, raw = false, jpg = false }) {
   if (!file.type.startsWith("image/")) throw new Error("Ese archivo no es una foto.");
   let bitmap;
   try {
@@ -625,8 +625,9 @@ async function uploadImage(file, { endpoint, sizes, square = false, raw = false 
   } catch {
     throw new Error("No se pudo leer la foto. Probá con otra.");
   }
-  const probe = await shrink(bitmap, 32, 0.8, "image/webp", square);
-  const type = probe.blob?.type === "image/webp" ? "image/webp" : "image/jpeg";
+  // El logo va en JPG: es lo que mejor muestra WhatsApp en la vista previa del link.
+  const probe = jpg ? null : await shrink(bitmap, 32, 0.8, "image/webp", square);
+  const type = probe?.blob?.type === "image/webp" ? "image/webp" : "image/jpeg";
   const ext = type === "image/webp" ? "webp" : "jpg";
   const form = new FormData();
   let first = null;
