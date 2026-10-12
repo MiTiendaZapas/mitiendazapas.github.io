@@ -85,7 +85,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   // --- resumen (header + barra) ------------------------------------------------
   /** "3 pares" si son todos calzados; "3 productos" si hay indumentaria. */
   function itemsText(count) {
-    const onlyFootwear = cart.lines().every((line) => line.product.category !== "indumentaria");
+    const onlyFootwear = !pricing.allProducts && cart.lines().every((line) => line.product.category !== "indumentaria");
     return onlyFootwear ? plural(count, "par", "pares") : plural(count, "producto");
   }
 
@@ -115,10 +115,10 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   function modeChoice(quote) {
     return `
       <fieldset class="mode-choice" aria-describedby="mode-help">
-        <legend class="mode-choice__legend">Llevás ${plural(quote.pairs, "par", "pares")}: ¿cómo querés comprar?</legend>
+        <legend class="mode-choice__legend">Llevás ${plural(quote.pairs, ...pricing.words)}: ¿cómo querés comprar?</legend>
         <p class="mode-choice__help" id="mode-help">${quote.byQuality
-          ? `El precio por mayor se aplica a cada calidad que llegue a ${pricing.minPairs} pares.`
-          : `Con ${pricing.minPairs} o más pares surtidos podés elegir.`}</p>
+          ? `El precio por mayor se aplica a cada calidad que llegue a ${pricing.minPairs} ${pricing.words[1]}.`
+          : `Con ${pricing.minPairs} o más ${pricing.words[1]} surtidos podés elegir.`}</p>
         <div class="choice-list">
           ${["mayor", "unidad"].map((key) => `
             <label class="choice">
@@ -149,7 +149,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
     const percent = Math.round((quote.pairs / pricing.minPairs) * 100);
     return `
       <div class="wholesale-meter">
-        <p>Sumá <strong>${plural(quote.pairsToWholesale, "par", "pares")} más</strong> (surtidos) para el precio por mayor.</p>
+        <p>Sumá <strong>${plural(quote.pairsToWholesale, ...pricing.words)} más</strong> (surtidos) para el precio por mayor.</p>
         <div class="wholesale-meter__track" role="progressbar" aria-valuemin="0" aria-valuemax="${pricing.minPairs}" aria-valuenow="${quote.pairs}" aria-label="Pares para precio por mayor">
           <span style="width:${percent}%"></span>
         </div>

@@ -70,6 +70,11 @@ export function createPricing(table) {
   // "wholesale": false = la tienda no vende por mayor (no se muestra nada de precio por mayor).
   const hasWholesale = table.wholesale !== false;
   const minPairs = Number(table.wholesale?.minPairs) || 5;
+  // Tiendas con stock propio (ropa y calzado del cliente): todo suma para el precio por mayor.
+  const allProducts = table.wholesale?.allProducts === true;
+  const countsForWholesale = (product) => allProducts || product.category !== "indumentaria";
+  // Cómo se nombran las unidades en carrito y pedido: "pares" o, con ropa y calzado juntos, "productos".
+  const words = allProducts ? ["producto", "productos"] : ["par", "pares"];
   const wholesaleLabel = table.wholesale?.label ?? `Llevando ${minPairs} o más pares surtidos`;
   const cache = new Map();
 
@@ -77,14 +82,15 @@ export function createPricing(table) {
     if (cache.has(product.id)) return cache.get(product.id);
     const key = priceKey(product.name);
     const shortKey = withoutBrand(key, product.brand);
-    const override = overrides[product.slug] ?? overrides[product.id] ?? {};
+    const own = product.price ? { unit: product.price, wholesale: product.wholesalePrice } : {};
+    const override = overrides[product.slug] ?? overrides[product.id] ?? own;
     const unitRule = findRule(unitList, key, shortKey, product.category);
     const unit = Number(override.unit) || unitRule?.price || unitList.default;
     const bulk = unitRule?.bulk ?? null;
     let wholesale = null;
-    if (hasWholesale && !bulk && product.category !== "indumentaria") {
+    if (hasWholesale && !bulk && countsForWholesale(product)) {
       wholesale = Number(override.wholesale) || findRule(wholesaleList, key, shortKey, product.category)?.price || wholesaleList.default;
-      if (wholesale >= unit) wholesale = null;   // nunca mostrar un "precio por mayor" que no conviene
+      if (!wholesale || wholesale >= unit) wholesale = null;   // sin precio por mayor (0) se cobra el de unidad   // nunca mostrar un "precio por mayor" que no conviene
     }
     const result = { unit, wholesale, bulk };
     cache.set(product.id, result);
@@ -94,12 +100,14 @@ export function createPricing(table) {
   return {
     hasWholesale,
     minPairs,
+    allProducts,
+    words,
     wholesaleLabel,
     forProduct: resolve,
 
     /** Cuenta pares (todo menos indumentaria) para saber si aplica precio por mayor. */
     countPairs(lines) {
-      return lines.reduce((sum, line) => sum + (line.product.category === "indumentaria" ? 0 : line.qty), 0);
+      return lines.reduce((sum, line) => sum + (countsForWholesale(line.product) ? line.qty : 0), 0);
     },
 
     /**
@@ -155,6 +163,8 @@ export function createPricing(table) {
         byQuality: groupKeys.includes("g5"),
         pairs,
         minPairs,
+        words,
+        allProducts,
         canChoose,
         mode: canChoose ? mode : "unidad",
         isWholesale,

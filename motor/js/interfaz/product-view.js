@@ -367,7 +367,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
     const banner = content.querySelector("[data-added]");
     banner.hidden = false;
     banner.querySelector("[data-added-text]").textContent =
-      `${plural(qty, "par agregado", "pares agregados")} (talle ${size}). Tenés ${plural(cart.count(), "par", "pares")} en tu pedido.`;
+      `${plural(qty, `${pricing.words[0]} agregado`, `${pricing.words[1]} agregados`)} (talle ${size}). Tenés ${plural(cart.count(), ...pricing.words)} en tu pedido.`;
     clearTimeout(showAdded.timer);
     showAdded.timer = setTimeout(() => { if (product) renderBuy(); }, ADDED_FEEDBACK_MS);
   }

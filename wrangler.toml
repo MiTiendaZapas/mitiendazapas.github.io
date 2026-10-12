@@ -1,0 +1,14 @@
+# Configuración del programa del panel (Cloudflare Pages Functions, carpeta functions/).
+# Las tiendas se arman y publican con herramientas/publicar_cloudflare.sh.
+name = "mitiendastock"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-10-01"
+
+# Depósito público de siempre (stock, fotos) y, aparte, uno PRIVADO para usuarios y claves.
+[[r2_buckets]]
+binding = "CATALOGO"
+bucket_name = "mitiendastock-catalogo"
+
+[[r2_buckets]]
+binding = "PRIVADO"
+bucket_name = "mitiendastock-privado"

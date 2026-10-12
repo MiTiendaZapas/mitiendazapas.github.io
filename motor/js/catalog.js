@@ -60,6 +60,9 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
         name: p.name.trim(),
         brand: p.brand || null,
         category: p.category || "zapatillas",
+        // Tiendas con stock propio: cada producto trae su precio (y, si tiene, su precio por mayor).
+        price: Number(p.price) > 0 ? Number(p.price) : null,
+        wholesalePrice: Number(p.wholesalePrice) > 0 ? Number(p.wholesalePrice) : null,
         sizes,
         available: sizes.filter((s) => s.stock > 0),
         images: (Array.isArray(p.images) ? p.images : []).map((img) => ({
@@ -79,6 +82,7 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
   return {
     products,
     updatedAt: data.generatedAt ? new Date(data.generatedAt) : null,
+    categories: data.categories && typeof data.categories === "object" ? data.categories : null,
     get: (id) => byId.get(id),
     getBySlug: (slug) => bySlug.get(slug),
     stockOf(productId, size) {

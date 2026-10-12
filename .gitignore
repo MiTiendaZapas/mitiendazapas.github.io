@@ -15,3 +15,9 @@ desktop.ini
 
 # Cloudflare (wrangler)
 .wrangler/
+
+# Claves del programa del panel para pruebas locales (nunca se suben)
+.dev.vars
+dist/
+.panel-prueba.txt
+.panel-prueba-otra.txt
