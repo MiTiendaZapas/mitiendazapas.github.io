@@ -21,3 +21,4 @@ desktop.ini
 dist/
 .panel-prueba.txt
 .panel-prueba-otra.txt
+.panel-clave-*.txt
