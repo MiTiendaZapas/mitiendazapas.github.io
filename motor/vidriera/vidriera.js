@@ -80,6 +80,25 @@ function applyColor(color) {
   root.style.setProperty("--v-on-accent-dark", light < 0.12 ? "#0f0f10" : "#ffffff");
 }
 
+// --- modo claro / oscuro -----------------------------------------------------------
+// Blanco por defecto. Si el celular está en modo oscuro, abre en oscuro. Con el botón
+// del encabezado la persona elige, y su elección queda guardada en ese celular.
+const THEME_KEY = "vidriera:tema";
+const systemDark = window.matchMedia?.("(prefers-color-scheme: dark)");
+function savedTheme() {
+  try { return localStorage.getItem(THEME_KEY); } catch { return null; }
+}
+function setTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0f0f10" : "#ffffff");
+  const button = document.querySelector("[data-theme-toggle]");
+  if (button) {
+    button.innerHTML = icon(theme === "dark" ? "sun" : "moon");
+    button.setAttribute("aria-label", theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro");
+  }
+}
+systemDark?.addEventListener?.("change", (e) => { if (!savedTheme()) setTheme(e.matches ? "dark" : "light"); });
+
 // --- dibujo ----------------------------------------------------------------------
 function headerHtml(info) {
   const mark = info.logo
@@ -90,6 +109,7 @@ function headerHtml(info) {
       <div class="v-wrap v-header__inner">
         <a class="v-brand" href="#inicio" aria-label="${esc(info.name)}, ir al inicio">${mark}<span class="v-brand__name">${esc(info.name)}</span></a>
         <div class="v-header__actions">
+          <button class="v-icon-btn" type="button" data-theme-toggle aria-label="Cambiar a modo oscuro">${icon("moon")}</button>
           <button class="v-icon-btn" type="button" data-open-search aria-label="Buscar">${icon("search")}</button>
           <button class="v-icon-btn v-cart-btn" type="button" data-open-cart aria-label="Ver tu pedido">
             ${icon("bag")}<span class="v-cart-btn__count" data-cart-count hidden>0</span>
@@ -243,6 +263,12 @@ async function start() {
     <div class="v-toast" role="status" aria-live="polite" data-toast></div>`;
 
   const $ = (sel) => app.querySelector(sel);
+  setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+  $("[data-theme-toggle]").addEventListener("click", () => {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    try { localStorage.setItem(THEME_KEY, next); } catch { /* sin guardado: igual cambia */ }
+    setTheme(next);
+  });
   const grid = $("[data-grid]");
   const productDialog = $("[data-product-dialog]");
   const cartDialog = $("[data-cart-dialog]");

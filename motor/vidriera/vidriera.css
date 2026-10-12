@@ -24,19 +24,18 @@
   --v-gutter: 16px;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --v-bg: #0f0f10;
-    --v-surface: #1a1a1c;
-    --v-surface-2: #252528;
-    --v-border: #2f2f33;
-    --v-text: #f4f4f5;
-    --v-muted: #a6a6ae;
-    --v-accent: var(--v-accent-dark, #f4f4f5);
-    --v-on-accent: var(--v-on-accent-dark, #0f0f10);
-    --v-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
-    color-scheme: dark;
-  }
+/* Modo oscuro: lo elige la persona con el botón del encabezado; si no eligió, sigue al celular. */
+:root[data-theme="dark"] {
+  --v-bg: #0f0f10;
+  --v-surface: #1a1a1c;
+  --v-surface-2: #252528;
+  --v-border: #2f2f33;
+  --v-text: #f4f4f5;
+  --v-muted: #a6a6ae;
+  --v-accent: var(--v-accent-dark, #f4f4f5);
+  --v-on-accent: var(--v-on-accent-dark, #0f0f10);
+  --v-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
 }
 @media (min-width: 768px) { :root { --v-gutter: 28px; } }
 
