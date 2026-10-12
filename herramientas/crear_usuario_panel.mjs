@@ -4,7 +4,7 @@
  * Uso (desde la carpeta plataforma-zapas):
  *   node herramientas/crear_usuario_panel.mjs <tienda> <usuario> [--local]
  *
- * Inventa una clave segura, la muestra UNA vez (para pasársela al cliente) y guarda
+ * Inventa una clave segura (o usa la de PANEL_CLAVE), la muestra UNA vez (para pasársela al cliente) y guarda
  * en el depósito PRIVADO solo la clave cifrada. Con --local la guarda en la prueba
  * de esta computadora (wrangler pages dev) en vez de Cloudflare.
  */
@@ -31,7 +31,14 @@ while (letters.length < 12) {
     if (n < 248 && letters.length < 12) letters.push(ALPHABET[n % ALPHABET.length]);
   }
 }
-const password = letters.join("").replace(/(.{4})(?!$)/g, "$1-");
+// Una clave elegida a mano (por ejemplo, para la tienda de demostración) va en la variable
+// PANEL_CLAVE, no en el comando, para que no quede en el historial.
+const chosen = process.env.PANEL_CLAVE;
+if (chosen !== undefined && (chosen.length < 6 || chosen.length > 100)) {
+  console.error("PANEL_CLAVE tiene que tener entre 6 y 100 letras o números.");
+  process.exit(1);
+}
+const password = chosen ?? letters.join("").replace(/(.{4})(?!$)/g, "$1-");
 
 const salt = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
 const iterations = 100000;
