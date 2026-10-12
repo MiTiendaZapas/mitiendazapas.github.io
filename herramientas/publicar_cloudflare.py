@@ -65,6 +65,16 @@ def copy_tree(source, target, skip):
             shutil.copy2(item, destination)
 
 
+NOT_FOUND_PAGE = """<!DOCTYPE html>
+<html lang="es-AR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Página no encontrada</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,sans-serif;background:#f5f5f3;color:#18181b;text-align:center;padding:24px}
+@media (prefers-color-scheme:dark){body{background:#111113;color:#f4f4f5}}h1{font-size:24px;margin:0 0 8px}p{margin:0 0 20px;opacity:.75}
+a{display:inline-block;padding:12px 20px;border-radius:999px;background:currentColor}a span{color:#f5f5f3;font-weight:600}@media (prefers-color-scheme:dark){a span{color:#111113}}</style>
+</head><body><main><h1>No encontramos esta página</h1><p>Puede que el link esté mal escrito o que la página ya no exista.</p>
+<a href="javascript:history.back()"><span>Volver</span></a></main></body></html>
+"""
+
 PAGE_FILE = re.compile(r'((?:href|src)=")((?!https?:|//)[^"?#]+\.(?:css|js))"')
 JS_IMPORT = re.compile(r'''((?:\bfrom|\bimport)\s*\(?\s*)(["'])(\.{1,2}/[^"'?]+\.js)\2''')
 CSS_IMPORT = re.compile(r'''(@import url\(")([^"?]+\.css)"''')
@@ -101,6 +111,10 @@ def build(dist):
     copy_tree(ROOT, main_store, SKIP_MAIN)
     shutil.copytree(ROOT / "motor", dist / "motor")
     shutil.copy2(ROOT / "herramientas" / "portada.html", dist / "index.html")
+    # Sin 404.html, Cloudflare responde la portada (con "todo bien") a cualquier archivo que
+    # no existe. Si un celular pedía un estilo nuevo justo mientras se publicaba, se quedaba
+    # horas con esa portada en vez del estilo y la tienda se veía sin diseño.
+    (dist / "404.html").write_text(NOT_FOUND_PAGE, encoding="utf-8")
     # Links de mitiendastock.com que se usaron antes de mover la tienda a /laimp/ (09/10).
     redirects = [line for page in MAIN_PAGES for line in (
         f"/{page} /{MAIN_STORE}/{page}/ 301", f"/{page}/* /{MAIN_STORE}/{page}/:splat 301")]
