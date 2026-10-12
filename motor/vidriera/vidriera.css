@@ -79,7 +79,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .v-icon-btn:hover { background: var(--v-surface); }
 .v-icon-btn--sm { width: 36px; height: 36px; }
-.v-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 0; border: 0; background: none; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.v-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 0; border: 0; background: none; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .v-link--muted { color: var(--v-muted); font-weight: 500; }
 
 /* Encabezado */
@@ -235,7 +235,7 @@ h1, h2, h3, p { margin: 0; }
 .v-stepper button { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; cursor: pointer; }
 .v-stepper button:disabled { opacity: 0.3; cursor: not-allowed; }
 .v-stepper output { min-width: 2ch; font-weight: 700; text-align: center; }
-.v-stepper--sm button { width: 36px; height: 36px; }
+.v-stepper--sm button { width: 44px; height: 44px; }   /* fácil de tocar con el dedo */
 .v-stepper--sm .icon { width: 16px; height: 16px; }
 
 /* Pedido */

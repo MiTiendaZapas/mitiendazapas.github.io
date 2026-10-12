@@ -27,7 +27,13 @@ const NETWORKS = {
 };
 
 const esc = escapeHtml;
-const photo = (path) => (path ? API + path : "");
+// Fotos y logo: en mitiendastock.com salen directo del depósito público (catalogo.mitiendastock.com),
+// que Cloudflare guarda en caché y no gasta pedidos del programa del panel. En la prueba local,
+// del programa del panel.
+const ON_CLOUDFLARE = location.hostname === "mitiendastock.com" || location.hostname.endsWith(".mitiendastock.com")
+  || location.hostname.endsWith("mitiendastock.pages.dev");
+const FILES = ON_CLOUDFLARE ? `https://catalogo.mitiendastock.com/tiendas/${encodeURIComponent(STORE)}/` : API;
+const photo = (path) => (path ? FILES + path : "");
 const state = { category: "", search: "", product: null, size: null, qty: 1, photoIndex: 0 };
 
 // --- datos -----------------------------------------------------------------------

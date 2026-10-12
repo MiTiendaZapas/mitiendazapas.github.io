@@ -8,6 +8,7 @@
  * Habla con el programa del panel (functions/api/panel/). Todo se arma con textContent
  * (nunca HTML con datos), así nada de lo cargado puede meter código en la página.
  */
+import { icon } from "../js/interfaz/icons.js";
 import { CATEGORY_ORDERS, PRODUCT_ORDERS, sortProducts } from "../vidriera/orden.js";
 
 const config = window.STORE_CONFIG ?? {};
@@ -104,6 +105,24 @@ const categoryName = (id) => (Object.hasOwn(state.categories, id) ? state.catego
 const field = (id, label, input, help) => h("div", { class: "panel-field" },
   h("label", { for: id }, label), input, help ? h("small", { class: "panel-muted" }, help) : null);
 
+/**
+ * Botón claro / oscuro. El panel abre en blanco; si el celular está en modo oscuro, en
+ * oscuro. Lo que elige el cliente con el botón queda guardado en ese celular (theme.js).
+ */
+function themeButton() {
+  const theme = window.storeTheme;
+  if (!theme?.available) return null;
+  const dark = () => theme.current() === "dark";
+  const button = h("button", { class: "btn btn--ghost btn--sm panel-theme", type: "button" });
+  const paint = () => {
+    button.innerHTML = icon(dark() ? "sun" : "moon");
+    button.setAttribute("aria-label", dark() ? "Cambiar a modo claro" : "Cambiar a modo oscuro");
+  };
+  button.addEventListener("click", () => { theme.toggle(); paint(); });
+  paint();
+  return button;
+}
+
 function renderTop({ loggedIn }) {
   const current = (location.hash.slice(1).split("/")[0]) || "productos";
   top.replaceChildren(
@@ -111,9 +130,10 @@ function renderTop({ loggedIn }) {
       h("div", { class: "panel-top__title" },
         h("strong", {}, state.settings.name || config.name || "Mi tienda"),
         h("span", {}, "Panel de tu tienda")),
-      loggedIn ? h("div", { class: "panel-top__actions" },
-        h("a", { class: "btn btn--outline btn--sm", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda"),
-        h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: logout }, "Salir")) : null),
+      h("div", { class: "panel-top__actions" },
+        themeButton(),
+        loggedIn ? h("a", { class: "btn btn--outline btn--sm", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda") : null,
+        loggedIn ? h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: logout }, "Salir") : null)),
     ...(loggedIn ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
       TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id || (t.id === "productos" && ["editar", "nuevo"].includes(current)) ? "page" : null }, t.label)))] : []));
 }

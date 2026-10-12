@@ -9,7 +9,11 @@
 .panel-top__title { display: grid; line-height: 1.2; }
 .panel-top__title strong { font-size: 16px; }
 .panel-top__title span { color: var(--color-text-muted); font-size: 12px; }
-.panel-top__actions { display: flex; gap: var(--space-2); }
+.panel-top__actions { display: flex; flex: none; align-items: center; gap: 4px; }
+.panel-top__title { min-width: 0; }
+.panel-top__title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-theme { width: 44px; min-height: 44px; padding: 0; }
+.panel-top .btn--sm { min-height: 44px; }
 
 .panel-main { display: grid; gap: var(--space-3); max-width: 760px; margin: 0 auto; padding: var(--space-4) var(--gutter); }
 .panel-card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
@@ -171,3 +175,20 @@
 .panel-help { display: grid; gap: var(--space-3); margin: 0; padding-left: 1.2em; }
 .panel-help li { display: grid; gap: 2px; font-size: 14px; line-height: 1.45; }
 .panel-help strong { font-size: 15px; }
+
+/* Celular: todo lo que se toca mide al menos 44px (fácil con el dedo). */
+.panel-chip, .panel-stock, .panel-item .btn--sm, .panel-more > summary { min-height: 44px; }
+.panel-presets .btn--sm, .panel-editor__head .btn--sm, .panel-logo__actions .btn--sm { min-height: 44px; }
+@media (max-width: 380px) {
+  .panel-top__title span { display: none; }          /* "Panel de tu tienda": no entra en pantallas chicas */
+  .panel-top .btn--outline { padding: 0 10px; }
+  .panel-tabs { gap: 0; padding: 0 8px; }
+  .panel-tab { padding: 12px 8px; font-size: 13px; }   /* las 4 secciones entran sin deslizar */
+}
+/* Fotos del producto: 2 por fila en el celular, con botones más grandes. */
+.panel-photos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 520px) { .panel-photos { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); } }
+.panel-photo__btn, .panel-photo__move button { width: 40px; height: 40px; }
+.panel-size-row { grid-template-columns: minmax(0, 1fr) auto 44px; }
+.panel-size-row__remove { width: 44px; height: 44px; }
+.panel-cat__actions button { width: 44px; height: 44px; }
