@@ -17,6 +17,7 @@ import { createCatalogView } from "./interfaz/catalog-view.js";
 import { createFiltersView } from "./interfaz/filters-view.js";
 import { renderHeader, renderHero } from "./interfaz/layout.js";
 import { renderFooter, renderInfoPage } from "./interfaz/pages.js";
+import { applyStoreSettings, applyWholesaleSettings, loadStoreSettings } from "./ajustes-tienda.js";
 import { createProductView } from "./interfaz/product-view.js";
 import { createToaster } from "./interfaz/toast.js";
 import { renderLastPairs } from "./interfaz/ultimos-pares.js";
@@ -40,6 +41,10 @@ const { key: channelKey, channel, isDefault } = resolveChannel(config);
 const links = createLinks(config, { key: channelKey, channel, isDefault });
 const storagePrefix = `${config.id}:${channelKey}`;
 const overlays = document.getElementById("overlays");
+
+// Tienda con stock propio: nombre, logo, WhatsApp, redes y color los elige el cliente en su panel.
+const storeSettings = config.manualStore ? await loadStoreSettings(config) : null;
+if (storeSettings) applyStoreSettings(config, channel, storeSettings);
 
 renderHeader(document.getElementById("site-header"), { config, channel, links });
 renderFooter(document.getElementById("site-footer"), { config, channel, links });
@@ -92,7 +97,7 @@ async function startStore() {
     ]);
     // Tienda con stock propio: las categorías las arma el cliente en su panel.
     if (catalog.categories) config.categories = { ...catalog.categories, ...(config.categories ?? {}) };
-    const pricing = createPricing(priceTable);
+    const pricing = createPricing(applyWholesaleSettings(priceTable, storeSettings));
     const cart = createCart({ storageKey: `${storagePrefix}:cart`, catalog });
     const restored = cart.restore();
 

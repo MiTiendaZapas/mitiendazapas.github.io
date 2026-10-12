@@ -85,7 +85,7 @@ export async function updateCatalog(env, store, change) {
     const result = await change(data);
     data.generatedAt = new Date().toISOString();
     data.count = data.products.length;
-    data.categories = usedCategories(data);
+    data.categories = keepCategories(data);
     const options = {
       httpMetadata: { contentType: "application/json; charset=utf-8", cacheControl: "no-cache" },
     };
@@ -96,20 +96,56 @@ export async function updateCatalog(env, store, change) {
   throw new Error("No se pudo guardar: probá de nuevo en un momento.");
 }
 
-/** Solo quedan las categorías que usa algún producto. */
-function usedCategories(data) {
-  const used = {};
-  for (const product of data.products) used[product.category] = data.categories?.[product.category] ?? product.category;
-  return used;
+/**
+ * Categorías de la tienda, en el orden que eligió el cliente (así salen en la tienda).
+ * Las crea y ordena él en su panel; si algún producto usa una que falta, se agrega al final.
+ */
+function keepCategories(data) {
+  const kept = {};
+  for (const [id, label] of Object.entries(data.categories ?? {})) kept[id] = label;
+  for (const product of data.products) if (!Object.hasOwn(kept, product.category)) kept[product.category] = product.category;
+  return kept;
+}
+export const MAX_CATEGORIES = 40;
+
+/** Busca la categoría por su código o por su nombre (sin importar mayúsculas); si no existe, la crea. */
+function categoryFor(data, value) {
+  const label = cleanText(value, 30, "la categoría", { required: true });
+  const categories = data.categories ?? {};
+  if (Object.hasOwn(categories, label)) return label;
+  const match = Object.entries(categories).find(([, l]) => l.toLowerCase() === label.toLowerCase());
+  if (match) return match[0];
+  const id = slugify(label);
+  if (!id) throw new Error("La categoría tiene que tener letras o números.");
+  if (Object.keys(categories).length >= MAX_CATEGORIES) throw new Error(`Máximo ${MAX_CATEGORIES} categorías.`);
+  data.categories = { ...categories, [Object.hasOwn(categories, id) ? `${id}-${Date.now() % 10000}` : id]: label };
+  return Object.keys(data.categories).at(-1);
+}
+
+/** Lista nueva de categorías desde el panel: [{ id?, label }] en el orden elegido. */
+export function cleanCategories(input, data) {
+  if (!Array.isArray(input) || input.length > MAX_CATEGORIES) throw new Error(`Máximo ${MAX_CATEGORIES} categorías.`);
+  const current = data.categories ?? {};
+  const result = {};
+  const labels = new Set();
+  for (const item of input) {
+    const label = cleanText(item?.label, 30, "el nombre de la categoría", { required: true });
+    if (labels.has(label.toLowerCase())) throw new Error(`La categoría "${label}" está repetida.`);
+    labels.add(label.toLowerCase());
+    let id = typeof item?.id === "string" && Object.hasOwn(current, item.id) ? item.id : slugify(label);
+    if (!id) throw new Error("Cada categoría tiene que tener letras o números.");
+    while (Object.hasOwn(result, id)) id = `${id}-2`;
+    result[id] = label;
+  }
+  const inUse = data.products.find((p) => !Object.hasOwn(result, p.category));
+  if (inUse) throw new Error(`No se puede borrar "${current[inUse.category] ?? inUse.category}": la usa "${inUse.name}". Cambiale la categoría primero.`);
+  return result;
 }
 
 /** Revisa y ordena lo que mandó el panel para un producto. */
 export function cleanProduct(input, current, data) {
   const name = cleanText(input.name, 80, "el nombre", { required: true });
   const brand = cleanText(input.brand, 40, "la marca");
-  const categoryLabel = cleanText(input.category, 30, "la categoría", { required: true });
-  const category = slugify(categoryLabel);
-  if (!category) throw new Error("La categoría tiene que tener letras o números.");
   const price = cleanPrice(input.price, "el precio", { required: true });
   const wholesalePrice = cleanPrice(input.wholesalePrice, "el precio por mayor");
   if (wholesalePrice && wholesalePrice >= price) throw new Error("El precio por mayor tiene que ser menor que el precio por unidad.");
@@ -144,12 +180,34 @@ export function cleanProduct(input, current, data) {
     slug = base;
     for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
   }
-  data.categories = { ...(data.categories ?? {}), [category]: categoryLabel };
+  const category = categoryFor(data, input.category);
   return {
     id: current?.id ?? `m-${crypto.randomUUID()}`,
     slug, name, brand: brand || null, category, price, wholesalePrice,
     sizes, images: cleanImages,
+    // Pausado: no se ve en la tienda, pero no se borra (por ejemplo, mientras llega mercadería).
+    hidden: input.hidden === true,
   };
+}
+
+/** Lo que ve el público: sin productos pausados. */
+export function publicCatalog(data) {
+  return { ...data, products: data.products.filter((p) => !p.hidden) };
+}
+
+/** Copia las fotos de un producto con nombres nuevos (así borrar uno no borra las del otro). */
+export async function copyPhotos(env, store, images) {
+  return Promise.all(images.map(async (img) => {
+    const code = crypto.randomUUID();
+    const ext = img.lg.endsWith(".jpg") ? "jpg" : "webp";
+    const copy = { lg: `fotos/${code}-lg.${ext}`, sm: `fotos/${code}-sm.${ext}`, w: img.w, h: img.h };
+    for (const size of ["lg", "sm"]) {
+      const source = await env.CATALOGO.get(`tiendas/${store}/${img[size]}`);
+      if (!source) throw new Error("No se encontró una de las fotos.");
+      await env.CATALOGO.put(`tiendas/${store}/${copy[size]}`, source.body, { httpMetadata: source.httpMetadata });
+    }
+    return copy;
+  }));
 }
 
 /** Borra del depósito las fotos que ya no usa ningún producto. */
@@ -249,4 +307,63 @@ export function imageType(bytes) {
   if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "webp";
   if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpg";
   return null;
+}
+
+// --- ajustes de la tienda (los cambia el cliente: nombre, logo, WhatsApp, redes...) ---
+const settingsKey = (store) => `tiendas/${store}/ajustes.json`;
+const LOGO_PATH = /^marca\/[a-f0-9-]{36}-(512|160)\.(webp|jpg)$/;
+const COLORS = new Set(["#18181b", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#db2777", "#c2410c", "#0f766e"]);
+export const isLogoFile = (name) => /^[a-f0-9-]{36}-(512|160)\.(webp|jpg)$/.test(name ?? "");
+
+export async function readSettings(env, store) {
+  const object = await env.CATALOGO.get(settingsKey(store));
+  return object ? object.json() : {};
+}
+export async function saveSettings(env, store, settings) {
+  await env.CATALOGO.put(settingsKey(store), JSON.stringify(settings), {
+    httpMetadata: { contentType: "application/json; charset=utf-8", cacheControl: "no-cache" },
+  });
+}
+
+/** Revisa los ajustes que mandó el panel. Las redes se arman desde el usuario (@nombre). */
+export function cleanSettings(input, current = {}) {
+  const phone = String(input?.whatsapp ?? "").replace(/\D/g, "");
+  if (phone && (phone.length < 10 || phone.length > 15)) throw new Error("El WhatsApp tiene que tener código de país y área. Ej: 5491123456789");
+  const handle = (value, field) => {
+    const text = String(value ?? "").trim().replace(/^@/, "").replace(/^https?:\/\/[^/]+\//, "").replace(/\/$/, "");
+    if (text && !/^[A-Za-z0-9._]{1,30}$/.test(text)) throw new Error(`El usuario de ${field} no es válido.`);
+    return text;
+  };
+  const min = Number(input?.wholesaleMin);
+  const color = String(input?.color ?? "");
+  const logo = input?.logo ?? current.logo ?? null;
+  if (logo && (!LOGO_PATH.test(logo.large ?? "") || !LOGO_PATH.test(logo.small ?? ""))) throw new Error("El logo no es válido.");
+  return {
+    name: cleanText(input?.name, 50, "el nombre de la tienda", { required: true }),
+    tagline: cleanText(input?.tagline, 70, "la frase"),
+    heroTitle: cleanText(input?.heroTitle, 40, "el título"),
+    heroHighlight: cleanText(input?.heroHighlight, 40, "la parte destacada del título"),
+    heroText: cleanText(input?.heroText, 220, "el texto de la portada"),
+    whatsapp: phone,
+    instagram: handle(input?.instagram, "Instagram"),
+    tiktok: handle(input?.tiktok, "TikTok"),
+    facebook: handle(input?.facebook, "Facebook"),
+    color: COLORS.has(color) ? color : "#18181b",
+    wholesale: input?.wholesale === true,
+    wholesaleMin: Number.isInteger(min) && min >= 2 && min <= 100 ? min : 5,
+    logo,
+  };
+}
+
+/** Cambia la clave del usuario que ingresó (pide la actual). */
+export async function changePassword(env, usuario, current, next) {
+  if (typeof next !== "string" || next.length < 8 || next.length > 100) throw new Error("La clave nueva tiene que tener entre 8 y 100 letras o números.");
+  const object = await env.PRIVADO.get(`usuarios/${usuario}.json`);
+  const user = object ? await object.json() : null;
+  if (!user) throw new Error("Usuario inexistente.");
+  const hash = await hashPassword(String(current ?? ""), user.salt, user.iterations ?? PBKDF2_ITERATIONS);
+  if (!sameText(hash, user.hash)) throw new Error("La clave actual no es correcta.");
+  const salt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
+  const updated = { ...user, salt, iterations: PBKDF2_ITERATIONS, hash: await hashPassword(next, salt), cambiada: new Date().toISOString() };
+  await env.PRIVADO.put(`usuarios/${usuario}.json`, JSON.stringify(updated));
 }

@@ -12,6 +12,7 @@ Uso (desde la carpeta del proyecto):
     bash herramientas/publicar_cloudflare.sh              publica (toma la llave de "wrangler login")
     python herramientas/publicar_cloudflare.py --armar    solo arma la carpeta, sin subir
 """
+import json
 import os
 import re
 import shutil
@@ -114,6 +115,12 @@ def build(dist):
     pages = sorted({html.parent.relative_to(dist).as_posix() for html in dist.rglob("index.html")} - {"."})
     redirects += [f"/{page} /{page}/ 301" for page in pages]
     (dist / "_redirects").write_text("\n".join(redirects) + "\n", encoding="utf-8")
+    # El programa del panel (functions/) corre SOLO en /api/ y en la portada de las tiendas
+    # con stock propio (para poner su nombre y logo al compartir). El resto se entrega directo.
+    manual = [name for name, folder in clients.items()
+              if re.search(r"^\s*manualStore:", (folder / "configuracion.js").read_text(encoding="utf-8"), re.M)]
+    routes = {"version": 1, "include": ["/api/*"] + [f"/{name}/" for name in manual], "exclude": []}
+    (dist / "_routes.json").write_text(json.dumps(routes, indent=2) + "\n", encoding="utf-8")
     add_version(dist)
     # Las imágenes para compartir (og:image) apuntan a la dirección nueva.
     for html in dist.rglob("*.html"):
