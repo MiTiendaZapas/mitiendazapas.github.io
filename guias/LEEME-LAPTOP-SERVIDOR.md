@@ -13,8 +13,8 @@ Inicio de Windows):
 
 | Programa | Qué hace | Dónde |
 |---|---|---|
-| **Piloto** `sincronizador/piloto.py --publicar` | Vuelta cada 10-15 min (antes 15-20; se bajó el 07/10): baja de GitHub, corre `sync_catalog.py`, publica `catalogo/` y el stock de casa. Descansa de 00:00 a 07:30. | `Desktop/mitiendazapas.github.io` |
-| **Bot de WhatsApp** `automatizacion/bot_whatsapp.py` | Todos los días (menos domingos), a una hora al azar entre 07:45 y 08:10, manda el stock al grupo real. | `Desktop/tienda-zapatillas/automatizacion` |
+| **Piloto** `sincronizador/piloto.py --publicar` | Vuelta cada 10-15 min (antes 15-20; se bajó el 07/10): baja de GitHub, corre `sync_catalog.py`, publica `catalogo/` y el stock de casa. Descansa de 00:00 a 05:30. | `Desktop/mitiendazapas.github.io` |
+| **Bot de WhatsApp** `automatizacion/bot_whatsapp.py` | Todos los días (menos domingos), a una hora al azar entre 05:45 y 06:10, manda el stock al grupo real. | `Desktop/tienda-zapatillas/automatizacion` |
 
 Carpetas en el Escritorio de la laptop:
 - `mitiendazapas.github.io` — este repo. **No renombrar**: el bot lee de ahí las fotos (`catalogo/fotos/...`).
@@ -63,7 +63,7 @@ Desde el 09/10 el bot lee el catálogo de **Cloudflare** (`https://catalogo.miti
 `id`, `name`, `sizes[{size, stock}]`, `images[0].lg`; y del archivo, `generatedAt` y `products`.
 
 - Si cambia ese formato, avisalo en una guía antes de publicarlo: el bot tiene que adaptarse a la vez.
-- `generatedAt` tiene que ser de hoy a partir de las 07:30: el bot espera hasta 30 min a que el piloto publique su primera
+- `generatedAt` tiene que ser de hoy a partir de las 05:30: el bot espera hasta 30 min a que el piloto publique su primera
   vuelta del día. Si el piloto no corre, manda con el stock que haya.
 - Los ids de las G5 empiezan con `g5-` (el bot guarda lo ya enviado por id para no repetir si retoma).
 - Un modelo sin stock o sin foto no se manda.
@@ -93,3 +93,7 @@ La **indumentaria** no pasa por el piloto ni por `catalogo/`: el bot la lee dire
 ## Cambio de número de WhatsApp del bot (11/10)
 
 El usuario quiere que el bot mande desde **otro número**. En la laptop se hace con `automatizacion/Cambiar_Numero_WhatsApp.bat`: vincula el número nuevo en una carpeta aparte (`sesion_wsp_nueva`), comprueba que encuentre los grupos y recién ahí reemplaza `sesion_wsp` (la vieja queda en `sesion_wsp_anterior`). El número nuevo tiene que estar agregado a los grupos del bot. No toques esas carpetas.
+
+## Cambio de horario (12/10)
+
+A pedido del usuario, desde el 13/10 el bot envía entre **05:45 y 06:10** (antes 07:45-08:10). Por eso el piloto ahora descansa de **00:00 a 05:30** (antes hasta 07:30): `REST_END_MINUTE` en `piloto.py`. Si se vuelve a mover el horario del bot, el descanso del piloto tiene que terminar ~15 min antes de la ventana, y en el bot hay que mover juntos `HORA_DESDE`, `HORA_HASTA` y `CATALOGO_FRESCO_DESDE`. Ojo: a esa hora el proveedor tiene que tener ya el stock del día publicado; si lo actualiza más tarde, el bot manda el stock de la noche anterior.
