@@ -45,7 +45,12 @@ const MIND = { "L.A IMP revendedores": [37000, 35000], "L.A IMP minorista": [400
   "ClienteA revendedores": [37000, 35000], "ClienteA minorista": [49000, 35000] };
 // 10/10: "TL 1 blancas" (con el 1 separado) cobraba otro precio que las "TL1"; ahora es el mismo.
 const SAME_AS = { "TL 1 blancas": "TL1 negras" };
-const intentional = { "L.A IMP revendedores": SAMBAS_42, "L.A IMP minorista": SAMBAS_42 };
+// 12/10: las Nike V2K pasan a $42.000 por mayor en todas las tiendas.
+const V2K_42 = { "Nike V2K marron": 42000 };
+const intentional = {
+  "L.A IMP revendedores": { ...SAMBAS_42, ...V2K_42 }, "L.A IMP minorista": { ...SAMBAS_42, ...V2K_42 },
+  "ClienteA revendedores": V2K_42, "ClienteA minorista": V2K_42,
+};
 
 for (const [name, legacyFile, pricesFile] of cases) {
   test(`${name}: mismos precios que la tienda actual`, { skip: !fs.existsSync(path.join(legacy, legacyFile)) && "no se encontró la tienda actual" }, () => {
