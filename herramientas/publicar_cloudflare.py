@@ -33,7 +33,9 @@ MAIN_PAGES = ["mayorista", "como-comprar", "talles", "envios", "cambios", "pregu
 
 # Lo que no se publica de la tienda principal (programas internos, pruebas, guías, stock).
 SKIP_MAIN = {".git", ".github", "catalogo", "sincronizador", "pruebas", "guias", "herramientas",
-             "README.md", ".nojekyll", ".gitignore", "node_modules", "__pycache__"}
+             "README.md", ".nojekyll", ".gitignore", "node_modules", "__pycache__",
+             # El programa del panel no se publica como archivo: wrangler lo arma desde functions/.
+             "functions", "servidor", "wrangler.toml", ".dev.vars", ".wrangler", "dist"}
 SKIP_CLIENT = {".git", "LEEME.md", ".gitignore", ".nojekyll"}
 
 

@@ -90,6 +90,17 @@ describe("precios", () => {
     // Otra marca adelante no se saca: "Adidas mind" no es una Mind de Nike.
     assert.equal(prices.forProduct(product("m4", "Adidas mind x", [], { brand: "Nike" })).unit, 43000);
   });
+  test("tienda con stock propio: precio de cada producto y ropa y calzado suman juntos", () => {
+    const prices = createPricing({ wholesale: { minPairs: 3, allProducts: true }, unit: { default: 0, rules: [] }, wholesalePrice: { default: 0, rules: [] } });
+    const buzo = { ...product("b1", "Buzo azul", [{ size: "M", stock: 9 }], { category: "indumentaria" }), price: 30000, wholesalePrice: 25000 };
+    const gorra = { ...product("g1", "Gorra", [{ size: "Único", stock: 9 }], { category: "accesorios" }), price: 10000, wholesalePrice: null };
+    assert.deepEqual(prices.forProduct(buzo), { unit: 30000, wholesale: 25000, bulk: null });
+    assert.deepEqual(prices.forProduct(gorra), { unit: 10000, wholesale: null, bulk: null });
+    assert.deepEqual(prices.words, ["producto", "productos"]);
+    const q = prices.quote([{ product: buzo, size: "M", qty: 2 }, { product: gorra, size: "Único", qty: 1 }], "mayor");
+    assert.equal(q.canChoose, true);   // 3 productos (aunque uno sea ropa)
+    assert.equal(q.total, 2 * 25000 + 10000);
+  });
   test("el número pegado o separado no cambia el precio (TL1 = TL 1 = TL-1)", () => {
     const prices = createPricing({
       unit: { default: 43000, rules: [{ price: 60000, contains: ["tl1"] }, { price: 70000, startsWith: ["air max 90"] }] },

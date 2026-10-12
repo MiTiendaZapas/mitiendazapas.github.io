@@ -27,6 +27,9 @@ const OPEN_CART_HASH = "#pedido";
 // en GitHub siguen al lado de la tienda (/catalogo/).
 const R2_CATALOG = "https://catalogo.mitiendastock.com/";
 function catalogBase(config) {
+  // Tienda con stock propio del cliente (lo carga desde su panel): el catálogo lo da
+  // el programa del panel (functions/api/tienda/), siempre al día.
+  if (config.manualStore) return `/api/tienda/${encodeURIComponent(config.manualStore)}/`;
   const host = location.hostname;
   const onCloudflare = host === "mitiendastock.com" || host.endsWith(".mitiendastock.com") || host.endsWith("mitiendastock.pages.dev");
   return onCloudflare ? R2_CATALOG : fromRoot(config.catalogBase);
@@ -68,7 +71,7 @@ async function startStore() {
     headStyle: config.catalogHeader,
     onAdded({ product, size, qty }) {
       toaster.show({
-        title: qty > 1 ? `${qty} pares agregados a tu pedido` : "Agregado a tu pedido",
+        title: qty > 1 ? `${qty} ${config.manualStore ? "productos" : "pares"} agregados a tu pedido` : "Agregado a tu pedido",
         text: `${product.name} · Talle ${size}`,
         thumb: product.images[0]?.sm,
         action: { label: "Ver pedido", onClick: () => cartView.open() },
@@ -87,6 +90,8 @@ async function startStore() {
       }),
       loadJson(fromRoot(channel.prices)),
     ]);
+    // Tienda con stock propio: las categorías las arma el cliente en su panel.
+    if (catalog.categories) config.categories = { ...catalog.categories, ...(config.categories ?? {}) };
     const pricing = createPricing(priceTable);
     const cart = createCart({ storageKey: `${storagePrefix}:cart`, catalog });
     const restored = cart.restore();

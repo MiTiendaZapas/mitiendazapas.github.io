@@ -32,7 +32,7 @@ export function buildOrderMessage({ config, channel, quote }) {
     return `${line.product.name} (${sizeLabel(line.product, line.size)}) ${money(line.price)}${many}`;
   };
   const count = quote.lines.reduce((sum, line) => sum + line.qty, 0);
-  const onlyFootwear = quote.lines.every((line) => line.product.category !== "indumentaria");
+  const onlyFootwear = !quote.allProducts && quote.lines.every((line) => line.product.category !== "indumentaria");
   const items = (n) => (onlyFootwear ? plural(n, "par", "pares") : plural(n, "producto"));
   if (quote.byQuality) {
     // Con G5 en el pedido, cada calidad va en su bloque con su subtotal (son proveedores distintos).
@@ -59,7 +59,7 @@ export function buildOrderMessage({ config, channel, quote }) {
     const modeLine = channel.purchaseModes[quote.canChoose ? quote.mode : "unidad"].message;
     if (modeLine) lines.push(modeLine + (quote.isWholesale ? onlyIn : ""));
   } else if (quote.canChoose) {
-    lines.push(`Compra por MAYOR (${quote.minPairs} pares o más)${onlyIn}`);
+    lines.push(`Compra por MAYOR (${quote.minPairs} ${quote.words?.[1] ?? "pares"} o más)${onlyIn}`);
   }
   // Las tiendas de clientes no llevan esta línea (orderShippingNote: false en su configuración).
   if (config.orderShippingNote !== false) lines.push("El envío se coordina aparte.");
