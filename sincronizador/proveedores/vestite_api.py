@@ -11,6 +11,7 @@ Es una API interna y puede cambiar: si el piloto deja de traer stock, revisar
 primero que este formato siga igual.
 """
 import json
+import unicodedata
 
 import net
 import settings
@@ -22,17 +23,24 @@ def _get_json(path):
     return json.loads(net.fetch_text(CONFIG["base_url"] + path))
 
 
+# Colores "de relleno" que la página del proveedor no cuenta como color (copiado de su
+# código el 12/10: "SIN COLOR", "UNICO" y "ÚNICO", sin importar mayúsculas ni tildes).
+PLACEHOLDER_COLORS = {"SIN COLOR", "UNICO"}
+
+
 def _is_without_color(color):
-    return not str(color or "").strip() or str(color).strip().upper() == "SIN COLOR"
+    text = unicodedata.normalize("NFD", str(color or "").strip().upper())
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    return not text or text in PLACEHOLDER_COLORS
 
 
 def visible_variants(variants):
     """Los talles que muestra el proveedor al abrir el modelo (misma regla que su página).
 
-    Los talles "SIN COLOR" vienen de su tienda vieja de Tiendanube. Si el modelo
-    tiene algún talle con color de verdad (ej. "Único"), la página del proveedor
-    muestra solo esos y deja afuera los "SIN COLOR". Si todos son "SIN COLOR",
-    los muestra todos.
+    Si el modelo tiene algún color de verdad (ej. "Negro"), la página del proveedor
+    muestra solo esos talles y deja afuera los de relleno ("SIN COLOR", "Único").
+    Si todos son de relleno, los muestra todos.
+    (Antes "Único" contaba como color de verdad; el proveedor lo cambió el 12/10.)
     """
     if any(not _is_without_color(v.get("color")) for v in variants):
         return [v for v in variants if not _is_without_color(v.get("color"))]
