@@ -162,6 +162,21 @@ describe("precios", () => {
 
 // --- carrito ------------------------------------------------------------------------
 describe("carrito", () => {
+  test("si llega stock nuevo con la página abierta, el pedido se corrige solo", () => {
+    const stock = { "p1:40": 5 };
+    const live = { get: (id) => PRODUCTS.find((p) => p.id === id), stockOf: (id, size) => stock[`${id}:${size}`] ?? 0 };
+    const cart = createCart({ storageKey: "t:vivo", catalog: live });
+    cart.add("p1", "40", 4);
+    const events = [];
+    cart.subscribe((e) => events.push(e.type));
+    stock["p1:40"] = 2;                       // se vendieron 3 mientras miraba
+    assert.deepEqual(cart.revalidate(), { removed: 0, adjusted: 1 });
+    assert.equal(cart.qtyOf("p1", "40"), 2);
+    assert.ok(events.includes("stock"));       // las tarjetas y el carrito se redibujan
+    stock["p1:40"] = 0;                       // se agotó
+    assert.equal(cart.revalidate().removed, 1);
+    assert.equal(cart.count(), 0);
+  });
   test("no deja agregar más que el stock del talle", () => {
     const cart = createCart({ storageKey: "t:cart", catalog });
     assert.equal(cart.add("p2", "40", 3).added, 1);

@@ -17,6 +17,7 @@ import { createCatalogView } from "./interfaz/catalog-view.js";
 import { createFiltersView } from "./interfaz/filters-view.js";
 import { renderHeader, renderHero } from "./interfaz/layout.js";
 import { renderFooter, renderInfoPage } from "./interfaz/pages.js";
+import { keepStockFresh } from "./stock-vivo.js";
 import { applyStoreSettings, applyWholesaleSettings, loadStoreSettings } from "./ajustes-tienda.js";
 import { createProductView } from "./interfaz/product-view.js";
 import { createToaster } from "./interfaz/toast.js";
@@ -66,6 +67,15 @@ function startInfoPage() {
   button.addEventListener("click", () => { location.href = links.store(OPEN_CART_HASH); });
 }
 
+/** Trae el stock (al abrir la tienda y, después, para mantenerlo al día). */
+function loadStock() {
+  return loadCatalog(catalogBase(config), {
+    order: config.catalogOrder,
+    includeHouseStock: config.includeHouseStock !== false,
+    showG5: config.showG5 === true,
+  });
+}
+
 /** Página de la tienda: catálogo, filtros, vista de producto y pedido. */
 async function startStore() {
   renderHero(document.getElementById("hero"), { config, channel, links });
@@ -88,11 +98,7 @@ async function startStore() {
 
   try {
     const [catalog, priceTable] = await Promise.all([
-      loadCatalog(catalogBase(config), {
-        order: config.catalogOrder,
-        includeHouseStock: config.includeHouseStock !== false,
-        showG5: config.showG5 === true,
-      }),
+      loadStock(),
       loadJson(fromRoot(channel.prices)),
     ]);
     // Tienda con stock propio: las categorías las arma el cliente en su panel.
@@ -139,6 +145,9 @@ async function startStore() {
         console.error(error);
       }
     }
+
+    // Con la página abierta, el stock se sigue actualizando solo.
+    keepStockFresh({ catalog, load: loadStock, cart, toaster });
 
     if (restored.removed || restored.adjusted) {
       toaster.show({

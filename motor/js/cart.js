@@ -94,6 +94,13 @@ export function createCart({ storageKey, catalog }) {
       emit({ type: "remove", productId, size });
     },
 
+    /** Vuelve a revisar el pedido contra el stock actual (después de traer stock nuevo). */
+    revalidate() {
+      const result = restore();
+      emit({ type: "stock" });
+      return result;
+    },
+
     clear() {
       lines = [];
       emit({ type: "clear" });
