@@ -15,28 +15,53 @@ import settings
 CONFIG = settings.EXTRA_PROVIDERS["beto_g5"]
 
 
+_cache = {}
+
+
+def _catalog():
+    """Su catálogo, pedido una sola vez por vuelta del piloto (lo usan list_products y find)."""
+    if "data" not in _cache:
+        _cache["data"] = json.loads(net.fetch_text(CONFIG["url"]))
+    return _cache["data"]
+
+
+def _to_item(item, prefix):
+    sizes = {}
+    for entry in item.get("talles", []):
+        size = str(entry.get("talle") or "").strip()
+        if size:
+            sizes[size] = sizes.get(size, 0) + max(int(entry.get("cantidad") or 0), 0)
+    photo = item.get("fotoGrande") or item.get("foto")
+    return {
+        "ref": f"{prefix}-{item['id']}",
+        "name": item["nombre"].strip(),
+        "sizes": [{"size": s, "stock": n} for s, n in sizes.items()],
+        "provider_brand": None,
+        "_image_urls": [photo] if photo else [],
+    }
+
+
 def list_products():
-    data = json.loads(net.fetch_text(CONFIG["url"]))
     products = []
-    for item in data["productos"]:
+    for item in _catalog()["productos"]:
         if str(item.get("linea") or "").strip().upper() != "G5":
             continue
         if str(item.get("categoria") or "").strip().lower() != "calzado":
             continue
-        sizes = {}
-        for entry in item.get("talles", []):
-            size = str(entry.get("talle") or "").strip()
-            if size:
-                sizes[size] = sizes.get(size, 0) + max(int(entry.get("cantidad") or 0), 0)
-        photo = item.get("fotoGrande") or item.get("foto")
-        products.append({
-            "ref": f"g5-{item['id']}",
-            "name": item["nombre"].strip(),
-            "sizes": [{"size": s, "stock": n} for s, n in sizes.items()],
-            "provider_brand": None,
-            "_image_urls": [photo] if photo else [],
-        })
+        products.append(_to_item(item, "g5"))
     return products
+
+
+def find(names):
+    """Modelos de cualquier línea por su nombre exacto (sin mayúsculas ni acentos): {nombre: item}."""
+    from classify import normalize
+    wanted = {normalize(n): n for n in names}
+    found = {}
+    for item in _catalog()["productos"]:
+        name = wanted.get(normalize(item.get("nombre") or ""))
+        if name:
+            found[name] = _to_item(item, "suma")
+    return found
 
 
 def get_image_urls(product):

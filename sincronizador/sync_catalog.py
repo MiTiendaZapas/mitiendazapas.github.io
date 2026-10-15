@@ -41,8 +41,12 @@ def _add_sizes(target, sizes):
         target[entry["size"]] = target.get(entry["size"], 0) + entry["stock"]
 
 
-def build_products(provider_items, manual_items, classifier):
-    """Fusiona proveedor + casa por nombre normalizado (misma idea que mezclar_stock.js)."""
+def build_products(provider_items, manual_items, classifier, summed_items=()):
+    """Fusiona proveedor + casa por nombre normalizado (misma idea que mezclar_stock.js).
+
+    summed_items: [(nombre en la tienda, modelo de otro proveedor, adaptador)] que son el
+    mismo producto (settings.STOCK_SUMS): su stock se suma al modelo de la tienda.
+    """
     by_key = {}
     ordered = []
 
@@ -50,7 +54,7 @@ def build_products(provider_items, manual_items, classifier):
         if key not in by_key:
             by_key[key] = {"id": product_id, "name": name, "sizes": {}, "house": {}, "origin": [],
                            "provider_item": None, "manual_photo": None, "kind": "zapatillas",
-                           "provider_brand": None}
+                           "provider_brand": None, "other": {}, "other_item": None, "other_source": None}
             ordered.append(key)
         return by_key[key]
 
@@ -77,12 +81,20 @@ def build_products(provider_items, manual_items, classifier):
         _add_sizes(product["sizes"], item["sizes"])
         product["origin"].append("proveedor")
 
+    for target, item, source in summed_items:
+        product = upsert(normalize(target), f"suma-{slugify(target)}", clean_name(target))
+        _add_sizes(product["sizes"], item["sizes"])
+        _add_sizes(product["other"], item["sizes"])   # cuánto de cada talle es del otro proveedor
+        product["origin"].append("otro")
+        product["other_item"], product["other_source"] = item, source
+
     products, used_slugs = [], set()
     for key in ordered:
         raw = by_key[key]
         # "casa": parte del stock que es de casa (las tiendas de clientes pueden excluirla).
         sizes = sorted((
-            {"size": s, "stock": n, **({"casa": raw["house"][s]} if raw["house"].get(s) else {})}
+            {"size": s, "stock": n, **({"casa": raw["house"][s]} if raw["house"].get(s) else {}),
+             **({"otro": raw["other"][s]} if raw["other"].get(s) else {})}
             for s, n in raw["sizes"].items()
         ), key=_size_sort_key)
         if not any(s["stock"] > 0 for s in sizes):
@@ -104,8 +116,32 @@ def build_products(provider_items, manual_items, classifier):
             "name_key": key,
             "_provider_item": raw["provider_item"],
             "_manual_photo": raw["manual_photo"],
+            "_other_item": raw["other_item"],
+            "_other_source": raw["other_source"],
         })
     return products
+
+
+def load_stock_sums():
+    """Modelos de otros proveedores que se suman a uno de la tienda (settings.STOCK_SUMS).
+
+    Si el otro proveedor falla, esta vuelta no se suma nada (la tienda muestra menos stock,
+    nunca de más) y el resto del catálogo se actualiza igual.
+    """
+    items = []
+    for name, pairs in settings.STOCK_SUMS.items():
+        try:
+            source = importlib.import_module(f"proveedores.{name}")
+            found = source.find(pairs.values())
+        except Exception as error:
+            print(f"  ⚠️ {name}: no se pudo leer para sumar stock ({type(error).__name__}: {error}).")
+            continue
+        for target, other in pairs.items():
+            if other in found:
+                items.append((target, found[other], source))
+            else:
+                print(f"  ⚠️ {name}: no está \"{other}\" (no se suma a {target}).")
+    return items
 
 
 def _photos_folder_index():
@@ -232,6 +268,10 @@ def attach_images(products, provider, store, download):
             if not product["images"] and fallback:
                 print(f"    ♻️ {product['id']}: sin fotos en el proveedor, se usa {fallback.name} de la carpeta Fotos/.")
                 product["images"] = store.update(product["id"], [fallback], reused=True)
+            # Último recurso: la foto del otro proveedor del que se suma el stock.
+            other = product.get("_other_item")
+            if not product["images"] and other and other.get("_image_urls"):
+                product["images"] = store.update(product["id"], product["_other_source"].get_image_urls(other), reused=True)
         if number % 10 == 0:
             store.save_state()     # si se corta la luz, no se pierde lo ya descargado
 
@@ -291,7 +331,9 @@ def run():
     print(f"Modelos de stock de casa: {len(manual_items)}")
 
     classifier = Classifier()
-    products = build_products(provider_items, manual_items, classifier)
+    summed_items = load_stock_sums()
+    print(f"Modelos que suman stock de otro proveedor: {len(summed_items)}")
+    products = build_products(provider_items, manual_items, classifier, summed_items)
     previous_products = _read_products(settings.PRODUCTS_FILE)
     for config in settings.EXTRA_PROVIDERS.values():
         previous_products += _read_products(extra_file(config))
@@ -347,7 +389,7 @@ def run():
         return 0
 
     for p in products:
-        for key in ("_provider_item", "_manual_photo", "name_key", "_source", "_frozen"):
+        for key in ("_provider_item", "_manual_photo", "name_key", "_source", "_frozen", "_other_item", "_other_source"):
             p.pop(key, None)
     def write_catalog(path, items):
         write_json_atomic(path, {

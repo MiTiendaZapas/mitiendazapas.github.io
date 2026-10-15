@@ -5,7 +5,7 @@ Hace dos revisiones:
      (qué colores cuenta como "de relleno"). Si la cambió, avisa: hay que revisar
      visible_variants() en sincronizador/proveedores/vestite_api.py (pasó el 12/10).
   2. COMPARACIÓN: talle por talle, lo que da el proveedor contra lo publicado en
-     catalogo.mitiendastock.com (sin contar el stock de casa).
+     catalogo.mitiendastock.com (sin contar el stock de casa ni el sumado de otro proveedor).
 
 Uso (desde la carpeta plataforma-zapas):   python herramientas/comparar_proveedor.py
 Las diferencias de 1 o 2 unidades suelen ser ventas de los últimos minutos (el piloto
@@ -52,7 +52,9 @@ def published_stock():
     data = json.load(urllib.request.urlopen(request, timeout=60))
     stock = {}
     for p in data["products"]:
-        sizes = {s["size"]: s["stock"] - s.get("casa", 0) for s in p["sizes"] if s["stock"] - s.get("casa", 0) > 0}
+        # Sin el stock de casa ni el que se suma de otro proveedor (settings.STOCK_SUMS).
+        own = lambda s: s["stock"] - s.get("casa", 0) - s.get("otro", 0)
+        sizes = {s["size"]: own(s) for s in p["sizes"] if own(s) > 0}
         stock[p["id"]] = (p["name"], sizes)
     return data.get("generatedAt"), stock
 

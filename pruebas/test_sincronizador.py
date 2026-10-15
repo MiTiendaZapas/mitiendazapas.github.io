@@ -93,6 +93,35 @@ class TestFusionConStockDeCasa(unittest.TestCase):
         self.assertEqual([s["size"] for s in af["sizes"]], ["38", "40", "41"])
 
 
+class TestSumaDeOtroProveedor(unittest.TestCase):
+    """settings.STOCK_SUMS: el mismo producto en otro proveedor suma su stock (15/10, ojotas)."""
+    def setUp(self):
+        provider = [
+            {"ref": "vp-1", "name": "Ojotas total black", "sizes": [{"size": "39/40", "stock": 32}, {"size": "41/42", "stock": 0}]},
+            {"ref": "vp-2", "name": "Ojotas Louis Vuitton negras", "sizes": [{"size": "39/40", "stock": 0}]},   # agotada acá
+        ]
+        other = lambda sizes: {"ref": "suma-x", "name": "Chinela", "sizes": sizes, "_image_urls": []}
+        summed = [
+            ("Ojotas total black", other([{"size": "39/40", "stock": 39}, {"size": "41/42", "stock": 38}]), None),
+            ("Ojotas Louis Vuitton negras", other([{"size": "39/40", "stock": 3}]), None),
+            ("Ojotas nuevas", other([{"size": "37/38", "stock": 0}]), None),     # sin stock en ningún lado
+        ]
+        self.products = {p["name"]: p for p in build_products(provider, [], Classifier(), summed)}
+
+    def test_suma_talle_por_talle_y_conserva_el_id(self):
+        black = self.products["Ojotas total black"]
+        self.assertEqual(black["id"], "vp-1")
+        sizes = {s["size"]: s for s in black["sizes"]}
+        self.assertEqual(sizes["39/40"], {"size": "39/40", "stock": 71, "otro": 39})
+        self.assertEqual(sizes["41/42"], {"size": "41/42", "stock": 38, "otro": 38})
+
+    def test_agotada_en_el_principal_sigue_con_el_stock_del_otro(self):
+        lv = self.products["Ojotas Louis Vuitton negras"]
+        self.assertEqual(lv["id"], "vp-2")
+        self.assertEqual(lv["sizes"], [{"size": "39/40", "stock": 3, "otro": 3}])
+        self.assertNotIn("Ojotas nuevas", self.products)
+
+
 class TestStockManual(unittest.TestCase):
     def test_lee_el_formato_del_panel_admin(self):
         with tempfile.TemporaryDirectory() as folder:
