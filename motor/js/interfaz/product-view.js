@@ -217,6 +217,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
         ${product.brand || product.category === "g5" ? `<p class="product-card__brand">${escapeHtml(product.brand ?? "")}${qualityBadgeHtml(product)}</p>` : ""}
         <h2 class="product-view__title" id="pv-title">${escapeHtml(product.name)}</h2>
         ${priceHtml(product, pricing)}
+        ${product.description ? `<p class="product-view__description">${escapeHtml(product.description)}</p>` : ""}
         <fieldset class="size-picker product-view__sizes">
           <legend class="size-picker__legend">Elegí tu talle${soldOutCount ? ` <span class="size-picker__soldout">(tachados: agotados)</span>` : ""}</legend>
           <div class="size-picker__list" data-sizes>${sizeButtonsHtml(product.sizes, state.size, { european: product.category === "g5" })}</div>

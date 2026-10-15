@@ -151,6 +151,19 @@ export function cleanCategories(input, data) {
   return result;
 }
 
+/**
+ * Datos opcionales de cualquier producto (propio o de Brasil):
+ *   description  texto corto (material, medidas, cómo calza)
+ *   compareAt    "precio anterior": se muestra tachado con el cartel "Oferta"
+ *   featured     destacado: sale primero en su categoría
+ */
+function cleanExtras(input, price) {
+  const description = cleanText(input?.description, 500, "la descripción");
+  const compareAt = cleanPrice(input?.compareAt, "el precio anterior");
+  if (compareAt && price && compareAt <= price) throw new Error("El precio anterior (tachado) tiene que ser más alto que el precio.");
+  return { description: description || null, compareAt, featured: input?.featured === true };
+}
+
 /** Revisa y ordena lo que mandó el panel para un producto. */
 export function cleanProduct(input, current, data) {
   const name = cleanText(input.name, 80, "el nombre", { required: true });
@@ -197,6 +210,7 @@ export function cleanProduct(input, current, data) {
     sizes, images: cleanImages,
     // Pausado: no se ve en la tienda, pero no se borra (por ejemplo, mientras llega mercadería).
     hidden: input.hidden === true,
+    ...cleanExtras(input, price),
     // Cuándo se cargó (para el orden "lo más nuevo primero").
     createdAt: current?.createdAt ?? new Date().toISOString(),
   };
@@ -253,7 +267,10 @@ function withChanges(base, change = {}) {
   for (const [size, stock] of Object.entries(extra)) if (!sizes.some((s) => s.size === size)) sizes.push({ size, br: 0, casa: stock, soloCasa: true });
   sizes.sort((a, b) => compareSizes(a.size, b.size));
   for (const s of sizes) s.stock = s.br + s.casa;
-  return { ...base, sizes, price: change.price ?? null, wholesalePrice: change.wholesalePrice ?? null, hidden: change.hidden === true };
+  return {
+    ...base, sizes, price: change.price ?? null, wholesalePrice: change.wholesalePrice ?? null, hidden: change.hidden === true,
+    description: change.description ?? null, compareAt: change.compareAt ?? null, featured: change.featured === true,
+  };
 }
 
 /**
@@ -304,6 +321,10 @@ export function cleanBrChange(input, base) {
   if (price) change.price = price;
   if (wholesalePrice) change.wholesalePrice = wholesalePrice;
   if (input?.hidden === true) change.hidden = true;
+  const extras = cleanExtras(input, price);
+  if (extras.description) change.description = extras.description;
+  if (extras.compareAt) change.compareAt = extras.compareAt;
+  if (extras.featured) change.featured = true;
   if (Object.keys(extra).length) {
     change.extra = extra;
     // Por si Brasil lo agota: así el modelo sigue en la tienda con los pares del cliente.
@@ -433,6 +454,10 @@ const LOGO_PATH = /^marca\/[a-f0-9-]{36}-(512|160)\.(webp|jpg)$/;
 const COLORS = new Set(["#18181b", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#db2777", "#c2410c", "#0f766e"]);
 export const isLogoFile = (name) => /^[a-f0-9-]{36}-(512|160)\.(webp|jpg)$/.test(name ?? "");
 
+const cleanPercent = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(Math.max(n, -0.9), 5) : 0;
+};
 const PRODUCT_ORDER_VALUES = ["alfabetico", "alfabetico-desc", "marca", "precio", "precio-desc", "nuevos", "manual"];
 
 export async function readSettings(env, store) {
@@ -475,7 +500,55 @@ export function cleanSettings(input, current = {}) {
     categoryOrder: input?.categoryOrder === "manual" ? "manual" : "alfabetico",
     productOrder: PRODUCT_ORDER_VALUES.includes(input?.productOrder) ? input.productOrder : "alfabetico",
     logo,
+    // Aviso arriba de la tienda (por ejemplo "Envío gratis este fin de semana").
+    notice: cleanText(input?.notice, 120, "el aviso"),
+    // Cuánto subió o bajó los precios de su lista de Brasil con "Cambiar precios" (0.1 = 10% más).
+    brPercent: cleanPercent(input?.brPercent),
   };
+}
+
+// --- cambiar precios de golpe (por ejemplo, +10% por la inflación) ------------------
+const roundPrice = (n) => Math.max(100, Math.round(n / 100) * 100);   // a los $100 más cercanos
+
+/**
+ * Sube o baja precios en porcentaje: los de sus productos y los precios propios que puso en
+ * modelos de Brasil se cambian; los modelos de Brasil con el precio de su lista suben con
+ * brPercent (se aplica sobre la lista, que maneja L.A IMP). Devuelve cuántos cambió.
+ */
+export function changePrices(catalog, settings, { percent, own, br }) {
+  const factor = 1 + percent;
+  const scale = (item) => {
+    for (const key of ["price", "wholesalePrice", "compareAt"]) if (item[key]) item[key] = roundPrice(item[key] * factor);
+    if (item.wholesalePrice && item.price && item.wholesalePrice >= item.price) item.wholesalePrice = null;
+    if (item.compareAt && item.price && item.compareAt <= item.price) item.compareAt = null;
+  };
+  let count = 0;
+  if (own) for (const product of catalog.products) { scale(product); count += 1; }
+  if (br) {
+    for (const change of Object.values(catalog.br ?? {})) if (change.price || change.compareAt) scale(change);
+    settings.brPercent = cleanPercent((1 + (Number(settings.brPercent) || 0)) * factor - 1);
+    count += 1;
+  }
+  return count;
+}
+
+/** Fotos del depósito que ya no usa ningún producto (subidas y no guardadas): se borran después de un día. */
+export async function cleanupPhotos(env, store, data) {
+  const used = new Set(data.products.flatMap((p) => p.images.flatMap((img) => [img.lg, img.sm])));
+  const prefix = `tiendas/${store}/fotos/`;
+  const old = Date.now() - 86_400_000;
+  const remove = [];
+  let cursor;
+  do {
+    const page = await env.CATALOGO.list({ prefix, cursor });
+    for (const object of page.objects) {
+      const path = object.key.slice(`tiendas/${store}/`.length);
+      if (!used.has(path) && new Date(object.uploaded).getTime() < old) remove.push(object.key);
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  for (let i = 0; i < remove.length; i += 1000) await env.CATALOGO.delete(remove.slice(i, i + 1000));
+  return remove.length;
 }
 
 /** Cambia la clave del usuario que ingresó (pide la actual). */

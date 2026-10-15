@@ -10,7 +10,11 @@ export function priceHtml(product, pricing) {
   } else if (prices.wholesale) {
     bulkLine = `<p class="price__bulk">${escapeHtml(pricing.wholesaleLabel)}: <strong class="money">${money(prices.wholesale)}</strong></p>`;
   }
-  return `<div class="price"><p class="price__unit money">${money(prices.unit)}</p>${bulkLine}</div>`;
+  // Oferta: el "precio anterior" que cargó el cliente, tachado, con su cartel.
+  const before = Number(product.compareAt) > prices.unit
+    ? ` <s class="price__before money" aria-label="Antes ${money(product.compareAt)}">${money(product.compareAt)}</s> <span class="price__offer">Oferta</span>`
+    : "";
+  return `<div class="price"><p class="price__unit money">${money(prices.unit)}${before}</p>${bulkLine}</div>`;
 }
 
 /**

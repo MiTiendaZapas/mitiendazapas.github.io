@@ -54,6 +54,7 @@ export function sortProducts(products, categories = {}, settings = {}, priceOf =
   const position = new Map(products.map((p, i) => [p.id, i]));   // desempate: el orden de la lista
   return [...products].sort((a, b) =>
     (rank.get(a.category) ?? Infinity) - (rank.get(b.category) ?? Infinity)
+    || (b.featured ? 1 : 0) - (a.featured ? 1 : 0)          // destacados: primeros en su categoría
     || within(a, b)
     || position.get(a.id) - position.get(b.id));
 }

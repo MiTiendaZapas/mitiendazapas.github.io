@@ -69,6 +69,10 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
         available: sizes.filter((s) => s.stock > 0),
         // Producto propio del cliente (lo cargó en su panel): solo vale el precio que le puso.
         manual: p.manual === true,
+        // Opcionales que carga el cliente en su panel: descripción, precio anterior (oferta) y destacado.
+        description: typeof p.description === "string" && p.description ? p.description : null,
+        compareAt: Number(p.compareAt) > 0 ? Number(p.compareAt) : null,
+        featured: p.featured === true,
         // Tiendas con stock de Brasil: esas fotos ya vienen con su dirección completa.
         images: (Array.isArray(p.images) ? p.images : []).map((img) => ({
           sm: img.sm ? fileUrl(base, img.sm) : null,

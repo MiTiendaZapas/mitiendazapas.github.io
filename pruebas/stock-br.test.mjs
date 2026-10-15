@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-const { brModel, brProducts, cleanBrChange, cleanCategories, publicMixedCatalog, storeCategories } = await import("../servidor/panel.js");
+const { brModel, brProducts, changePrices, cleanBrChange, cleanupPhotos, cleanCategories, cleanProduct, publicMixedCatalog, storeCategories } = await import("../servidor/panel.js");
 const { createPricing } = await import("../motor/js/pricing.js");
 
 const brazil = {
@@ -74,5 +74,47 @@ describe("stock de Brasil", () => {
     assert.deepEqual(pricing.forProduct({ ...own, manual: true }), { unit: 15000, wholesale: null, bulk: null });
     // A un modelo de Brasil con precio propio (sin precio por mayor propio) sí le queda el por mayor de la lista.
     assert.deepEqual(pricing.forProduct({ id: "vp-2", name: "Mind negras", category: "ojotas", price: 52000 }), { unit: 52000, wholesale: 12000, bulk: null });
+  });
+
+  test("cambiar precios: +10% a lo propio, a los precios propios de Brasil y a la lista (redondeado a $100)", () => {
+    const catalog = store({
+      products: [{ id: "m-1", price: 15000, wholesalePrice: 12000, compareAt: 18000, images: [], sizes: [] }],
+      br: { "vp-2": { price: 52000 }, "vp-1": { hidden: true } },
+    });
+    const settings = { brPercent: 0 };
+    changePrices(catalog, settings, { percent: 0.1, own: true, br: true });
+    assert.deepEqual([catalog.products[0].price, catalog.products[0].wholesalePrice, catalog.products[0].compareAt], [16500, 13200, 19800]);
+    assert.equal(catalog.br["vp-2"].price, 57200);
+    assert.equal(catalog.br["vp-1"].price, undefined);       // sin precio propio: sube con la lista
+    assert.ok(Math.abs(settings.brPercent - 0.1) < 1e-9);
+    changePrices(catalog, settings, { percent: 0.1, own: false, br: true });
+    assert.ok(Math.abs(settings.brPercent - 0.21) < 1e-9);    // dos subas de 10% = 21%
+    const pricing = createPricing({ wholesale: false, unit: { default: 60000, rules: [] }, percent: settings.brPercent });
+    assert.equal(pricing.forProduct({ id: "x", name: "Dunk", category: "zapatillas" }).unit, 72600);
+    assert.equal(pricing.forProduct({ id: "y", name: "Dunk", category: "zapatillas", price: 50000 }).unit, 50000);
+  });
+
+  test("opcionales: descripción, oferta (tiene que ser más cara) y destacado", () => {
+    const data = store();
+    const base = { name: "Remera", category: "Remeras", price: 15000, sizes: [{ size: "M", stock: 1 }], images: [] };
+    const product = cleanProduct({ ...base, description: "  Algodón  ", compareAt: "20000", featured: true }, null, data);
+    assert.deepEqual([product.description, product.compareAt, product.featured], ["Algodón", 20000, true]);
+    assert.throws(() => cleanProduct({ ...base, compareAt: 15000 }, null, data), /más alto/);
+    const plain = cleanProduct(base, null, data);
+    assert.deepEqual([plain.description, plain.compareAt, plain.featured], [null, null, false]);
+  });
+
+  test("limpieza: borra solo las fotos que ningún producto usa y que tienen más de un día", async () => {
+    const day = 86_400_000;
+    const objects = [
+      { key: "tiendas/t/fotos/a-lg.webp", uploaded: new Date(Date.now() - 3 * day) },   // la usa un producto
+      { key: "tiendas/t/fotos/b-lg.webp", uploaded: new Date(Date.now() - 3 * day) },   // suelta y vieja: se borra
+      { key: "tiendas/t/fotos/c-lg.webp", uploaded: new Date() },                       // suelta pero recién subida
+    ];
+    let deleted = [];
+    const env = { CATALOGO: { list: async () => ({ objects, truncated: false }), delete: async (keys) => { deleted = keys; } } };
+    const data = { products: [{ images: [{ lg: "fotos/a-lg.webp", sm: "fotos/a-sm.webp" }] }] };
+    assert.equal(await cleanupPhotos(env, "t", data), 1);
+    assert.deepEqual(deleted, ["tiendas/t/fotos/b-lg.webp"]);
   });
 });

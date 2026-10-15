@@ -47,6 +47,13 @@ const overlays = document.getElementById("overlays");
 // Tienda con stock propio: nombre, logo, WhatsApp, redes y color los elige el cliente en su panel.
 const storeSettings = config.manualStore ? await loadStoreSettings(config) : null;
 if (storeSettings) applyStoreSettings(config, channel, storeSettings);
+// Aviso que escribe el cliente en su panel (por ejemplo "Envío gratis este fin de semana").
+if (storeSettings?.notice) {
+  const notice = document.createElement("p");
+  notice.className = "store-notice";
+  notice.textContent = storeSettings.notice;
+  document.getElementById("site-header").before(notice);
+}
 
 renderHeader(document.getElementById("site-header"), { config, channel, links });
 renderFooter(document.getElementById("site-footer"), { config, channel, links });

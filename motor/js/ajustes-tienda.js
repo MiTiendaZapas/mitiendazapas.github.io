@@ -55,6 +55,8 @@ export function applyStoreSettings(config, channel, settings) {
 /** Venta por mayor que eligió el cliente (o ninguna). */
 export function applyWholesaleSettings(priceTable, settings) {
   if (!settings) return priceTable;
+  // Lo que subió o bajó la lista con "Cambiar precios" en su panel.
+  if (settings.brPercent) priceTable = { ...priceTable, percent: settings.brPercent };
   if (!settings.wholesale) return { ...priceTable, wholesale: false };
   const min = settings.wholesaleMin || 5;
   return { ...priceTable, wholesale: { ...(priceTable.wholesale || {}), minPairs: min, allProducts: true, label: `Llevando ${min} o más productos surtidos` } };

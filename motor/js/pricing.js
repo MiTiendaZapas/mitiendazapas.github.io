@@ -76,6 +76,10 @@ export function createPricing(table) {
   // Cómo se nombran las unidades en carrito y pedido: "pares" o, con ropa y calzado juntos, "productos".
   const words = allProducts ? ["producto", "productos"] : ["par", "pares"];
   const wholesaleLabel = table.wholesale?.label ?? `Llevando ${minPairs} o más pares surtidos`;
+  // Tiendas con panel: "Cambiar precios" sube (o baja) la lista en este porcentaje (0.1 = 10%).
+  // No toca los productos con precio propio (esos ya se cambiaron uno por uno).
+  const percent = Number(table.percent) || 0;
+  const adjust = (price) => (percent && price ? Math.max(100, Math.round((price * (1 + percent)) / 100) * 100) : price);
   const cache = new Map();
 
   function resolve(product) {
@@ -85,14 +89,14 @@ export function createPricing(table) {
     const own = product.price ? { unit: product.price, wholesale: product.wholesalePrice } : {};
     const override = overrides[product.slug] ?? overrides[product.id] ?? own;
     const unitRule = findRule(unitList, key, shortKey, product.category);
-    const unit = Number(override.unit) || unitRule?.price || unitList.default;
+    const unit = Number(override.unit) || adjust(unitRule?.price || unitList.default);
     const bulk = unitRule?.bulk ?? null;
     let wholesale = null;
     if (hasWholesale && !bulk && countsForWholesale(product)) {
       // Producto propio del cliente: solo su precio por mayor (nunca el de la lista de precios).
       wholesale = product.manual
         ? Number(product.wholesalePrice) || null
-        : Number(override.wholesale) || findRule(wholesaleList, key, shortKey, product.category)?.price || wholesaleList.default;
+        : Number(override.wholesale) || adjust(findRule(wholesaleList, key, shortKey, product.category)?.price || wholesaleList.default);
       if (!wholesale || wholesale >= unit) wholesale = null;   // sin precio por mayor (0) se cobra el de unidad   // nunca mostrar un "precio por mayor" que no conviene
     }
     const result = { unit, wholesale, bulk };
