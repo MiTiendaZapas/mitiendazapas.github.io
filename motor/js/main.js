@@ -157,7 +157,11 @@ async function startStore() {
     }
 
     // Con la página abierta, el stock se sigue actualizando solo.
-    keepStockFresh({ catalog, load: loadStock, cart, toaster });
+    keepStockFresh({
+      catalog, load: loadStock, cart, toaster,
+      onUpdate: () => { catalogView.refreshStock(); productView.refreshStock(); },
+      onOpenCart: () => cartView.open(),
+    });
 
     if (restored.removed || restored.adjusted) {
       toaster.show({

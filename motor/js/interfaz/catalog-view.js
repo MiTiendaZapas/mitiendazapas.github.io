@@ -143,6 +143,31 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
     for (const title of titles) title.hidden = withProducts.size < 2 || !withProducts.has(title.dataset.section);
   }
 
+  /**
+   * Stock nuevo (la tienda lo trae sola cada 2 minutos): cada tarjeta muestra sus talles
+   * actuales sin redibujar la grilla (la página no salta). Un modelo agotado del todo
+   * queda en su lugar, marcado "Agotado". Si el talle elegido se agotó, se avisa ahí.
+   */
+  function refreshStock() {
+    for (const card of grid.querySelectorAll("[data-product-id]")) {
+      const product = productsById.get(card.dataset.productId);
+      if (!product) continue;
+      const state = selection.get(product.id);
+      const lost = state?.size && !product.available.some((s) => s.size === state.size) ? state.size : null;
+      if (lost) selection.delete(product.id);
+      const soldOut = product.available.length === 0;
+      card.classList.toggle("is-soldout", soldOut);
+      card.querySelector(".size-picker__list").innerHTML = sizeButtonsHtml(product.available, selection.get(product.id)?.size,
+        { european: product.category === "g5" });
+      if (card.querySelector(".add-btn.is-added")) continue;   // no pisar "Agregado" mientras se ve
+      const buy = card.querySelector("[data-buy]");
+      buy.innerHTML = soldOut
+        ? `<p class="stock-hint is-low">Se agotó</p><button class="btn btn--primary add-btn" type="button" disabled>Agotado</button>`
+        : buyHtml(product);
+      if (lost && !soldOut) buy.querySelector(".stock-hint").textContent = `Se agotó el talle ${lost}. Elegí otro.`;
+    }
+  }
+
   // --- tarjetas ------------------------------------------------------------
   function mediaHtml(product, index) {
     const cover = product.images[0];
@@ -312,6 +337,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
     showOnly,
     preselectSize,
     render,
+    refreshStock,
     totalCount: () => productsById.size,
     layoutTop: () => root.querySelector(".catalog__layout").getBoundingClientRect().top,
     toolbar: root.querySelector("[data-catalog-toolbar]"),

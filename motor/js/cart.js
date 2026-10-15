@@ -24,24 +24,33 @@ export function createCart({ storageKey, catalog }) {
     return Math.min(catalog.stockOf(productId, size), MAX_QTY_PER_LINE);
   }
 
-  /** Revalida lo guardado. Devuelve cuántas líneas se quitaron o ajustaron. */
+  /**
+   * Revalida lo guardado. Devuelve cuántas líneas se quitaron o ajustaron y cuáles
+   * (changes: [{ product, size, qty: la nueva cantidad, 0 si se quitó }]).
+   */
   function restore() {
     const saved = readStorage(storageKey, []);
     let removed = 0;
     let adjusted = 0;
+    const changes = [];
     lines = [];
     for (const entry of Array.isArray(saved) ? saved : []) {
       const qty = Math.floor(Number(entry?.qty));
       const max = maxFor(entry?.productId, String(entry?.size));
-      if (!catalog.get(entry?.productId) || max < 1 || !(qty >= 1)) {
+      const product = catalog.get(entry?.productId);
+      if (!product || max < 1 || !(qty >= 1)) {
         removed += 1;
+        if (product && qty >= 1) changes.push({ product, size: String(entry.size), qty: 0 });
         continue;
       }
-      if (qty > max) adjusted += 1;
+      if (qty > max) {
+        adjusted += 1;
+        changes.push({ product, size: String(entry.size), qty: max });
+      }
       lines.push({ productId: entry.productId, size: String(entry.size), qty: Math.min(qty, max) });
     }
     persist();
-    return { removed, adjusted };
+    return { removed, adjusted, changes };
   }
 
   return {

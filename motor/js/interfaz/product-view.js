@@ -381,8 +381,18 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
     counter.classList.add("is-bumped");
   });
 
+  /** Stock nuevo con la ficha abierta: talles al día (sin cerrarla ni mover las fotos). */
+  function refreshStock() {
+    if (!dialog.open || !product) return;
+    const chosen = product.sizes.find((s) => s.size === state.size);
+    if (state.size && !(chosen?.stock > 0)) state = { size: null, qty: 1 };
+    content.querySelector("[data-sizes]").innerHTML = sizeButtonsHtml(product.sizes, state.size, { european: product.category === "g5" });
+    renderBuy();
+  }
+
   return {
     /** Abre el producto de la dirección actual, si la hay (link compartido). */
     openFromUrl: syncWithHash,
+    refreshStock,
   };
 }

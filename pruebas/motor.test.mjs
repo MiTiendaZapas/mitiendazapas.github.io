@@ -17,6 +17,7 @@ globalThis.history = { state: null, replaceState: (_s, _t, url) => { globalThis.
 
 const { createPricing } = await import("../motor/js/pricing.js");
 const { createCart } = await import("../motor/js/cart.js");
+const { applyStock, orderChangeText } = await import("../motor/js/stock-vivo.js");
 const { createFilters } = await import("../motor/js/filters.js");
 const { buildOrderMessage } = await import("../motor/js/whatsapp.js");
 const { escapeHtml, normalize, money, whatsappLink } = await import("../motor/js/utils.js");
@@ -170,12 +171,28 @@ describe("carrito", () => {
     const events = [];
     cart.subscribe((e) => events.push(e.type));
     stock["p1:40"] = 2;                       // se vendieron 3 mientras miraba
-    assert.deepEqual(cart.revalidate(), { removed: 0, adjusted: 1 });
+    const first = cart.revalidate();
+    assert.deepEqual([first.removed, first.adjusted], [0, 1]);
+    assert.deepEqual(first.changes.map((c) => [c.product.id, c.size, c.qty]), [["p1", "40", 2]]);
+    assert.equal(orderChangeText(first.changes), `Del talle 40 de ${first.changes[0].product.name} quedan 2: ajustamos tu pedido.`);
     assert.equal(cart.qtyOf("p1", "40"), 2);
     assert.ok(events.includes("stock"));       // las tarjetas y el carrito se redibujan
     stock["p1:40"] = 0;                       // se agotó
-    assert.equal(cart.revalidate().removed, 1);
+    const second = cart.revalidate();
+    assert.equal(second.removed, 1);
+    assert.match(orderChangeText(second.changes), /^Se agotó el talle 40 de .+: lo sacamos de tu pedido\.$/);
     assert.equal(cart.count(), 0);
+    assert.deepEqual(cart.revalidate().changes, []);   // sin cambios: sin cartel
+  });
+  test("el stock nuevo se pasa a los modelos en pantalla (talles agotados, nuevos y que vuelven)", () => {
+    const shown = { products: [{ id: "x", sizes: [{ size: "38", stock: 2 }, { size: "39", stock: 1 }], available: [] }] };
+    const now = { "x:38": 0, "x:39": 3, "x:40": 1 };
+    applyStock(shown, {
+      get: () => ({ sizes: [{ size: "39" }, { size: "40" }] }),
+      stockOf: (id, size) => now[`${id}:${size}`] ?? 0,
+    });
+    assert.deepEqual(shown.products[0].sizes, [{ size: "38", stock: 0 }, { size: "39", stock: 3 }, { size: "40", stock: 1 }]);
+    assert.deepEqual(shown.products[0].available.map((s) => s.size), ["39", "40"]);
   });
   test("no deja agregar más que el stock del talle", () => {
     const cart = createCart({ storageKey: "t:cart", catalog });
@@ -197,14 +214,17 @@ describe("carrito", () => {
       { productId: "p1", size: "38", qty: 1, price: 1 },  // un "precio" agregado a mano se ignora
     ]));
     const cart = createCart({ storageKey: "t:cart", catalog });
-    assert.deepEqual(cart.restore(), { removed: 3, adjusted: 1 });
+    const { removed, adjusted, changes } = cart.restore();
+    assert.deepEqual([removed, adjusted], [3, 1]);
+    // El cartel cuenta solo lo que la persona eligió de verdad (no los datos rotos).
+    assert.deepEqual(changes.map((c) => [c.product.id, c.size, c.qty]), [["p1", "40", 5], ["p2", "41", 0]]);
     assert.equal(cart.qtyOf("p1", "40"), 5);
     assert.equal(cart.count(), 6);
   });
   test("un JSON roto en el navegador no rompe la tienda", () => {
     localStorage.setItem("t:cart", "{roto");
     const cart = createCart({ storageKey: "t:cart", catalog });
-    assert.deepEqual(cart.restore(), { removed: 0, adjusted: 0 });
+    assert.deepEqual(cart.restore(), { removed: 0, adjusted: 0, changes: [] });
     assert.equal(cart.count(), 0);
   });
 });

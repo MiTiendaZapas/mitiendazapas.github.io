@@ -104,6 +104,8 @@
 }
 .product-card:hover { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border)); }
 .product-card.is-added { border-color: var(--color-accent); }
+/* Se agotó mientras la persona miraba: queda en su lugar (la página no salta), apagado. */
+.product-card.is-soldout .product-card__media { opacity: 0.45; filter: grayscale(1); }
 
 .product-card__media {
   position: relative;
