@@ -12,6 +12,7 @@
  */
 import { icon } from "../js/interfaz/icons.js";
 import { createPricing } from "../js/pricing.js";
+import { sortSizes } from "../js/talles.js";
 import { CATEGORY_ORDERS, PRODUCT_ORDERS, sortProducts } from "../vidriera/orden.js";
 
 const config = window.STORE_CONFIG ?? {};
@@ -43,6 +44,7 @@ const state = {
   limits: { imagesPerProduct: 6, products: 150 }, search: "", filter: "todos",
   // Stock de Brasil (solo algunas tiendas): modelos, precios de la lista y qué se está mirando.
   br: null, listPricing: null, view: "br", brSearch: "", brFilter: "todos",
+  guard: null,   // cambios sin guardar en la pantalla abierta (ver route)
 };
 
 // --- piezas chicas ---------------------------------------------------------------
@@ -454,6 +456,7 @@ function renderBrEditor(product) {
     await api("/br", { method: "POST", body });
     await loadData();
     toast(message);
+    state.guard = null;
     location.hash = "#productos";
   });
   const form = h("form", { class: "panel-editor", onsubmit: (event) => {
@@ -495,6 +498,9 @@ function renderBrEditor(product) {
   root.replaceChildren(form);
   renderSizes();
   window.scrollTo(0, 0);
+  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes]);
+  const initial = snapshot();
+  state.guard = () => snapshot() !== initial;
 }
 
 // --- productos: editar / nuevo ----------------------------------------------------
@@ -504,7 +510,7 @@ function openEditor(product) {
 
 function renderEditor(product) {
   const draft = product
-    ? structuredClone(product)
+    ? { ...structuredClone(product), sizes: sortSizes(product.sizes) }
     : { name: "", brand: "", category: Object.keys(state.categories)[0] ?? "", price: "", wholesalePrice: "", sizes: [], images: [], hidden: false };
   let uploading = 0;
 
@@ -551,7 +557,6 @@ function renderEditor(product) {
 
   // Datos
   const name = h("input", { id: "f-name", class: "panel-input", maxlength: 80, required: true, value: draft.name });
-  const brand = h("input", { id: "f-brand", class: "panel-input", maxlength: 40, value: draft.brand ?? "" });
   const NEW = "__nueva__";
   const categorySelect = h("select", { id: "f-category", class: "panel-input" },
     Object.entries(state.categories).map(([id, label]) => h("option", { value: id, selected: id === draft.category }, label)),
@@ -585,9 +590,17 @@ function renderEditor(product) {
       }),
       ...(draft.sizes.length ? [] : [h("p", { class: "panel-muted" }, "Agregá los talles que tenés y cuántas unidades de cada uno.")]));
   }
-  const addSizes = (sizes) => {
-    const have = new Set(draft.sizes.map((s) => s.size.toLowerCase()));
-    for (const size of sizes) if (!have.has(size.toLowerCase())) draft.sizes.push({ size, stock: 0 });
+  /**
+   * Botones de talles: dejan EXACTAMENTE esos talles (en su orden). Los que siguen
+   * conservan su cantidad; si se va a sacar alguno que tiene unidades, se pregunta antes.
+   */
+  const usePreset = (sizes) => {
+    const key = (size) => size.trim().toLowerCase();
+    const wanted = new Set(sizes.map(key));
+    const losing = draft.sizes.filter((s) => s.size.trim() && !wanted.has(key(s.size)) && s.stock > 0);
+    if (losing.length && !confirm(`Se van a sacar los talles ${losing.map((s) => s.size).join(", ")}, que tienen unidades cargadas. ¿Seguir?`)) return;
+    const kept = new Map(draft.sizes.filter((s) => wanted.has(key(s.size))).map((s) => [key(s.size), s.stock]));
+    draft.sizes = sizes.map((size) => ({ size, stock: kept.get(key(size)) ?? 0 }));
     renderSizes();
   };
 
@@ -598,9 +611,10 @@ function renderEditor(product) {
     const category = categorySelect.value === NEW ? newCategory.value : categorySelect.value;
     const body = {
       id: product?.id,
-      name: name.value, brand: brand.value, category,
+      // La marca ya no se pide (se conserva la de los productos viejos que la tenían).
+      name: name.value, brand: draft.brand ?? "", category,
       price: price.value.replace(/\D/g, ""), wholesalePrice: wholesale.value.replace(/\D/g, ""),
-      sizes: draft.sizes.map((s) => ({ size: s.size.trim(), stock: s.stock })).filter((s) => s.size),
+      sizes: sortSizes(draft.sizes.map((s) => ({ size: s.size.trim(), stock: s.stock })).filter((s) => s.size)),
       images: draft.images,
       hidden: !visible.checked,
     };
@@ -611,6 +625,7 @@ function renderEditor(product) {
     });
     if (saved) {
       toast(product ? "Cambios guardados." : "Producto agregado a tu tienda.");
+      state.guard = null;
       location.hash = "#productos";
     }
   } },
@@ -622,14 +637,13 @@ function renderEditor(product) {
     h("section", { class: "panel-card" }, h("h2", {}, "Datos"),
       field("f-name", "Nombre", name),
       field("f-category", "Categoría", categorySelect), newCategoryField,
-      field("f-brand", "Marca", brand, "Opcional."),
       h("div", { class: "panel-two" },
         field("f-price", "Precio", price),
         field("f-wholesale", "Precio por mayor", wholesale, wholesaleHelp)),
       h("label", { class: "panel-switch", for: "f-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para pausarlo sin borrarlo."))),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles y cantidades"),
-      h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => addSizes(p.sizes) }, p.label)),
+      h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
         h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, "+ Otro talle")),
       sizesBox),
     product ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: () => removeProduct(product) }, "Borrar este producto") : null,
@@ -640,7 +654,11 @@ function renderEditor(product) {
   renderPhotos();
   renderSizes();
   window.scrollTo(0, 0);
-  if (!product) name.focus();
+  // Si sale sin guardar, se le pregunta (ver route).
+  const snapshot = () => JSON.stringify([name.value, categorySelect.value, newCategory.value, price.value, wholesale.value,
+    visible.checked, draft.sizes, draft.images, uploading]);
+  const initial = snapshot();
+  state.guard = () => snapshot() !== initial;
 }
 
 async function removeProduct(product) {
@@ -652,49 +670,91 @@ async function removeProduct(product) {
   });
   if (done) {
     toast("Producto borrado.");
+    state.guard = null;
     location.hash = "#productos";
   }
 }
 
 // --- categorías -------------------------------------------------------------------
+/**
+ * Categorías y orden de la tienda. Acá todo se guarda solo, al momento (sin botón
+ * "Guardar"): son cambios chicos y así una categoría nueva ya aparece al cargar un producto.
+ */
 function renderCategories() {
-  const rows = Object.entries(state.categories).map(([id, label]) => ({ id, label }));
+  let rows = Object.entries(state.categories).map(([id, label]) => ({ id, label }));
   const select = (id, options, value) => h("select", { id, class: "panel-input" },
     options.map((o) => h("option", { value: o.value, selected: o.value === value }, o.label)));
   const categoryOrder = select("o-categories", CATEGORY_ORDERS, state.settings.categoryOrder ?? "alfabetico");
   const productOrder = select("o-products", PRODUCT_ORDERS, state.settings.productOrder ?? "alfabetico");
   const manual = () => categoryOrder.value === "manual";
-  categoryOrder.addEventListener("change", () => renderRows());
-  const used = (id) => state.products.filter((p) => p.category === id).length;
+  // Cuántos productos usan cada categoría (los propios y, si hay, los de Brasil).
+  const used = (id) => state.products.filter((p) => p.category === id).length
+    + (state.br?.products.filter((p) => p.category === id).length ?? 0);
   const list = h("div", { class: "panel-cats" });
-  const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "button" }, "Guardar");
+  const status = h("p", { class: "panel-muted panel-autosave", role: "status" }, "Los cambios se guardan solos.");
 
-  function renderRows() {
-    // En "De la A a la Z" se muestran ordenadas así y las flechas no se usan.
-    if (!manual()) rows.sort((a, b) => a.label.localeCompare(b.label, "es", { sensitivity: "base" }));
-    list.replaceChildren(...rows.map((row, i) => {
-      const count = row.id ? used(row.id) : 0;
-      return h("div", { class: "panel-cat" },
-        h("input", { class: "panel-input", value: row.label, maxlength: 30, "aria-label": `Nombre de la categoría ${i + 1}`, placeholder: "Nombre",
-          oninput: (e) => { row.label = e.target.value; } }),
-        h("span", { class: "panel-muted panel-cat__count" }, count === 1 ? "1 producto" : `${count} productos`),
-        h("div", { class: "panel-cat__actions" },
-          h("button", { type: "button", "aria-label": "Subir", disabled: !manual() || i === 0, onclick: () => { rows.splice(i - 1, 0, ...rows.splice(i, 1)); renderRows(); } }, "↑"),
-          h("button", { type: "button", "aria-label": "Bajar", disabled: !manual() || i === rows.length - 1, onclick: () => { rows.splice(i + 1, 0, ...rows.splice(i, 1)); renderRows(); } }, "↓"),
-          h("button", { type: "button", "aria-label": `Borrar ${row.label}`, disabled: count > 0, title: count > 0 ? "Tiene productos: cambiales la categoría antes de borrarla" : null,
-            onclick: () => { rows.splice(i, 1); renderRows(); } }, "×")));
-    }), ...(rows.length ? [] : [h("p", { class: "panel-muted" }, "Todavía no tenés categorías. Agregá la primera.")]));
+  // Un guardado por vez, en orden (si se tocan dos cosas rápido, no se pisan).
+  let queue = Promise.resolve();
+  function persist(task, message) {
+    status.textContent = "Guardando…";
+    queue = queue.then(async () => {
+      try {
+        await task();
+        status.textContent = "Guardado.";
+        if (message) toast(message);
+      } catch (e) {
+        status.textContent = "No se guardó el último cambio.";
+        toast(e.message, "error");
+        rows = Object.entries(state.categories).map(([id, label]) => ({ id, label }));
+        renderRows();
+      }
+    });
+    return queue;
   }
-  saveButton.addEventListener("click", () => busy(saveButton, async () => {
-    const { categories } = await api("/categorias", { method: "POST", body: { categories: rows.map((r) => ({ id: r.id, label: r.label })) } });
+  const saveCategories = (message) => persist(async () => {
+    const named = rows.filter((r) => r.label.trim());
+    const { categories } = await api("/categorias", { method: "POST", body: { categories: named.map((r) => ({ id: r.id, label: r.label.trim() })) } });
     state.categories = categories;
+    // Las nuevas reciben su código: la lista se arma de nuevo con lo guardado.
+    const pending = rows.filter((r) => !r.label.trim());
+    rows = [...Object.entries(categories).map(([id, label]) => ({ id, label })), ...pending];
+    renderRows();
+  }, message);
+  const saveOrder = () => persist(async () => {
     const { settings } = await api("/ajustes", { method: "POST", body: {
       ...state.settings, name: state.settings.name || config.name, categoryOrder: categoryOrder.value, productOrder: productOrder.value,
     } });
     state.settings = settings;
-    toast("Listo: la tienda ya usa este orden.");
-    renderCategories();
-  }));
+  }, "Listo: la tienda ya usa este orden.");
+  categoryOrder.addEventListener("change", () => { renderRows(); saveOrder(); });
+  productOrder.addEventListener("change", saveOrder);
+
+  function renderRows() {
+    // En "De la A a la Z" se muestran ordenadas así y las flechas no se usan.
+    if (!manual()) rows.sort((a, b) => (a.label && b.label ? a.label.localeCompare(b.label, "es", { sensitivity: "base" }) : a.label ? -1 : 1));
+    const move = (i, delta) => { rows.splice(i + delta, 0, ...rows.splice(i, 1)); renderRows(); saveCategories(); };
+    list.replaceChildren(...rows.map((row, i) => {
+      const count = row.id ? used(row.id) : 0;
+      return h("div", { class: "panel-cat" },
+        h("input", { class: "panel-input", value: row.label, maxlength: 30, "aria-label": `Nombre de la categoría ${i + 1}`, placeholder: "Nombre de la categoría",
+          oninput: (e) => { row.label = e.target.value; },
+          // Se guarda al terminar de escribir (al salir del casillero o con Enter).
+          onchange: () => { if (row.label.trim()) saveCategories(row.id ? "Categoría renombrada." : "Categoría creada: ya la podés usar en tus productos."); },
+          onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } } }),
+        h("span", { class: "panel-muted panel-cat__count" }, count === 1 ? "1 producto" : `${count} productos`),
+        h("div", { class: "panel-cat__actions" },
+          h("button", { type: "button", "aria-label": "Subir", disabled: !manual() || i === 0 || !row.id, onclick: () => move(i, -1) }, "↑"),
+          h("button", { type: "button", "aria-label": "Bajar", disabled: !manual() || i === rows.length - 1 || !row.id, onclick: () => move(i, 1) }, "↓"),
+          h("button", { type: "button", "aria-label": `Borrar ${row.label}`, disabled: count > 0, title: count > 0 ? "Tiene productos: cambiales la categoría antes de borrarla" : null,
+            onclick: () => {
+              if (!row.id) { rows.splice(i, 1); return renderRows(); }
+              if (!confirm(`¿Borrar la categoría "${row.label}"?`)) return;
+              rows.splice(i, 1);
+              renderRows();
+              saveCategories("Categoría borrada.");
+            } }, "×")));
+    }), ...(rows.length ? [] : [h("p", { class: "panel-muted" }, "Todavía no tenés categorías. Agregá la primera.")]));
+  }
 
   root.replaceChildren(
     h("section", { class: "panel-card" },
@@ -702,18 +762,19 @@ function renderCategories() {
       h("p", { class: "panel-muted" }, "Los productos se ven agrupados por categoría. Elegí en qué orden van las categorías y cómo se ordenan los productos dentro de cada una."),
       h("div", { class: "panel-two" },
         field("o-categories", "Categorías", categoryOrder),
-        // Con stock de Brasil, dentro de cada categoría van por marca y modelo (como siempre).
-        state.br
-          ? h("div", { class: "panel-field" }, h("span", { class: "panel-label" }, "Productos dentro de cada categoría"),
-            h("p", { class: "panel-muted" }, "Por marca y modelo."))
-          : field("o-products", "Productos dentro de cada categoría", productOrder,
-            "“En el orden que yo elijo”: en Productos → Más → Subir o Bajar."))),
+        field("o-products", "Productos dentro de cada categoría", productOrder, state.br
+          ? "“En el orden que yo elijo” y “Lo último que cargo” valen para tus productos; los de Brasil quedan por marca y modelo."
+          : "“En el orden que yo elijo”: en Productos → Más → Subir o Bajar."))),
     h("section", { class: "panel-card" },
-    h("h2", {}, "Categorías"),
-    h("p", { class: "panel-muted" }, "Creá, renombrá o borrá categorías (solo se puede borrar una sin productos). Con “En el orden que yo elijo”, ordenalas con las flechas."),
-    list,
-    h("button", { class: "btn btn--outline", type: "button", onclick: () => { rows.push({ id: null, label: "" }); renderRows(); list.querySelector(".panel-cat:last-child input")?.focus(); } }, "+ Nueva categoría")),
-    h("div", { class: "panel-savebar" }, saveButton));
+      h("h2", {}, "Categorías"),
+      h("p", { class: "panel-muted" }, "Creá, renombrá o borrá categorías (solo se puede borrar una sin productos). Con “En el orden que yo elijo”, ordenalas con las flechas."),
+      list,
+      h("button", { class: "btn btn--outline", type: "button", onclick: () => {
+        rows.push({ id: null, label: "" });
+        renderRows();
+        list.querySelector(".panel-cat:last-child input")?.focus();
+      } }, "+ Nueva categoría"),
+      status));
   renderRows();
 }
 
@@ -781,6 +842,7 @@ function renderStoreSettings() {
       state.settings = result.settings;
       renderTop({ loggedIn: true });
       toast("Listo: tu tienda ya muestra los cambios.");
+      initial = snapshot();
     }
   } },
     h("h1", { class: "panel-title" }, "Mi tienda"),
@@ -808,6 +870,11 @@ function renderStoreSettings() {
     passwordCard(),
     h("div", { class: "panel-savebar" }, saveButton));
   root.replaceChildren(form);
+  // Si sale sin guardar, se le pregunta (ver route). La clave va aparte y no cuenta.
+  const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, wholesaleMin];
+  const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color, wholesaleOn.checked]);
+  let initial = snapshot();
+  state.guard = () => snapshot() !== initial;
 }
 
 function passwordCard() {
@@ -920,8 +987,24 @@ async function loadListPricing() {
   }
 }
 
+/**
+ * Cambios sin guardar: cada pantalla con botón "Guardar" deja en state.guard cómo saber
+ * si hay algo sin guardar. Si se va a otra pestaña o cierra la página, se pregunta antes.
+ */
+let currentHash = location.hash;
+window.addEventListener("beforeunload", (event) => {
+  if (state.guard?.()) event.preventDefault();
+});
+
 function route() {
   if (!state.store) return;
+  if (location.hash !== currentHash && state.guard?.()
+    && !confirm("Tenés cambios sin guardar. ¿Salir igual? Se van a perder.")) {
+    history.replaceState(null, "", currentHash || "#productos");
+    return;
+  }
+  state.guard = null;
+  currentHash = location.hash;
   const [section, id] = location.hash.slice(1).split("/");
   renderTop({ loggedIn: true });
   if (section === "editar") {

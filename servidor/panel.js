@@ -16,6 +16,7 @@
  *   - Las claves se guardan cifradas (PBKDF2), nunca tal cual.
  *   - Todo lo que llega se revisa (largo, tipo, cantidad) antes de guardarlo.
  */
+import { compareSizes } from "../motor/js/talles.js";
 
 export const LIMITS = {
   products: 150,          // productos por tienda
@@ -170,6 +171,7 @@ export function cleanProduct(input, current, data) {
     if (!Number.isInteger(stock) || stock < 0 || stock > 99999) throw new Error(`La cantidad del talle ${size} no es válida.`);
     return { size, stock };
   });
+  sizes.sort((a, b) => compareSizes(a.size, b.size));
 
   const images = Array.isArray(input.images) ? input.images : [];
   if (images.length > LIMITS.imagesPerProduct) throw new Error(`Máximo ${LIMITS.imagesPerProduct} fotos por producto.`);
@@ -249,7 +251,7 @@ function withChanges(base, change = {}) {
   const sizes = base.sizes.map((s) => ({ size: s.size, br: s.stock, casa: extra[s.size] ?? 0 }));
   // "soloCasa": un talle que Brasil no tiene (lo agregó el cliente).
   for (const [size, stock] of Object.entries(extra)) if (!sizes.some((s) => s.size === size)) sizes.push({ size, br: 0, casa: stock, soloCasa: true });
-  sizes.sort((a, b) => a.size.localeCompare(b.size, "es", { numeric: true }));
+  sizes.sort((a, b) => compareSizes(a.size, b.size));
   for (const s of sizes) s.stock = s.br + s.casa;
   return { ...base, sizes, price: change.price ?? null, wholesalePrice: change.wholesalePrice ?? null, hidden: change.hidden === true };
 }
@@ -431,6 +433,8 @@ const LOGO_PATH = /^marca\/[a-f0-9-]{36}-(512|160)\.(webp|jpg)$/;
 const COLORS = new Set(["#18181b", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#db2777", "#c2410c", "#0f766e"]);
 export const isLogoFile = (name) => /^[a-f0-9-]{36}-(512|160)\.(webp|jpg)$/.test(name ?? "");
 
+const PRODUCT_ORDER_VALUES = ["alfabetico", "alfabetico-desc", "marca", "precio", "precio-desc", "nuevos", "manual"];
+
 export async function readSettings(env, store) {
   const object = await env.CATALOGO.get(settingsKey(store));
   return object ? object.json() : {};
@@ -469,7 +473,7 @@ export function cleanSettings(input, current = {}) {
     wholesaleMin: Number.isInteger(min) && min >= 2 && min <= 100 ? min : 5,
     // Orden de la tienda: categorías (alfabético o el que eligió) y productos dentro de cada una.
     categoryOrder: input?.categoryOrder === "manual" ? "manual" : "alfabetico",
-    productOrder: ["alfabetico", "nuevos", "precio", "manual"].includes(input?.productOrder) ? input.productOrder : "alfabetico",
+    productOrder: PRODUCT_ORDER_VALUES.includes(input?.productOrder) ? input.productOrder : "alfabetico",
     logo,
   };
 }
