@@ -101,17 +101,23 @@ export async function updateCatalog(env, store, change) {
  * Las crea y ordena él en su panel; si algún producto usa una que falta, se agrega al final.
  */
 function keepCategories(data) {
-  const kept = {};
-  for (const [id, label] of Object.entries(data.categories ?? {})) kept[id] = label;
+  const kept = storeCategories(data);
   for (const product of data.products) if (!Object.hasOwn(kept, product.category)) kept[product.category] = product.category;
   return kept;
 }
 export const MAX_CATEGORIES = 40;
 
+/** Categorías de la tienda. Con stock de Brasil, las suyas van siempre (el cliente puede renombrarlas). */
+export function storeCategories(data) {
+  const categories = {};
+  if (data.stockBR) for (const id of brCategoryIds(data)) if (!Object.hasOwn(data.categories ?? {}, id)) categories[id] = BR_CATEGORIES[id];
+  return Object.assign(categories, data.categories ?? {});
+}
+
 /** Busca la categoría por su código o por su nombre (sin importar mayúsculas); si no existe, la crea. */
 function categoryFor(data, value) {
   const label = cleanText(value, 30, "la categoría", { required: true });
-  const categories = data.categories ?? {};
+  const categories = storeCategories(data);
   if (Object.hasOwn(categories, label)) return label;
   const match = Object.entries(categories).find(([, l]) => l.toLowerCase() === label.toLowerCase());
   if (match) return match[0];
@@ -125,7 +131,7 @@ function categoryFor(data, value) {
 /** Lista nueva de categorías desde el panel: [{ id?, label }] en el orden elegido. */
 export function cleanCategories(input, data) {
   if (!Array.isArray(input) || input.length > MAX_CATEGORIES) throw new Error(`Máximo ${MAX_CATEGORIES} categorías.`);
-  const current = data.categories ?? {};
+  const current = storeCategories(data);
   const result = {};
   const labels = new Set();
   for (const item of input) {
@@ -139,6 +145,8 @@ export function cleanCategories(input, data) {
   }
   const inUse = data.products.find((p) => !Object.hasOwn(result, p.category));
   if (inUse) throw new Error(`No se puede borrar "${current[inUse.category] ?? inUse.category}": la usa "${inUse.name}". Cambiale la categoría primero.`);
+  const brMissing = data.stockBR ? brCategoryIds(data).find((id) => !Object.hasOwn(result, id)) : null;
+  if (brMissing) throw new Error(`"${current[brMissing] ?? BR_CATEGORIES[brMissing]}" es la categoría del stock de Brasil: se puede renombrar, pero no borrar.`);
   return result;
 }
 
@@ -192,9 +200,115 @@ export function cleanProduct(input, current, data) {
   };
 }
 
-/** Lo que ve el público: sin productos pausados. */
+/** Lo que ve el público: sin productos pausados. "manual": precio y precio por mayor salen solo del producto. */
 export function publicCatalog(data) {
-  return { ...data, products: data.products.filter((p) => !p.hidden) };
+  return { ...data, products: data.products.filter((p) => !p.hidden).map((p) => ({ ...p, manual: true })) };
+}
+
+// --- stock de Brasil en tiendas de clientes --------------------------------------
+// Una tienda con "stockBR" muestra:
+//   1) el stock del proveedor, que publica el piloto en la raíz del depósito (siempre al día),
+//   2) con lo que el cliente cambió en su panel, modelo por modelo (data.br[id]): su precio,
+//      ocultarlo, o pares que él tiene en su casa (se suman a los de Brasil),
+//   3) y sus productos propios (data.products), en las categorías que él crea.
+// data.stockBR = { casa: true|false, g5: true|false } lo pone herramientas/activar_stock_br.mjs
+// (el cliente no lo puede cambiar).
+export const BR_CATEGORIES = { zapatillas: "Zapatillas", ojotas: "Ojotas", g5: "Calidad G5" };
+const brCategoryIds = (data) => ["zapatillas", "ojotas", ...(data.stockBR?.g5 ? ["g5"] : [])];
+const BR_FILES_URL = "https://catalogo.mitiendastock.com/";
+const MAX_EXTRA_SIZES = 30;
+
+/** Stock del proveedor tal como lo publicó el piloto (con o sin G5). */
+export async function readBrStock(env, options = {}) {
+  const files = ["productos.json", ...(options.g5 ? ["productos-g5.json"] : [])];
+  const lists = await Promise.all(files.map(async (key) => {
+    const object = await env.CATALOGO.get(key);
+    return object ? object.json() : { products: [] };
+  }));
+  const products = lists.flatMap((list) => list.products ?? [])
+    .filter((p) => p && typeof p.id === "string" && typeof p.name === "string" && Array.isArray(p.sizes));
+  return { generatedAt: lists[0].generatedAt ?? null, products };
+}
+
+/** Un modelo de Brasil sin los cambios del cliente. Las fotos van con su dirección completa. */
+export function brModel(product, options = {}) {
+  const sizes = product.sizes
+    .filter((s) => s && String(s.size ?? "").trim() !== "")
+    .map((s) => ({ size: String(s.size), stock: Math.max(0, (Number(s.stock) || 0) - (options.casa ? 0 : Number(s.casa) || 0)) }));
+  const full = (path) => (!path ? null : /^https?:\/\//.test(path) ? path : BR_FILES_URL + path);
+  return {
+    id: product.id, slug: String(product.slug || product.id), name: product.name, brand: product.brand || null,
+    category: product.category || "zapatillas", sizes,
+    images: (Array.isArray(product.images) ? product.images : []).map((img) => ({ lg: full(img.lg), sm: full(img.sm), w: img.w, h: img.h })),
+  };
+}
+
+/** Modelo de Brasil con lo que cambió el cliente. Cada talle dice cuánto es de Brasil (br) y cuánto suyo (casa). */
+function withChanges(base, change = {}) {
+  const extra = change.extra ?? {};
+  const sizes = base.sizes.map((s) => ({ size: s.size, br: s.stock, casa: extra[s.size] ?? 0 }));
+  // "soloCasa": un talle que Brasil no tiene (lo agregó el cliente).
+  for (const [size, stock] of Object.entries(extra)) if (!sizes.some((s) => s.size === size)) sizes.push({ size, br: 0, casa: stock, soloCasa: true });
+  sizes.sort((a, b) => a.size.localeCompare(b.size, "es", { numeric: true }));
+  for (const s of sizes) s.stock = s.br + s.casa;
+  return { ...base, sizes, price: change.price ?? null, wholesalePrice: change.wholesalePrice ?? null, hidden: change.hidden === true };
+}
+
+/**
+ * Todos los modelos de Brasil de la tienda, con los cambios del cliente. Si Brasil agotó un
+ * modelo del que el cliente tiene pares en su casa, sigue (con la foto y el nombre guardados).
+ */
+export function brProducts(data, br) {
+  const changes = data.br ?? {};
+  const seen = new Set();
+  const list = br.products.map((p) => {
+    seen.add(p.id);
+    return withChanges(brModel(p, data.stockBR), changes[p.id]);
+  });
+  for (const [id, change] of Object.entries(changes)) {
+    if (!seen.has(id) && change.model && change.extra) list.push(withChanges({ ...change.model, id, sizes: [] }, change));
+  }
+  return list;
+}
+
+/** Lo que ve el público en una tienda con stock de Brasil. */
+export function publicMixedCatalog(data, br) {
+  const fromBrazil = brProducts(data, br)
+    .filter((p) => !p.hidden)
+    .map(({ hidden, sizes, ...p }) => ({ ...p, sizes: sizes.map(({ size, stock }) => ({ size, stock })) }));
+  const own = publicCatalog(data).products;
+  const categories = storeCategories(data);
+  const dates = [br.generatedAt, data.generatedAt].filter(Boolean).sort();
+  return { version: 1, store: data.store, generatedAt: dates.at(-1) ?? null, categories, products: [...fromBrazil, ...own] };
+}
+
+/** Revisa lo que mandó el panel para un modelo de Brasil. Devuelve null si quedó todo automático. */
+export function cleanBrChange(input, base) {
+  const price = cleanPrice(input?.price, "el precio");
+  const wholesalePrice = cleanPrice(input?.wholesalePrice, "el precio por mayor");
+  if (price && wholesalePrice && wholesalePrice >= price) throw new Error("El precio por mayor tiene que ser menor que el precio por unidad.");
+  const list = Array.isArray(input?.extra) ? input.extra : [];
+  if (list.length > MAX_EXTRA_SIZES) throw new Error(`Máximo ${MAX_EXTRA_SIZES} talles.`);
+  const extra = {};
+  for (const item of list) {
+    const size = cleanText(item?.size, 12, "el talle", { required: true });
+    if (Object.hasOwn(extra, size)) throw new Error(`El talle ${size} está repetido.`);
+    const stock = Number(item?.stock);
+    if (!Number.isInteger(stock) || stock < 0 || stock > 9999) throw new Error(`La cantidad del talle ${size} no es válida.`);
+    extra[size] = stock;
+  }
+  for (const size of Object.keys(extra)) if (extra[size] === 0) delete extra[size];
+  const change = {};
+  if (price) change.price = price;
+  if (wholesalePrice) change.wholesalePrice = wholesalePrice;
+  if (input?.hidden === true) change.hidden = true;
+  if (Object.keys(extra).length) {
+    change.extra = extra;
+    // Por si Brasil lo agota: así el modelo sigue en la tienda con los pares del cliente.
+    const { id, sizes, ...model } = base;
+    change.model = model;
+  }
+  return Object.keys(change).length ? change : null;
 }
 
 /** Copia las fotos de un producto con nombres nuevos (así borrar uno no borra las del otro). */

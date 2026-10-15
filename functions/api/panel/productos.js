@@ -1,12 +1,17 @@
 // GET  /api/panel/productos        ->  catálogo completo de la tienda (incluso lo sin stock)
+//                                      y, si tiene stock de Brasil, sus modelos con los cambios del cliente
 // POST /api/panel/productos  {...} ->  crea un producto (sin id) o lo cambia (con id)
-import { LIMITS, cleanProduct, deletePhotos, fail, json, readCatalog, updateCatalog } from "../../../servidor/panel.js";
+import { LIMITS, brProducts, storeCategories, cleanProduct, deletePhotos, fail, json, readBrStock, readCatalog, updateCatalog } from "../../../servidor/panel.js";
 
 export async function onRequestGet({ env, data }) {
   const { data: catalog } = await readCatalog(env, data.session.tienda);
-  return json({ categories: catalog.categories ?? {}, products: catalog.products, limits: LIMITS });
+  const result = { categories: storeCategories(catalog), products: catalog.products, limits: LIMITS };
+  if (catalog.stockBR) {
+    const br = await readBrStock(env, catalog.stockBR);
+    Object.assign(result, { stockBR: catalog.stockBR, brUpdatedAt: br.generatedAt, brProducts: brProducts(catalog, br) });
+  }
+  return json(result);
 }
-
 export async function onRequestPost({ request, env, data }) {
   const store = data.session.tienda;
   let input;

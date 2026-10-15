@@ -1,6 +1,8 @@
 /*
  * PANEL del cliente (tiendas con stock propio). Secciones:
  *   Productos   cargar, editar, copiar, pausar, ordenar y mover stock
+ *               (tiendas con stock de Brasil: además, cada modelo de Brasil con su precio,
+ *               ocultarlo o sumarle los pares que el cliente tiene en su casa)
  *   Categorías  crear, renombrar, ordenar y borrar
  *   Mi tienda   nombre, logo, WhatsApp, redes, color, textos, venta por mayor y clave
  *   Ayuda       guía corta
@@ -9,6 +11,7 @@
  * (nunca HTML con datos), así nada de lo cargado puede meter código en la página.
  */
 import { icon } from "../js/interfaz/icons.js";
+import { createPricing } from "../js/pricing.js";
 import { CATEGORY_ORDERS, PRODUCT_ORDERS, sortProducts } from "../vidriera/orden.js";
 
 const config = window.STORE_CONFIG ?? {};
@@ -38,6 +41,8 @@ const TABS = [
 const state = {
   store: null, usuario: null, products: [], categories: {}, settings: {},
   limits: { imagesPerProduct: 6, products: 150 }, search: "", filter: "todos",
+  // Stock de Brasil (solo algunas tiendas): modelos, precios de la lista y qué se está mirando.
+  br: null, listPricing: null, view: "br", brSearch: "", brFilter: "todos",
 };
 
 // --- piezas chicas ---------------------------------------------------------------
@@ -135,7 +140,7 @@ function renderTop({ loggedIn }) {
         loggedIn ? h("a", { class: "btn btn--outline btn--sm", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda") : null,
         loggedIn ? h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: logout }, "Salir") : null)),
     ...(loggedIn ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
-      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id || (t.id === "productos" && ["editar", "nuevo"].includes(current)) ? "page" : null }, t.label)))] : []));
+      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id || (t.id === "productos" && ["editar", "nuevo", "br"].includes(current)) ? "page" : null }, t.label)))] : []));
 }
 
 // --- ingreso ---------------------------------------------------------------------
@@ -179,7 +184,19 @@ function matchesFilter(p) {
   return true;
 }
 
+/** Pestaña Productos. Con stock de Brasil, arriba se elige qué mirar: Brasil o los productos propios. */
 function renderProducts() {
+  if (!state.br) return renderOwnProducts();
+  const switcher = h("div", { class: "panel-switcher", role: "group", "aria-label": "Qué productos ver" },
+    [["br", `Stock de Brasil (${state.br.products.length})`], ["propios", `Mis productos (${state.products.length})`]].map(([id, label]) =>
+      h("button", { type: "button", class: "panel-switcher__btn", "aria-pressed": String(state.view === id),
+        onclick: () => { state.view = id; renderProducts(); } }, label)));
+  if (state.view === "br") renderBrProducts();
+  else renderOwnProducts();
+  root.prepend(switcher);
+}
+
+function renderOwnProducts() {
   const full = state.products.length >= state.limits.products;
   const list = h("ul", { class: "panel-list" });
   const chips = h("div", { class: "panel-chips", role: "group", "aria-label": "Filtrar productos" });
@@ -252,7 +269,7 @@ function itemView(product, canOrder, refresh) {
   });
   const copy = async (event) => busy(event.currentTarget, async () => {
     const { product: created } = await api("/copiar", { method: "POST", body: { id: product.id } });
-    state.products.splice(index + 1, 0, created);
+    state.products.splice(state.products.indexOf(product) + 1, 0, created);
     toast("Copia creada (pausada). Cambiale lo que haga falta y mostrala.");
     openEditor(created);
   });
@@ -298,6 +315,186 @@ function renderQuickStock(product, box, badge) {
           value,
           h("button", { type: "button", "aria-label": `Sumar uno al talle ${s.size}`, onclick: change(1) }, "+")));
     })));
+}
+
+// --- stock de Brasil ------------------------------------------------------------------
+const brTotal = (product, part) => product.sizes.reduce((sum, s) => sum + s[part], 0);
+const brChanged = (p) => Boolean(p.price || p.wholesalePrice || p.hidden || brTotal(p, "casa"));
+
+/** Precio de la lista para un modelo de Brasil (sin el precio propio que le haya puesto el cliente). */
+function listPrice(product) {
+  const prices = state.listPricing?.forProduct({ ...product, price: null, wholesalePrice: null, manual: false });
+  return prices ? { unit: prices.unit, wholesale: prices.wholesale } : { unit: null, wholesale: null };
+}
+
+function matchesBrFilter(p) {
+  if (state.brFilter === "cambios") return brChanged(p);
+  if (state.brFilter === "ocultos") return p.hidden;
+  if (state.brFilter === "casa") return brTotal(p, "casa") > 0;
+  if (state.brFilter.startsWith("cat:")) return p.category === state.brFilter.slice(4);
+  return true;
+}
+
+function renderBrProducts() {
+  const products = [...state.br.products].sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+  const list = h("ul", { class: "panel-list" });
+  const chips = h("div", { class: "panel-chips", role: "group", "aria-label": "Filtrar modelos de Brasil" });
+  const brCategories = [...new Set(products.map((p) => p.category))];
+
+  function renderChips() {
+    const count = (fn) => products.filter(fn).length;
+    const options = [
+      { id: "todos", label: `Todos (${products.length})` },
+      { id: "cambios", label: `Con cambios tuyos (${count(brChanged)})` },
+      { id: "casa", label: `Con pares tuyos (${count((p) => brTotal(p, "casa") > 0)})` },
+      { id: "ocultos", label: `Ocultos (${count((p) => p.hidden)})` },
+      ...(brCategories.length > 1 ? brCategories.map((id) => ({ id: `cat:${id}`, label: categoryName(id) })) : []),
+    ];
+    chips.replaceChildren(...options.map((o) => h("button", { type: "button", class: "panel-chip", "aria-pressed": String(state.brFilter === o.id),
+      onclick: () => { state.brFilter = o.id; renderChips(); renderItems(); } }, o.label)));
+  }
+  function renderItems() {
+    const term = state.brSearch.trim().toLowerCase();
+    const shown = products.filter((p) => matchesBrFilter(p) && (!term || `${p.name} ${p.brand ?? ""}`.toLowerCase().includes(term)));
+    list.replaceChildren(...(shown.length
+      ? shown.map((p) => brItemView(p, () => { renderChips(); renderItems(); }))
+      : [h("li", { class: "panel-empty" }, "No hay modelos con ese filtro.")]));
+  }
+
+  root.replaceChildren(
+    h("p", { class: "panel-muted panel-intro" },
+      "Estos modelos y su stock llegan solos y se actualizan solos. Tocá “Editar” en uno para ponerle tu precio, ocultarlo o sumar los pares que tenés en tu casa."),
+    h("input", { class: "panel-input", type: "search", placeholder: "Buscar modelo", value: state.brSearch, "aria-label": "Buscar modelo",
+      oninput: (e) => { state.brSearch = e.target.value; renderItems(); } }),
+    chips, list);
+  renderChips();
+  renderItems();
+}
+
+function brItemView(product, refresh) {
+  const fromBrazil = brTotal(product, "br");
+  const own = brTotal(product, "casa");
+  const unit = product.price || listPrice(product).unit;
+  const image = product.images[0];
+  const thumb = image
+    ? h("img", { src: image.sm || image.lg, alt: "", width: 64, height: 80, loading: "lazy" })
+    : h("span", { class: "panel-thumb--empty" }, "Sin foto");
+  const toggle = async (event) => busy(event.currentTarget, async () => {
+    const { change } = await api("/br", { method: "POST", body: brBody(product, { hidden: !product.hidden }) });
+    product.hidden = change?.hidden === true;
+    toast(product.hidden ? "Modelo oculto: ya no se ve en tu tienda." : "Modelo visible otra vez en tu tienda.");
+    refresh();
+  });
+  const stockText = own
+    ? `${fromBrazil} de Brasil + ${own} tuyos`
+    : fromBrazil ? `${fromBrazil} de Brasil` : "Sin stock";
+  return h("li", { class: `panel-item${product.hidden ? " is-paused" : ""}` },
+    h("div", { class: "panel-item__row" },
+      h("div", { class: "panel-thumb" }, thumb),
+      h("div", { class: "panel-item__info" },
+        h("strong", {}, product.name),
+        h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
+        h("span", {}, unit ? money(unit) : "Sin precio",
+          h("small", { class: "panel-muted" }, product.price ? " · tu precio" : " · precio de tu lista")),
+        h("span", { class: "panel-muted" }, stockText),
+        product.hidden ? h("span", { class: "panel-paused-tag" }, "Oculto: no se ve en tu tienda") : null),
+      h("div", { class: "panel-item__actions" },
+        h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => { location.hash = `#br/${encodeURIComponent(product.id)}`; } }, "Editar"),
+        h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: toggle }, product.hidden ? "Mostrar" : "Ocultar"))));
+}
+
+/** Lo que se manda al guardar un modelo de Brasil (lo que no se cambia, queda como estaba). */
+function brBody(product, changes = {}) {
+  return {
+    id: product.id,
+    price: product.price ?? "", wholesalePrice: product.wholesalePrice ?? "", hidden: product.hidden === true,
+    extra: product.sizes.filter((s) => s.casa > 0).map((s) => ({ size: s.size, stock: s.casa })),
+    ...changes,
+  };
+}
+
+function renderBrEditor(product) {
+  const draft = structuredClone(product);
+  const list = listPrice(product);
+  const price = h("input", { id: "b-price", class: "panel-input", inputmode: "numeric", value: draft.price ?? "",
+    placeholder: list.unit ? `${list.unit}` : "Ej: 60000" });
+  const wholesale = h("input", { id: "b-wholesale", class: "panel-input", inputmode: "numeric", value: draft.wholesalePrice ?? "",
+    placeholder: list.wholesale ? `${list.wholesale}` : "Opcional" });
+  const visible = h("input", { id: "b-visible", type: "checkbox", checked: !draft.hidden });
+  // Si la tienda no vende por mayor, no se pide precio por mayor.
+  const sellsWholesale = state.settings.name ? state.settings.wholesale === true : state.listPricing?.hasWholesale !== false;
+  const sizesBox = h("div", { class: "panel-sizes" });
+
+  function renderSizes() {
+    sizesBox.replaceChildren(
+      h("div", { class: "panel-br-row panel-br-row--head", "aria-hidden": "true" },
+        h("span", {}, "Talle"), h("span", {}, "De Brasil"), h("span", {}, "En tu casa")),
+      ...draft.sizes.map((s, i) => {
+        const value = h("output", { class: "panel-quick__value" }, s.casa);
+        const set = (n) => { s.casa = Math.max(0, n); value.textContent = s.casa; };
+        // Un talle que Brasil no tiene se puede quitar; los de Brasil quedan siempre.
+        const removable = s.fresh || s.soloCasa;
+        return h("div", { class: "panel-br-row" },
+          s.fresh
+            ? h("input", { class: "panel-input panel-size-row__name", value: s.size, maxlength: 12, "aria-label": "Talle nuevo", placeholder: "Talle",
+              oninput: (e) => { s.size = e.target.value.trim(); } })
+            : h("strong", {}, s.size),
+          h("span", { class: "panel-muted" }, s.br ? `${s.br}` : "—"),
+          h("div", { class: "panel-stepper" },
+            h("button", { type: "button", "aria-label": `Restar uno al talle ${s.size}`, onclick: () => set(s.casa - 1) }, "−"),
+            value,
+            h("button", { type: "button", "aria-label": `Sumar uno al talle ${s.size}`, onclick: () => set(s.casa + 1) }, "+")),
+          removable ? h("button", { type: "button", class: "panel-size-row__remove", "aria-label": `Quitar talle ${s.size}`,
+            onclick: () => { draft.sizes.splice(i, 1); renderSizes(); } }, "×") : h("span", {}));
+      }));
+  }
+
+  const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar");
+  const save = (body, message) => busy(saveButton, async () => {
+    await api("/br", { method: "POST", body });
+    await loadData();
+    toast(message);
+    location.hash = "#productos";
+  });
+  const form = h("form", { class: "panel-editor", onsubmit: (event) => {
+    event.preventDefault();
+    const sizes = draft.sizes.filter((s) => s.size);
+    save({
+      id: product.id,
+      price: price.value.replace(/\D/g, ""), wholesalePrice: wholesale.value.replace(/\D/g, ""), hidden: !visible.checked,
+      extra: sizes.filter((s) => s.casa > 0).map((s) => ({ size: s.size, stock: s.casa })),
+    }, "Cambios guardados.");
+  } },
+    h("div", { class: "panel-editor__head" },
+      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, "← Volver"),
+      h("h1", {}, product.name)),
+    h("section", { class: "panel-card panel-br-head" },
+      product.images[0] ? h("img", { src: product.images[0].sm || product.images[0].lg, alt: "", width: 96, height: 120 }) : null,
+      h("div", {},
+        h("p", {}, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
+        h("p", { class: "panel-muted" }, "Modelo del stock de Brasil: las fotos, el nombre y el stock de Brasil se actualizan solos."))),
+    h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
+      h("div", { class: "panel-two" },
+        field("b-price", "Precio", price, list.unit ? `Vacío = el de tu lista (${money(list.unit)}).` : "Vacío = el de tu lista."),
+        sellsWholesale ? field("b-wholesale", "Precio por mayor", wholesale, list.wholesale ? `Vacío = el de tu lista (${money(list.wholesale)}).` : "Opcional.") : null),
+      h("label", { class: "panel-switch", for: "b-visible" }, visible, h("span", {}, "Se ve en la tienda"),
+        h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
+    h("section", { class: "panel-card" }, h("h2", {}, "Talles"),
+      h("p", { class: "panel-muted" }, "“De Brasil” se actualiza solo. En “En tu casa” sumá los pares que tenés vos: en la tienda se ven todos juntos."),
+      sizesBox,
+      h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => {
+        draft.sizes.push({ size: "", br: 0, casa: 1, fresh: true });
+        renderSizes();
+        sizesBox.querySelector(".panel-br-row:last-child input")?.focus();
+      } }, "+ Otro talle")),
+    brChanged(product) ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: () => {
+      if (confirm("¿Volver este modelo a lo automático? Se borran tu precio y tus pares de este modelo.")) save({ id: product.id }, "El modelo volvió a lo automático.");
+    } }, "Volver todo a lo automático") : null,
+    h("div", { class: "panel-savebar" }, saveButton));
+
+  root.replaceChildren(form);
+  renderSizes();
+  window.scrollTo(0, 0);
 }
 
 // --- productos: editar / nuevo ----------------------------------------------------
@@ -637,6 +834,13 @@ function renderHelp() {
     ["Tu tienda", "En “Mi tienda” cambiás el nombre, el logo, tu WhatsApp, tus redes, los textos de la portada, el color y la venta por mayor. También tu clave."],
     ["Los pedidos", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
   ];
+  if (state.br) steps.unshift(
+    ["El stock de Brasil", "En “Productos” → “Stock de Brasil” están los modelos que llegan solos. No hace falta cargarlos: el stock se actualiza solo."],
+    ["Tu precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el de tu lista."],
+    ["Pares que tenés en tu casa", "En el mismo modelo, en “En tu casa”, sumá con “+” los pares que tenés vos. En la tienda se ven junto con los de Brasil. Cuando vendas uno tuyo, restalo con “−”."],
+    ["Ocultar un modelo", "Con “Ocultar” deja de verse en tu tienda. Con “Mostrar” vuelve."],
+    ["Otras cosas que vendas", "Ropa, accesorios o lo que quieras: en “Mis productos” → “Nuevo producto”, con tus fotos y la categoría que elijas."],
+  );
   root.replaceChildren(h("section", { class: "panel-card" },
     h("h1", {}, "Cómo usar tu panel"),
     h("ol", { class: "panel-help" }, steps.map(([title, text]) => h("li", {}, h("strong", {}, title), h("span", {}, text)))),
@@ -696,6 +900,20 @@ async function loadData() {
   state.categories = data.categories;
   state.limits = data.limits ?? state.limits;
   state.settings = settings ?? {};
+  state.br = data.stockBR ? { products: data.brProducts ?? [], options: data.stockBR, updatedAt: data.brUpdatedAt } : null;
+  if (state.br && !state.listPricing) state.listPricing = await loadListPricing();
+}
+
+/** Precios de la lista de la tienda (los que se cobran en los modelos de Brasil sin precio propio). */
+async function loadListPricing() {
+  const file = Object.values(config.channels ?? {})[0]?.prices;
+  if (!file) return null;
+  try {
+    const response = await fetch(`../${file}`, { cache: "no-cache" });
+    return response.ok ? createPricing(await response.json()) : null;
+  } catch {
+    return null;
+  }
 }
 
 function route() {
@@ -707,6 +925,10 @@ function route() {
     if (product) return renderEditor(product);
   }
   if (section === "nuevo") return renderEditor(null);
+  if (section === "br" && state.br) {
+    const product = state.br.products.find((p) => p.id === decodeURIComponent(id ?? ""));
+    if (product) return renderBrEditor(product);
+  }
   if (section === "categorias") return renderCategories();
   if (section === "tienda") return renderStoreSettings();
   if (section === "ayuda") return renderHelp();

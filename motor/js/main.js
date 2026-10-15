@@ -101,8 +101,11 @@ async function startStore() {
       loadStock(),
       loadJson(fromRoot(channel.prices)),
     ]);
-    // Tienda con stock propio: las categorías las arma el cliente en su panel.
-    if (catalog.categories) config.categories = { ...catalog.categories, ...(config.categories ?? {}) };
+    // Tienda con stock propio: las categorías (sus nombres y su orden) las arma el cliente en su panel.
+    if (catalog.categories) {
+      const rest = Object.entries(config.categories ?? {}).filter(([id]) => !Object.hasOwn(catalog.categories, id));
+      config.categories = { ...catalog.categories, ...Object.fromEntries(rest) };
+    }
     const pricing = createPricing(applyWholesaleSettings(priceTable, storeSettings));
     const cart = createCart({ storageKey: `${storagePrefix}:cart`, catalog });
     const restored = cart.restore();

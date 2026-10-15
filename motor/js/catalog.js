@@ -24,6 +24,8 @@ function sortProducts(products, order) {
  * proveedor. Se descuenta el stock de casa de cada talle y desaparecen los
  * modelos que eran solo de casa.
  */
+const fileUrl = (base, path) => (/^https?:\/\//.test(path) ? path : base + path);
+
 export async function loadCatalog(base, { order = "marca-modelo", includeHouseStock = true, showG5 = false } = {}) {
   // "no-cache": el navegador pregunta si hay versión nueva (stock actualizado),
   // pero si no cambió no vuelve a descargar el archivo.
@@ -65,9 +67,12 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
         wholesalePrice: Number(p.wholesalePrice) > 0 ? Number(p.wholesalePrice) : null,
         sizes,
         available: sizes.filter((s) => s.stock > 0),
+        // Producto propio del cliente (lo cargó en su panel): solo vale el precio que le puso.
+        manual: p.manual === true,
+        // Tiendas con stock de Brasil: esas fotos ya vienen con su dirección completa.
         images: (Array.isArray(p.images) ? p.images : []).map((img) => ({
-          sm: img.sm ? base + img.sm : null,
-          lg: base + img.lg,
+          sm: img.sm ? fileUrl(base, img.sm) : null,
+          lg: fileUrl(base, img.lg),
           w: img.w,
           h: img.h,
         })),
