@@ -18,6 +18,7 @@ import { createFiltersView } from "./interfaz/filters-view.js";
 import { renderHeader, renderHero } from "./interfaz/layout.js";
 import { renderFooter, renderInfoPage } from "./interfaz/pages.js";
 import { keepStockFresh } from "./stock-vivo.js";
+import { orderedCategories } from "../vidriera/orden.js";
 import { applyStoreSettings, applyWholesaleSettings, loadStoreSettings } from "./ajustes-tienda.js";
 import { createProductView } from "./interfaz/product-view.js";
 import { createToaster } from "./interfaz/toast.js";
@@ -103,8 +104,13 @@ async function startStore() {
     ]);
     // Tienda con stock propio: las categorías (sus nombres y su orden) las arma el cliente en su panel.
     if (catalog.categories) {
+      // Los productos (y los botones de categoría) salen en el orden que eligió el cliente;
+      // dentro de cada categoría, como siempre (por marca y modelo).
+      const order = orderedCategories(catalog.categories, storeSettings ?? {});
       const rest = Object.entries(config.categories ?? {}).filter(([id]) => !Object.hasOwn(catalog.categories, id));
-      config.categories = { ...catalog.categories, ...Object.fromEntries(rest) };
+      config.categories = { ...Object.fromEntries(order.map((id) => [id, catalog.categories[id]])), ...Object.fromEntries(rest) };
+      const rank = new Map(order.map((id, i) => [id, i]));
+      catalog.products.sort((a, b) => (rank.get(a.category) ?? Infinity) - (rank.get(b.category) ?? Infinity));
     }
     const pricing = createPricing(applyWholesaleSettings(priceTable, storeSettings));
     const cart = createCart({ storageKey: `${storagePrefix}:cart`, catalog });

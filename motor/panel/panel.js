@@ -702,8 +702,12 @@ function renderCategories() {
       h("p", { class: "panel-muted" }, "Los productos se ven agrupados por categoría. Elegí en qué orden van las categorías y cómo se ordenan los productos dentro de cada una."),
       h("div", { class: "panel-two" },
         field("o-categories", "Categorías", categoryOrder),
-        field("o-products", "Productos dentro de cada categoría", productOrder,
-          "“En el orden que yo elijo”: en Productos → Más → Subir o Bajar."))),
+        // Con stock de Brasil, dentro de cada categoría van por marca y modelo (como siempre).
+        state.br
+          ? h("div", { class: "panel-field" }, h("span", { class: "panel-label" }, "Productos dentro de cada categoría"),
+            h("p", { class: "panel-muted" }, "Por marca y modelo."))
+          : field("o-products", "Productos dentro de cada categoría", productOrder,
+            "“En el orden que yo elijo”: en Productos → Más → Subir o Bajar."))),
     h("section", { class: "panel-card" },
     h("h2", {}, "Categorías"),
     h("p", { class: "panel-muted" }, "Creá, renombrá o borrá categorías (solo se puede borrar una sin productos). Con “En el orden que yo elijo”, ordenalas con las flechas."),
