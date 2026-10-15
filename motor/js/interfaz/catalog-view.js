@@ -128,7 +128,19 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
       card.parentElement.hidden = !visible;
       if (visible) shown += 1;
     }
+    showSections();
     return shown;
+  }
+
+  /** Títulos de categoría: solo los que tienen algo a la vista, y solo si se ve más de una categoría. */
+  function showSections() {
+    const titles = [...grid.querySelectorAll("[data-section]")];
+    if (!titles.length) return;
+    const withProducts = new Set();
+    for (const card of grid.querySelectorAll("[data-product-id]")) {
+      if (!card.parentElement.hidden) withProducts.add(productsById.get(card.dataset.productId)?.category);
+    }
+    for (const title of titles) title.hidden = withProducts.size < 2 || !withProducts.has(title.dataset.section);
   }
 
   // --- tarjetas ------------------------------------------------------------
@@ -204,11 +216,25 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
     buy.innerHTML = buyHtml(product);
   }
 
-  function render(products) {
+  /**
+   * sections: { código: nombre } de las categorías (tiendas con panel). Si se pasa, cada
+   * categoría tiene su título arriba de sus productos (los productos ya vienen ordenados así).
+   */
+  let sections = null;
+  function render(products, options = {}) {
+    if (options.sections !== undefined) sections = options.sections;
     productsById = new Map(products.map((p) => [p.id, p]));
     grid.setAttribute("aria-busy", "false");
     countLabel.textContent = countText(products.length, products.length, false, headStyle);
-    grid.innerHTML = products.map(cardHtml).join("");
+    let current = null;
+    grid.innerHTML = products.map((product, index) => {
+      const title = sections && product.category !== current
+        ? `<li class="catalog-section" data-section="${escapeHtml(product.category)}"><h3 class="catalog-section__title">${escapeHtml(sections[product.category] ?? product.category)}</h3></li>`
+        : "";
+      current = product.category;
+      return title + cardHtml(product, index);
+    }).join("");
+    showSections();
     for (const card of grid.querySelectorAll("[data-product-id]")) {
       card.querySelector("[data-buy]").innerHTML = buyHtml(productsById.get(card.dataset.productId));
     }

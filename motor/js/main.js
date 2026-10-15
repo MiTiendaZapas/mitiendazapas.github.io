@@ -117,7 +117,8 @@ async function startStore() {
     const restored = cart.restore();
 
     catalogView.connect({ pricing, cart });
-    catalogView.render(catalog.products);
+    // Tiendas con panel: cada categoría con su título arriba de sus productos.
+    catalogView.render(catalog.products, { sections: catalog.categories ? config.categories : null });
     createFiltersView({ config, filters: createFilters(catalog.products), catalogView, overlays });
     renderLastPairs(document.querySelector("[data-last-pairs]"), { products: catalog.products, pricing });
     cartView = createCartView({
