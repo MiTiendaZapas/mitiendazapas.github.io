@@ -11,6 +11,9 @@ viven en el depósito R2 (catalogo.mitiendastock.com) y los sube el piloto.
 Uso (desde la carpeta del proyecto):
     bash herramientas/publicar_cloudflare.sh              publica (toma la llave de "wrangler login")
     python herramientas/publicar_cloudflare.py --armar    solo arma la carpeta, sin subir
+    bash herramientas/publicar_cloudflare.sh --prueba     sube a un link de PRUEBA
+        (https://prueba.mitiendastock.pages.dev), nunca a mitiendastock.com. Suma las
+        tiendas de prueba sin GitHub (../repositorio-demo-br). Usa los mismos depósitos.
 """
 import json
 import os
@@ -40,9 +43,17 @@ SKIP_MAIN = {".git", ".github", "catalogo", "sincronizador", "pruebas", "guias",
 SKIP_CLIENT = {".git", "LEEME.md", ".gitignore", ".nojekyll"}
 
 
-def client_repos():
+TEST_STORES = ["demo-br"]   # tiendas de prueba (sin GitHub): solo van al link de prueba
+TEST_BRANCH = "prueba"
+
+
+def client_repos(test=False):
     """{nombre en el link: carpeta} de cada tienda de cliente, según su repositorio de GitHub."""
     found = {}
+    if test:
+        for name in TEST_STORES:
+            if (PROJECTS / f"repositorio-{name}" / "configuracion.js").exists():
+                found[name] = PROJECTS / f"repositorio-{name}"
     for folder in sorted(PROJECTS.glob("repositorio-*")):
         if not (folder / "configuracion.js").exists():
             continue
@@ -102,7 +113,7 @@ def add_version(dist):
             path.write_text(new, encoding="utf-8")
 
 
-def build(dist):
+def build(dist, test=False):
     # La tienda de L.A IMP va en /laimp/ (entera: sus rutas son relativas). La raíz es una
     # portada neutra: quien corta el link de un cliente no llega a la tienda ni a los precios
     # de L.A IMP. /motor/ también va en la raíz, porque lo usan las tiendas de clientes.
@@ -118,7 +129,7 @@ def build(dist):
     # Links de mitiendastock.com que se usaron antes de mover la tienda a /laimp/ (09/10).
     redirects = [line for page in MAIN_PAGES for line in (
         f"/{page} /{MAIN_STORE}/{page}/ 301", f"/{page}/* /{MAIN_STORE}/{page}/:splat 301")]
-    clients = client_repos()
+    clients = client_repos(test)
     for name, folder in clients.items():
         if (dist / name).exists():
             raise RuntimeError(f"El cliente '{name}' choca con una carpeta ya usada.")
@@ -148,7 +159,8 @@ def build(dist):
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     dist = Path(tempfile.mkdtemp(prefix="mitiendastock-"))
-    clients = build(dist)
+    test = "--prueba" in sys.argv
+    clients = build(dist, test)
     files = sum(1 for p in dist.rglob("*") if p.is_file())
     print(f"Armado en {dist}: tienda principal + {len(clients)} clientes ({', '.join(clients)}), {files} archivos.")
     if "--armar" in sys.argv:
@@ -159,8 +171,11 @@ def main():
         print("Falta CLOUDFLARE_API_TOKEN: publicar con  bash herramientas/publicar_cloudflare.sh")
         return 1
     env.setdefault("CLOUDFLARE_ACCOUNT_ID", ACCOUNT_ID)
+    branch = TEST_BRANCH if test else "main"
+    if test:
+        print(f"PRUEBA: se sube a https://{TEST_BRANCH}.{PROJECT_NAME}.pages.dev (las tiendas reales no cambian).")
     result = subprocess.run(["npx", "wrangler", "pages", "deploy", str(dist), "--project-name", PROJECT_NAME,
-                             "--branch", "main", "--commit-dirty=true"], shell=(sys.platform == "win32"), env=env)
+                             "--branch", branch, "--commit-dirty=true"], shell=(sys.platform == "win32"), env=env)
     return result.returncode
 
 
