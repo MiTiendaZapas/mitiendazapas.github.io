@@ -479,9 +479,26 @@ function brItemView(product, refresh) {
     toast(product.hidden ? "Modelo oculto: ya no se ve en tu tienda." : "Modelo visible otra vez en tu tienda.");
     refresh();
   });
-  const stockText = own
-    ? `${fromBrazil} de Brasil + ${own} tuyos`
+  const stockText = (mine) => mine
+    ? `${fromBrazil} de Brasil + ${mine} tuyos`
     : fromBrazil ? `${fromBrazil} de Brasil` : "Sin stock";
+  const stockLine = h("span", { class: "panel-muted" }, stockText(own));
+  // Al sumar o restar pares, se actualizan los textos sin cerrar el cuadro.
+  const paintPairs = () => {
+    const mine = brTotal(product, "casa");
+    stockLine.textContent = stockText(mine);
+    pairsButton.textContent = mine ? `Mis pares: ${mine}` : "Mis pares";
+    pairsButton.classList.toggle("is-none", !mine);
+  };
+  // "Mis pares": sumar o restar al toque los pares que el cliente tiene en su casa.
+  const quick = h("div", { class: "panel-quick", hidden: true });
+  const pairsButton = h("button", { class: `panel-stock${own ? "" : " is-none"}`, type: "button", "aria-expanded": "false",
+    onclick: () => {
+      const open = quick.hidden;
+      quick.hidden = !open;
+      pairsButton.setAttribute("aria-expanded", String(open));
+      if (open) renderQuickPairs(product, quick, paintPairs);
+    } }, own ? `Mis pares: ${own}` : "Mis pares");
   return h("li", { class: `panel-item${product.hidden ? " is-paused" : ""}` },
     h("div", { class: "panel-item__row" },
       h("div", { class: "panel-thumb" }, thumb),
@@ -490,12 +507,39 @@ function brItemView(product, refresh) {
         h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
         h("span", {}, unit ? money(unit) : "Sin precio",
           h("small", { class: "panel-muted" }, product.price ? " · tu precio" : " · precio de tu lista")),
-        h("span", { class: "panel-muted" }, stockText),
+        stockLine,
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Oculto: no se ve en tu tienda") : null,
         tagsFor(product)),
       h("div", { class: "panel-item__actions" },
+        pairsButton,
         h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => { location.hash = `#br/${encodeURIComponent(product.id)}`; } }, "Editar"),
-        h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: toggle }, product.hidden ? "Mostrar" : "Ocultar"))));
+        h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: toggle }, product.hidden ? "Mostrar" : "Ocultar"))),
+    quick);
+}
+
+/** Pares de casa al toque: + y − por talle, se guarda solo (como "vendí uno" en los productos propios). */
+function renderQuickPairs(product, box, onChange) {
+  box.replaceChildren(
+    h("p", { class: "panel-muted" }, "Los pares que tenés vos. Sumá o restá: se guarda solo. Para un talle que Brasil no tiene, entrá a “Editar”."),
+    h("div", { class: "panel-quick__grid" }, product.sizes.map((s) => {
+      const value = h("output", { class: "panel-quick__value" }, s.casa);
+      const change = (delta) => (event) => busy(event.currentTarget, async () => {
+        const next = Math.max(0, s.casa + delta);
+        if (next === s.casa) return;
+        const extra = product.sizes.map((x) => ({ size: x.size, stock: x === s ? next : x.casa })).filter((x) => x.stock > 0);
+        await api("/br", { method: "POST", body: brBody(product, { extra }) });
+        s.casa = next;
+        s.stock = s.br + s.casa;
+        value.textContent = next;
+        onChange();
+      });
+      return h("div", { class: "panel-quick__size" },
+        h("span", { class: "panel-quick__label" }, `Talle ${s.size}`, s.br ? h("small", { class: "panel-muted" }, ` · Brasil ${s.br}`) : null),
+        h("div", { class: "panel-stepper" },
+          h("button", { type: "button", "aria-label": `Restar un par tuyo del talle ${s.size}`, onclick: change(-1) }, "−"),
+          value,
+          h("button", { type: "button", "aria-label": `Sumar un par tuyo al talle ${s.size}`, onclick: change(1) }, "+")));
+    })));
 }
 
 /** Lo que se manda al guardar un modelo de Brasil (lo que no se cambia, queda como estaba). */

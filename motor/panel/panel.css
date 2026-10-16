@@ -222,3 +222,6 @@
 
 /* Condiciones de uso (en Ayuda) */
 .panel-terms { display: grid; gap: var(--space-2); margin: 0; padding-left: 1.3em; font-size: 14px; line-height: 1.45; }
+
+/* "Mis pares" sin pares todavía: gris en vez de verde */
+.panel-stock.is-none { background: var(--color-surface-2); color: var(--color-text-muted); }
