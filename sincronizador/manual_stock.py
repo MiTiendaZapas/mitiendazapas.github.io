@@ -7,6 +7,7 @@ import json
 import re
 
 import settings
+from classify import normalize as normalize_nombre
 
 _ENTRY = re.compile(
     r"\{\s*modelo:\s*'((?:[^'\\]|\\.)*)'\s*,\s*talles:\s*(\[.*?\])\s*,\s*foto:\s*'((?:[^'\\]|\\.)*)'\s*\}",
@@ -29,9 +30,27 @@ def _traer_stock_de_la_app():
         print(f"  ⚠️ No se pudo traer el stock de casa de la app ({e}); se usan los archivos que hay.")
 
 
+def _precios_de_casa():
+    """Precios que se cargaron en la app para modelos de casa (los escribe stock_casa_sync.py).
+    {nombre normalizado: (precio de venta, precio por mayor)}. Si el archivo falta, no hay precios propios."""
+    ruta = settings.LEGACY_REPO / "Automatizacion" / "precios_casa.json"
+    try:
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    out = {}
+    for e in datos.get("precios", []):
+        try:
+            out[normalize_nombre(e["nombre"])] = (int(e.get("price") or 0) or None, int(e.get("wholesalePrice") or 0) or None)
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
 def load():
     """Devuelve [(kind, {name, sizes, photo})]; kind es 'zapatillas' o 'indumentaria'."""
     _traer_stock_de_la_app()
+    precios = _precios_de_casa()
     items = []
     for kind, path in settings.MANUAL_STOCK_FILES.items():
         if not path.exists():
@@ -49,5 +68,11 @@ def load():
                 {"size": str(t["talle"]).strip(), "stock": max(int(t.get("stock", 0) or 0), 0)}
                 for t in raw_sizes if str(t.get("talle", "")).strip()
             ]
-            items.append((kind, {"name": _unescape(name), "sizes": sizes, "photo": _unescape(photo)}))
+            item = {"name": _unescape(name), "sizes": sizes, "photo": _unescape(photo)}
+            precio, mayor = precios.get(normalize_nombre(item["name"]), (None, None))
+            if precio:
+                item["price"] = precio                 # precio de venta cargado en la app
+                if mayor:
+                    item["wholesale"] = mayor          # precio por mayor (opcional)
+            items.append((kind, item))
     return items

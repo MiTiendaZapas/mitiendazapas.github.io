@@ -64,3 +64,17 @@ de arriba: un modelo sin stock ya no aparece en el archivo.
 - El stock de la tienda no refleja un cambio del socio: esperar una vuelta del piloto
   (los cambios llegan en cada vuelta, no al instante).
 - Para volver atrás un archivo: copiar el que corresponda desde `Automatizacion/backups_stock/`.
+
+## Precio de los modelos que SOLO son de casa (16/10)
+
+En la app, cada modelo de casa que **no vende el proveedor** tiene dos campos: "Venta" y "Por mayor" (opcionales).
+Si no se cargan, el modelo usa los precios automáticos de siempre (las reglas de `precios-*.json`).
+
+- `stock_casa_sync.py` escribe esos precios en `TiendaZapasOficial/Automatizacion/precios_casa.json`
+  (carpeta ignorada por git, igual que los backups: cada PC lo genera sola desde Firebase).
+- `manual_stock.load()` lo lee y `sync_catalog.build_products()` pone `price` / `wholesalePrice` en `catalogo/productos.json`
+  **solo si el modelo es únicamente de casa** (`origin == ["casa"]`). Si el proveedor también lo vende, mandan las reglas.
+- El motor de las tiendas ya soportaba esos campos (`product.price` en `motor/js/pricing.js`): no se tocó `motor/`.
+- Ojo: un precio de catálogo es el mismo en las tiendas que muestran ese modelo (minorista y revendedores). Si solo se
+  carga "Venta", el "Por mayor" sigue saliendo de las reglas.
+- Comprobar: en `catalogo/productos.json` el modelo debe traer `"price": N`. Si no aparece, mirar `precios_casa.json`.

@@ -189,6 +189,7 @@ def sincronizar(destino=None, simular=False):
     estado = _cargar_estado()
     por_tipo = {"zapatillas": [], "indumentaria": []}
     fotos_nuevas = []
+    precios = []   # precios cargados en la app para modelos con stock (ver manual_stock._precios_de_casa)
     for id_, d in docs:
         if d.get("eliminado") or not d.get("nombre"):
             continue
@@ -201,6 +202,9 @@ def sincronizar(destino=None, simular=False):
         if version and (estado.get(id_) != version or not (raiz / foto).exists()):
             fotos_nuevas.append((id_, foto, version))
         por_tipo[tipo].append({"modelo": d["nombre"], "talles": talles, "foto": foto})
+        precio = int(d.get("precio") or 0)
+        if precio > 0:
+            precios.append({"nombre": d["nombre"], "price": precio, "wholesalePrice": int(d.get("precioMayor") or 0) or None})
 
     cambios = []
     for tipo, (archivo, variable, encabezado) in ARCHIVOS.items():
@@ -220,6 +224,19 @@ def sincronizar(destino=None, simular=False):
         tmp = ruta.with_suffix(".tmp")
         tmp.write_text(nuevo, encoding="utf-8")
         tmp.replace(ruta)
+
+    # Los precios van aparte (los .js tienen un formato fijo que leen varias herramientas): un
+    # archivito que lee manual_stock.load() y el sincronizador pone en el catálogo.
+    ruta_precios = raiz / "Automatizacion" / "precios_casa.json"
+    nuevo_precios = json.dumps({"precios": sorted(precios, key=lambda e: e["nombre"].lower())}, ensure_ascii=False, indent=1)
+    actual_precios = ruta_precios.read_text(encoding="utf-8") if ruta_precios.exists() else None
+    if (actual_precios is None and precios) or (actual_precios is not None and actual_precios.strip() != nuevo_precios.strip()):
+        cambios.append(f"precios de casa ({len(precios)})")
+        if not simular:
+            ruta_precios.parent.mkdir(parents=True, exist_ok=True)
+            tmp = ruta_precios.with_suffix(".tmp")
+            tmp.write_text(nuevo_precios, encoding="utf-8")
+            tmp.replace(ruta_precios)
 
     for id_, foto, version in fotos_nuevas:
         d = fb.obtener(f"stock_casa_fotos/{id_}")

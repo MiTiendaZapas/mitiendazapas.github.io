@@ -54,7 +54,8 @@ def build_products(provider_items, manual_items, classifier, summed_items=()):
         if key not in by_key:
             by_key[key] = {"id": product_id, "name": name, "sizes": {}, "house": {}, "origin": [],
                            "provider_item": None, "manual_photo": None, "kind": "zapatillas",
-                           "provider_brand": None, "other": {}, "other_item": None, "other_source": None}
+                           "provider_brand": None, "other": {}, "other_item": None, "other_source": None,
+                           "manual_price": None, "manual_wholesale": None}
             ordered.append(key)
         return by_key[key]
 
@@ -66,6 +67,9 @@ def build_products(provider_items, manual_items, classifier, summed_items=()):
         product["origin"].append("casa")
         product["kind"] = kind
         product["manual_photo"] = product["manual_photo"] or item["photo"]
+        # Precio que se cargó en la app (AppPedidos > Stock de casa) para un modelo que no es del proveedor.
+        product["manual_price"] = product["manual_price"] or item.get("price")
+        product["manual_wholesale"] = product["manual_wholesale"] or item.get("wholesale")
 
     for item in provider_items:
         if any(word in normalize(item["name"]) for word in settings.EXCLUDE_KEYWORDS):
@@ -104,7 +108,7 @@ def build_products(provider_items, manual_items, classifier, summed_items=()):
             slug += "-2"
         used_slugs.add(slug)
         default_category = "indumentaria" if raw["kind"] == "indumentaria" else "zapatillas"
-        products.append({
+        entry = {
             "id": raw["id"],
             "slug": slug,
             "name": raw["name"],
@@ -118,7 +122,15 @@ def build_products(provider_items, manual_items, classifier, summed_items=()):
             "_manual_photo": raw["manual_photo"],
             "_other_item": raw["other_item"],
             "_other_source": raw["other_source"],
-        })
+        }
+        # Solo los modelos que son SOLO de casa pueden traer precio propio (el motor de las tiendas lo
+        # toma de "price" / "wholesalePrice"). Si el modelo también lo vende el proveedor, mandan las
+        # reglas de precios de siempre.
+        if set(raw["origin"]) == {"casa"} and raw["manual_price"]:
+            entry["price"] = raw["manual_price"]
+            if raw["manual_wholesale"]:
+                entry["wholesalePrice"] = raw["manual_wholesale"]
+        products.append(entry)
     return products
 
 
