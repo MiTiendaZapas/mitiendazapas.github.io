@@ -219,3 +219,6 @@
 /* Etiquetas en la lista: destacado y oferta */
 .panel-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .panel-tag { padding: 2px 8px; border-radius: 999px; background: var(--color-surface-2); color: var(--color-text); font-size: 12px; font-weight: 600; }
+
+/* Condiciones de uso (en Ayuda) */
+.panel-terms { display: grid; gap: var(--space-2); margin: 0; padding-left: 1.3em; font-size: 14px; line-height: 1.45; }

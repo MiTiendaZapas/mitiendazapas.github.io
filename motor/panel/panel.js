@@ -1004,6 +1004,24 @@ function passwordCard() {
 }
 
 // --- ayuda -------------------------------------------------------------------------
+/** Condiciones de uso de Mi Tienda Stock (las aprobó el dueño de la plataforma el 16/10/2026). */
+const TERMS = [
+  "La tienda y el panel son para vender productos que tenés o que podés conseguir. No cargues productos que no existen.",
+  "Usá fotos tuyas o que tengas permiso para usar.",
+  "No se pueden subir fotos ni textos ofensivos, engañosos o que copien a otra marca o tienda.",
+  "Los precios, el stock propio y la atención a tus clientes son tu responsabilidad. El stock de Brasil se actualiza solo, pero siempre confirmá con el cliente antes de cobrar.",
+  "Cuidá tu usuario y tu clave. No se los pases a nadie.",
+  "Si no se cumplen estas reglas, la tienda se puede pausar.",
+  "El servicio cuesta $25.000 por mes. Si no se paga, hay unos días de margen; si sigue sin pagarse, la tienda se pausa hasta que se regularice.",
+];
+
+function termsCard() {
+  return h("section", { class: "panel-card", id: "condiciones" },
+    h("h2", {}, "Condiciones de uso de Mi Tienda Stock"),
+    h("p", { class: "panel-muted" }, "Al usar tu tienda y este panel, aceptás estas condiciones:"),
+    h("ol", { class: "panel-terms" }, TERMS.map((text) => h("li", {}, text))));
+}
+
 function renderHelp() {
   const steps = [
     ["Cargá tus productos", "En “Productos” tocá “Nuevo producto”: subí fotos, poné nombre, categoría, precio y los talles con su cantidad. Tocá “Guardar” y ya aparece en tu tienda."],
@@ -1026,7 +1044,8 @@ function renderHelp() {
   root.replaceChildren(h("section", { class: "panel-card" },
     h("h1", {}, "Cómo usar tu panel"),
     h("ol", { class: "panel-help" }, steps.map(([title, text]) => h("li", {}, h("strong", {}, title), h("span", {}, text)))),
-    h("p", { class: "panel-muted" }, "Tu link para compartir es el de “Ver tienda”. ¿Dudas? Escribinos por WhatsApp.")));
+    h("p", { class: "panel-muted" }, "Tu link para compartir es el de “Ver tienda”. ¿Dudas? Escribinos por WhatsApp.")),
+    termsCard());
 }
 
 // --- imágenes: se achican en el celular antes de subir -------------------------------
