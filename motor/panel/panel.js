@@ -848,7 +848,9 @@ function renderEditor(product) {
   let uploading = 0;
   const progress = new Map();   // foto que se está subiendo -> porcentaje
 
-  // Fotos
+  // Fotos: cerradas se ve solo la portada (menos ruido); "Ver y cambiar fotos" muestra todas.
+  let photosOpen = false;
+  const photosHelp = h("p", { class: "panel-muted" }, `Hasta ${state.limits.imagesPerProduct}. La primera es la portada; con las flechas cambiás el orden.`);
   const photos = h("div", { class: "panel-photos" });
   const fileInput = h("input", { type: "file", accept: "image/*", multiple: true, hidden: true, onchange: (e) => addPhotos([...e.target.files]) });
   function movePhoto(i, delta) {
@@ -857,6 +859,7 @@ function renderEditor(product) {
     renderPhotos();
   }
   function renderPhotos() {
+    if (!photosOpen) return renderPhotosClosed();
     const last = draft.images.length - 1;
     const tiles = draft.images.map((img, i) => h("div", { class: "panel-photo" },
       h("img", { src: storeUrl(img.sm), alt: `Foto ${i + 1}` }),
@@ -870,8 +873,30 @@ function renderEditor(product) {
     const loading = [...progress.values()].map((percent) => h("div", { class: "panel-photo panel-photo--loading" },
       h("span", {}, percent < 100 ? `Subiendo… ${percent}%` : "Guardando…"),
       h("span", { class: "panel-progress", style: `--progress:${percent}%` })));
+    photos.className = "panel-photos";
     photos.replaceChildren(...tiles, ...loading,
-      ...(canAdd ? [h("button", { type: "button", class: "panel-photo panel-photo--add", onclick: () => fileInput.click() }, "+ Foto")] : []), fileInput);
+      ...(canAdd ? [h("button", { type: "button", class: "panel-photo panel-photo--add", onclick: () => fileInput.click() }, "+ Foto")] : []),
+      h("button", { type: "button", class: "btn btn--outline btn--sm panel-photos__done", onclick: () => { photosOpen = false; renderPhotos(); } }, "Listo"),
+      fileInput);
+    photosHelp.hidden = false;
+  }
+  /** Fotos cerradas: la portada y un botón. Sin fotos: "+ Agregar fotos" abre la galería del celular. */
+  function renderPhotosClosed() {
+    const cover = draft.images[0];
+    const count = draft.images.length;
+    const sending = [...progress.values()];
+    photos.className = "panel-photos-closed";
+    photosHelp.hidden = true;
+    photos.replaceChildren(
+      cover ? h("img", { class: "panel-photos-closed__cover", src: storeUrl(cover.sm), alt: "Portada" })
+        : h("span", { class: "panel-photos-closed__empty" }, "Sin fotos"),
+      h("div", { class: "panel-photos-closed__info" },
+        sending.length ? h("p", { class: "panel-muted" }, `Subiendo… ${Math.min(...sending)}%`)
+          : h("p", { class: "panel-muted" }, count ? (count === 1 ? "1 foto" : `${count} fotos`) : "Todavía no tiene fotos."),
+        count
+          ? h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { photosOpen = true; renderPhotos(); } }, "Ver y cambiar fotos")
+          : h("button", { type: "button", class: "btn btn--primary btn--sm", onclick: () => fileInput.click() }, "+ Agregar fotos")),
+      fileInput);
   }
   async function addPhotos(files) {
     fileInput.value = "";
@@ -993,22 +1018,22 @@ function renderEditor(product) {
       h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, "← Volver"),
       h("h1", {}, product ? "Editar producto" : "Nuevo producto"),
       product && !product.hidden ? viewLink(product) : null),
-    h("section", { class: "panel-card" }, h("h2", {}, "Fotos"),
-      h("p", { class: "panel-muted" }, `Hasta ${state.limits.imagesPerProduct}. La primera es la portada; con las flechas cambiás el orden.`), photos),
+    h("section", { class: "panel-card" }, h("h2", {}, "Fotos"), photosHelp, photos),
     h("section", { class: "panel-card" }, h("h2", {}, "Datos"),
       field("f-name", "Nombre", name),
       field("f-category", "Categoría", categorySelect), newCategoryField,
       h("div", { class: "panel-two" },
         field("f-price", "Precio", price, "El precio normal. Para rebajarlo, usá “Oferta”, más abajo."),
-        field("f-wholesale", "Precio por mayor", wholesale, wholesaleHelp)),
+        // Si la tienda no vende por mayor, no se pide (se activa en "Mi tienda").
+        state.settings.wholesale === false ? null : field("f-wholesale", "Precio por mayor", wholesale, wholesaleHelp)),
       h("label", { class: "panel-switch", for: "f-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para pausarlo sin borrarlo."))),
-    offer.node,
-    h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles y cantidades"),
       h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
         h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, "+ Otro talle")),
       sizesBox),
+    offer.node,
+    h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
     product ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: () => removeProduct(product) }, "Borrar este producto") : null,
     h("div", { class: "panel-savebar" }, saveButton));
 
