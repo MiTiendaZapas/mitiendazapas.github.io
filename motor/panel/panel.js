@@ -208,56 +208,85 @@ function pricesButton() {
   return h("a", { class: "btn btn--outline btn--sm", href: "#precios" }, "Cambiar precios");
 }
 
-/** Subir o bajar todos los precios en porcentaje (por ejemplo, por la inflación). */
+/**
+ * Cambiar precios de golpe, en 3 pasos con botones grandes: subir o bajar, cuánto y a cuáles.
+ * Antes de aplicar muestra cómo quedan algunos productos de verdad de la tienda.
+ */
 function renderPriceChange() {
-  const percent = h("input", { id: "pc-percent", class: "panel-input", inputmode: "decimal", placeholder: "Ej: 10", autocomplete: "off" });
-  const direction = h("select", { id: "pc-direction", class: "panel-input" },
-    h("option", { value: "1" }, "Subir"), h("option", { value: "-1" }, "Bajar"));
-  const own = h("input", { id: "pc-own", type: "checkbox", checked: true });
-  const br = state.br ? h("input", { id: "pc-br", type: "checkbox", checked: true }) : null;
-  const preview = h("p", { class: "panel-muted", role: "status" });
-  const value = () => Number(String(percent.value).replace(",", ".")) * Number(direction.value);
-  const example = (price) => Math.max(100, Math.round((price * (1 + value() / 100)) / 100) * 100);
-  const paint = () => {
-    const v = value();
-    preview.textContent = Number.isFinite(v) && v !== 0 && Math.abs(v) <= 100
-      ? `Ejemplo: un producto de ${money(60000)} pasa a ${money(example(60000))}. Se redondea a los $100.`
-      : "Escribí el porcentaje, por ejemplo 10.";
-  };
-  percent.addEventListener("input", paint);
-  direction.addEventListener("change", paint);
-  paint();
-  const apply = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Aplicar");
+  let direction = 1;          // 1 subir, -1 bajar
+  let amount = 10;            // porcentaje elegido o "otro"
+  let scope = "todos";        // "todos" | "propios" | "brasil"
+  const custom = h("input", { id: "pc-custom", class: "panel-input", inputmode: "decimal", placeholder: "Ej: 12", autocomplete: "off" });
+  const customField = field("pc-custom", "Porcentaje", custom);
+  const steps = h("div", { class: "panel-pc" });
+  const examples = h("div", { class: "panel-pc__examples", role: "status" });
+  const apply = h("button", { class: "btn btn--primary btn--lg", type: "submit" });
+
+  const percent = () => (amount === "otro" ? Number(String(custom.value).replace(",", ".")) || 0 : amount);
+  const after = (price) => roundPrice(price * (1 + (direction * percent()) / 100));
+  const choice = (options, current, onPick) => h("div", { class: "panel-pc__choices" }, options.map(([value, label]) =>
+    h("button", { type: "button", class: "panel-chip", "aria-pressed": String(current === value), onclick: () => onPick(value) }, label)));
+
+  /** Hasta 3 productos de verdad, con su precio de hoy y cómo queda. */
+  function sample() {
+    const own = scope !== "brasil" ? state.products.filter((p) => p.price).map((p) => ({ name: p.name, price: p.price })) : [];
+    const br = scope !== "propios" && state.br
+      ? state.br.products.map((p) => ({ name: p.name, price: p.price || listPrice(p).unit })).filter((p) => p.price) : [];
+    return [...own.slice(0, 2), ...br.slice(0, 3 - Math.min(own.length, 2))].slice(0, 3);
+  }
+
+  function paint() {
+    steps.replaceChildren(
+      h("section", { class: "panel-card" }, h("h2", {}, "1. ¿Qué querés hacer?"),
+        choice([[1, "Subir precios"], [-1, "Bajar precios"]], direction, (v) => { direction = v; paint(); })),
+      h("section", { class: "panel-card" }, h("h2", {}, `2. ¿Cuánto querés ${direction > 0 ? "subirlos" : "bajarlos"}?`),
+        choice([[5, "5%"], [10, "10%"], [15, "15%"], [20, "20%"], ["otro", "Otro"]], amount, (v) => { amount = v; paint(); if (v === "otro") custom.focus(); }),
+        amount === "otro" ? customField : null),
+      state.br ? h("section", { class: "panel-card" }, h("h2", {}, "3. ¿A cuáles?"),
+        choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["brasil", "Solo a los de Brasil"]], scope, (v) => { scope = v; paint(); })) : null);
+    const n = percent();
+    const valid = n > 0 && n <= (direction > 0 ? 100 : 50);
+    const list = sample();
+    examples.replaceChildren(
+      h("h2", {}, "Así quedan algunos"),
+      !valid ? h("p", { class: "panel-muted" }, "Elegí cuánto, arriba.")
+        : list.length ? h("ul", {}, list.map((item) => h("li", {}, h("span", {}, item.name),
+          h("span", {}, h("s", { class: "panel-muted" }, money(item.price)), " → ", h("strong", {}, money(after(item.price)))))))
+          : h("p", { class: "panel-muted" }, "Todavía no hay productos con precio."),
+      h("p", { class: "panel-muted" }, "Se redondea a los $100. También cambian el precio por mayor y las ofertas."));
+    apply.textContent = valid ? `${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios` : "Elegí cuánto";
+    apply.disabled = !valid;
+  }
+  custom.addEventListener("input", () => { const keep = document.activeElement === custom; paint(); if (keep) custom.focus(); });
+
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
-    const v = value();
-    if (!Number.isFinite(v) || v === 0) return toast("Escribí el porcentaje, por ejemplo 10.", "error");
-    const what = [own.checked ? "tus productos" : null, br?.checked ? "los modelos de Brasil" : null].filter(Boolean).join(" y ");
-    if (!what) return toast("Elegí a qué productos cambiarles el precio.", "error");
-    if (!confirm(`¿${v > 0 ? "Subir" : "Bajar"} ${Math.abs(v)}% los precios de ${what}?`)) return;
+    const n = percent();
+    const what = { todos: "todos tus productos", propios: "tus productos", brasil: "los modelos de Brasil" }[state.br ? scope : "propios"];
+    if (!confirm(`¿${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios de ${what}?`)) return;
     const done = await busy(apply, async () => {
-      await api("/precios", { method: "POST", body: { percent: v, own: own.checked, br: br?.checked === true } });
+      await api("/precios", { method: "POST", body: {
+        percent: direction * n,
+        own: !state.br || scope !== "brasil",
+        br: Boolean(state.br) && scope !== "propios",
+      } });
       await loadData();
       return true;
     });
     if (done) {
-      toast(`Listo: precios ${v > 0 ? "subidos" : "bajados"} ${Math.abs(v)}%.`);
+      toast(`Listo: precios ${direction > 0 ? "subidos" : "bajados"} ${n}%.`);
       location.hash = "#productos";
     }
   } },
     h("div", { class: "panel-editor__head" },
       h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, "← Volver"),
       h("h1", {}, "Cambiar precios")),
-    h("section", { class: "panel-card" },
-      h("p", { class: "panel-muted" }, "Sube o baja todos los precios de una vez, en porcentaje. También el precio por mayor y el precio anterior de las ofertas."),
-      h("div", { class: "panel-two" }, field("pc-direction", "¿Subir o bajar?", direction), field("pc-percent", "Porcentaje (%)", percent)),
-      preview),
-    h("section", { class: "panel-card" }, h("h2", {}, "¿A qué productos?"),
-      h("label", { class: "panel-switch", for: "pc-own" }, own, h("span", {}, "Mis productos")),
-      br ? h("label", { class: "panel-switch", for: "pc-br" }, br, h("span", {}, "Modelos de Brasil"),
-        h("small", { class: "panel-muted" }, "Los que tienen el precio de tu lista y los que tienen tu precio.")) : null),
+    h("p", { class: "panel-muted panel-intro" }, "Cambiá todos los precios de una vez, por ejemplo cuando aumenta todo."),
+    steps,
+    h("section", { class: "panel-card" }, examples),
     h("div", { class: "panel-savebar" }, apply));
   root.replaceChildren(form);
+  paint();
   window.scrollTo(0, 0);
 }
 
@@ -384,6 +413,63 @@ function renderQuickStock(product, box, badge) {
     })));
 }
 
+const roundPrice = (n) => Math.max(100, Math.round(n / 100) * 100);
+const OFFER_PERCENTS = [10, 20, 30];
+
+/**
+ * Recuadro "Oferta": un interruptor y el descuento con botones (10%, 20%, 30% u otro precio).
+ * Muestra cómo queda en la tienda. getNormal: el precio normal (el que está escrito arriba).
+ * En la tienda se guarda como precio = el de oferta y "antes" = el normal (se ve tachado).
+ */
+function offerBox(prefix, getNormal, initial = {}) {
+  let on = Boolean(initial.on);
+  let mode = 20;
+  const custom = h("input", { id: `${prefix}-offer-price`, class: "panel-input", inputmode: "numeric", placeholder: "Ej: 12000" });
+  if (on && initial.sale && getNormal()) {
+    const percent = Math.round((1 - initial.sale / getNormal()) * 100);
+    if (OFFER_PERCENTS.includes(percent) && roundPrice(getNormal() * (1 - percent / 100)) === initial.sale) mode = percent;
+    else { mode = "otro"; custom.value = initial.sale; }
+  }
+  const toggle = h("input", { id: `${prefix}-offer`, type: "checkbox", checked: on });
+  const chips = h("div", { class: "panel-offer__chips", role: "group", "aria-label": "Descuento" });
+  const customField = field(`${prefix}-offer-price`, "Precio de oferta", custom);
+  const preview = h("div", { class: "panel-offer__preview", role: "status" });
+  const body = h("div", { class: "panel-offer__body" }, chips, customField, preview);
+  const sale = () => (mode === "otro" ? Number(custom.value.replace(/\D/g, "")) || 0 : roundPrice(getNormal() * (1 - mode / 100)));
+
+  function paint() {
+    body.hidden = !on;
+    customField.hidden = mode !== "otro";
+    chips.replaceChildren(...[...OFFER_PERCENTS.map((n) => [n, `${n}% menos`]), ["otro", "Otro precio"]].map(([value, label]) =>
+      h("button", { type: "button", class: "panel-chip", "aria-pressed": String(mode === value),
+        onclick: () => { mode = value; paint(); if (value === "otro") custom.focus(); } }, label)));
+    const normal = getNormal();
+    const now = sale();
+    if (!normal) preview.replaceChildren(h("p", { class: "panel-error" }, "Primero escribí el precio normal, arriba."));
+    else if (!now || now >= normal) preview.replaceChildren(h("p", { class: "panel-error" }, `El precio de oferta tiene que ser menor que ${money(normal)}.`));
+    else preview.replaceChildren(h("span", { class: "panel-muted" }, "Así se ve en tu tienda: "),
+      h("strong", {}, money(now)), " ", h("s", { class: "panel-muted" }, money(normal)), " ", h("span", { class: "panel-offer__tag" }, "OFERTA"));
+  }
+  toggle.addEventListener("change", () => { on = toggle.checked; paint(); });
+  custom.addEventListener("input", paint);
+  paint();
+  return {
+    node: h("section", { class: "panel-card" }, h("h2", {}, "Oferta"),
+      h("label", { class: "panel-switch", for: `${prefix}-offer` }, toggle, h("span", {}, "Poner en oferta"),
+        h("small", { class: "panel-muted" }, "En la tienda se ve el precio rebajado, el de antes tachado y el cartel “Oferta”.")),
+      body),
+    refresh: paint,
+    /** { on, sale, normal }. Si está prendida pero el precio no sirve, avisa con un error. */
+    read: () => ({ on, sale: sale(), normal: getNormal() }),
+    check() {
+      if (!on) return;
+      const { sale: now, normal } = this.read();
+      if (!normal) throw new Error("Para la oferta, primero escribí el precio normal.");
+      if (!now || now >= normal) throw new Error(`El precio de oferta tiene que ser menor que ${money(normal)}.`);
+    },
+  };
+}
+
 /** Etiquetas chicas en la lista: destacado y oferta. */
 function tagsFor(product) {
   const tags = [product.featured ? "★ Destacado" : null, product.compareAt ? "Oferta" : null].filter(Boolean);
@@ -391,22 +477,19 @@ function tagsFor(product) {
 }
 
 /**
- * Opcionales de un producto (propio o de Brasil): descripción, precio anterior (oferta) y
- * destacado. Devuelve los elementos para el formulario y cómo leer lo cargado.
+ * Opcionales de un producto (propio o de Brasil): descripción y destacado. Devuelve los elementos para el formulario y cómo leer lo cargado.
  */
 function extraFields(prefix, draft) {
   const description = h("textarea", { id: `${prefix}-description`, class: "panel-input panel-textarea", maxlength: 500, rows: 3,
     placeholder: "Ej: Algodón peinado. Calce amplio, si dudás pedí un talle menos." }, draft.description ?? "");
-  const compareAt = h("input", { id: `${prefix}-compare`, class: "panel-input", inputmode: "numeric", value: draft.compareAt ?? "", placeholder: "Opcional" });
   const featured = h("input", { id: `${prefix}-featured`, type: "checkbox", checked: draft.featured === true });
   return {
     nodes: [
       field(`${prefix}-description`, "Descripción (opcional)", description, "Material, medidas, cómo calza… Se ve al abrir el producto."),
-      field(`${prefix}-compare`, "Precio anterior (opcional)", compareAt, "Para mostrar una oferta: se ve tachado al lado del precio, con el cartel “Oferta”."),
       h("label", { class: "panel-switch", for: `${prefix}-featured` }, featured, h("span", {}, "Destacado"),
         h("small", { class: "panel-muted" }, "Sale primero en su categoría.")),
     ],
-    read: () => ({ description: description.value, compareAt: compareAt.value.replace(/\D/g, ""), featured: featured.checked }),
+    read: () => ({ description: description.value, featured: featured.checked }),
   };
 }
 
@@ -506,7 +589,7 @@ function brItemView(product, refresh) {
         h("strong", {}, product.name),
         h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
         h("span", {}, unit ? money(unit) : "Sin precio",
-          h("small", { class: "panel-muted" }, product.price ? " · tu precio" : " · precio de tu lista")),
+          h("small", { class: "panel-muted" }, product.compareAt ? " · en oferta" : product.price ? " · tu precio" : " · precio de tu lista")),
         stockLine,
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Oculto: no se ve en tu tienda") : null,
         tagsFor(product)),
@@ -556,12 +639,16 @@ function brBody(product, changes = {}) {
 function renderBrEditor(product) {
   const draft = structuredClone(product);
   const list = listPrice(product);
-  const price = h("input", { id: "b-price", class: "panel-input", inputmode: "numeric", value: draft.price ?? "",
+  // En oferta, arriba va el precio normal (vacío si es el de la lista) y el de oferta en su recuadro.
+  const normalValue = draft.compareAt ? (draft.compareAt === list.unit ? "" : draft.compareAt) : draft.price;
+  const price = h("input", { id: "b-price", class: "panel-input", inputmode: "numeric", value: normalValue ?? "",
     placeholder: list.unit ? `${list.unit}` : "Ej: 60000" });
   const wholesale = h("input", { id: "b-wholesale", class: "panel-input", inputmode: "numeric", value: draft.wholesalePrice ?? "",
     placeholder: list.wholesale ? `${list.wholesale}` : "Opcional" });
   const visible = h("input", { id: "b-visible", type: "checkbox", checked: !draft.hidden });
   const extras = extraFields("b", draft);
+  const offer = offerBox("b", () => Number(price.value.replace(/\D/g, "")) || list.unit || 0, { on: Boolean(draft.compareAt), sale: draft.compareAt ? draft.price : null });
+  price.addEventListener("input", () => offer.refresh());
   // Si la tienda no vende por mayor, no se pide precio por mayor.
   const sellsWholesale = state.settings.name ? state.settings.wholesale === true : state.listPricing?.hasWholesale !== false;
   const sizesBox = h("div", { class: "panel-sizes" });
@@ -600,12 +687,15 @@ function renderBrEditor(product) {
   });
   const form = h("form", { class: "panel-editor", onsubmit: (event) => {
     event.preventDefault();
+    try { offer.check(); } catch (e) { return toast(e.message, "error"); }
+    const deal = offer.read();
     const sizes = draft.sizes.filter((s) => s.size);
     save({
       id: product.id,
       price: price.value.replace(/\D/g, ""), wholesalePrice: wholesale.value.replace(/\D/g, ""), hidden: !visible.checked,
       extra: sizes.filter((s) => s.casa > 0).map((s) => ({ size: s.size, stock: s.casa })),
       ...extras.read(),
+      ...(deal.on ? { price: deal.sale, compareAt: deal.normal } : { compareAt: "" }),
     }, "Cambios guardados.");
   } },
     h("div", { class: "panel-editor__head" },
@@ -622,7 +712,8 @@ function renderBrEditor(product) {
         sellsWholesale ? field("b-wholesale", "Precio por mayor", wholesale, list.wholesale ? `Vacío = el de tu lista (${money(list.wholesale)}).` : "Opcional.") : null),
       h("label", { class: "panel-switch", for: "b-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
-    h("section", { class: "panel-card" }, h("h2", {}, "Opcional"), ...extras.nodes),
+    offer.node,
+    h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles"),
       h("p", { class: "panel-muted" }, "“De Brasil” se actualiza solo. En “En tu casa” sumá los pares que tenés vos: en la tienda se ven todos juntos."),
       sizesBox,
@@ -639,7 +730,7 @@ function renderBrEditor(product) {
   root.replaceChildren(form);
   renderSizes();
   window.scrollTo(0, 0);
-  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read()]);
+  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read(), offer.read()]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -712,7 +803,9 @@ function renderEditor(product) {
   const newCategoryField = field("f-new-category", "Nombre de la categoría nueva", newCategory);
   const syncCategory = () => { newCategoryField.hidden = categorySelect.value !== NEW; };
   categorySelect.addEventListener("change", syncCategory);
-  const price = h("input", { id: "f-price", class: "panel-input", inputmode: "numeric", required: true, value: draft.price ?? "", placeholder: "Ej: 25000" });
+  // En oferta, arriba va el precio normal (el que se ve tachado) y el de oferta en su recuadro.
+  const price = h("input", { id: "f-price", class: "panel-input", inputmode: "numeric", required: true,
+    value: (draft.compareAt || draft.price) ?? "", placeholder: "Ej: 25000" });
   const wholesale = h("input", { id: "f-wholesale", class: "panel-input", inputmode: "numeric", value: draft.wholesalePrice ?? "", placeholder: "Opcional" });
   const min = state.settings.wholesaleMin || 5;
   const wholesaleHelp = state.settings.wholesale === false
@@ -720,6 +813,8 @@ function renderEditor(product) {
     : `Opcional. Se aplica llevando ${min} o más productos surtidos.`;
   const visible = h("input", { id: "f-visible", type: "checkbox", checked: !draft.hidden });
   const extras = extraFields("f", draft);
+  const offer = offerBox("f", () => Number(price.value.replace(/\D/g, "")) || 0, { on: Boolean(draft.compareAt), sale: draft.compareAt ? draft.price : null });
+  price.addEventListener("input", () => offer.refresh());
 
   // Talles
   const sizesBox = h("div", { class: "panel-sizes" });
@@ -756,6 +851,8 @@ function renderEditor(product) {
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
     if (uploading) return toast("Esperá a que terminen de subir las fotos.", "error");
+    try { offer.check(); } catch (e) { return toast(e.message, "error"); }
+    const deal = offer.read();
     const category = categorySelect.value === NEW ? newCategory.value : categorySelect.value;
     const body = {
       id: product?.id,
@@ -766,6 +863,8 @@ function renderEditor(product) {
       images: draft.images,
       hidden: !visible.checked,
       ...extras.read(),
+      // En oferta: se cobra el de oferta y el normal se muestra tachado.
+      ...(deal.on ? { price: deal.sale, compareAt: deal.normal } : { compareAt: "" }),
     };
     const saved = await busy(saveButton, async () => {
       await api("/productos", { method: "POST", body });
@@ -787,11 +886,12 @@ function renderEditor(product) {
       field("f-name", "Nombre", name),
       field("f-category", "Categoría", categorySelect), newCategoryField,
       h("div", { class: "panel-two" },
-        field("f-price", "Precio", price),
+        field("f-price", "Precio", price, "El precio normal. Para rebajarlo, usá “Oferta”, más abajo."),
         field("f-wholesale", "Precio por mayor", wholesale, wholesaleHelp)),
       h("label", { class: "panel-switch", for: "f-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para pausarlo sin borrarlo."))),
-    h("section", { class: "panel-card" }, h("h2", {}, "Opcional"), ...extras.nodes),
+    offer.node,
+    h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles y cantidades"),
       h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
         h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, "+ Otro talle")),
@@ -806,7 +906,7 @@ function renderEditor(product) {
   window.scrollTo(0, 0);
   // Si sale sin guardar, se le pregunta (ver route).
   const snapshot = () => JSON.stringify([name.value, categorySelect.value, newCategory.value, price.value, wholesale.value,
-    visible.checked, draft.sizes, draft.images, uploading, extras.read()]);
+    visible.checked, draft.sizes, draft.images, uploading, extras.read(), offer.read()]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -1073,8 +1173,9 @@ function renderHelp() {
     ["El mismo modelo en otro color", "Tocá “Más” → “Copiar”. Se crea una copia pausada con las mismas fotos y talles: cambiale el nombre, las fotos y las cantidades, y tildá “Se ve en la tienda”."],
     ["Pausar sin borrar", "“Más” → “Pausar” lo esconde de la tienda (por ejemplo, mientras esperás mercadería). Con “Mostrar” vuelve a aparecer."],
     ["Orden de la tienda", "Por defecto, las categorías y los productos van de la A a la Z. En “Categorías” → “Orden de tu tienda” podés elegir otro orden: lo último que cargás primero, del más barato al más caro, o el que vos armes (con las flechas en Categorías y con “Más” → “Subir / Bajar” en Productos)."],
-    ["Subir todos los precios", "En “Productos” tocá “Cambiar precios”, escribí el porcentaje (por ejemplo 10) y tocá “Aplicar”. Se redondean a los $100."],
-    ["Ofertas y destacados", "Al editar un producto, en “Opcional”: con “Precio anterior” se ve tachado con el cartel “Oferta”; con “Destacado” sale primero en su categoría. También podés escribir una descripción."],
+    ["Subir o bajar todos los precios", "En “Productos” tocá “Cambiar precios”: elegí subir o bajar, cuánto (5%, 10%…) y mirá cómo quedan antes de aplicar."],
+    ["Poner algo en oferta", "Tocá “Editar” en el producto, prendé “Poner en oferta” y elegí el descuento (10%, 20%, 30% u otro precio). En la tienda se ve el precio rebajado, el de antes tachado y el cartel “Oferta”. Para sacarla, apagá “Poner en oferta”."],
+    ["Destacados y descripción", "Al editar un producto, en “Más opciones”: con “Destacado” sale primero en su categoría, y podés escribir una descripción."],
     ["Tu tienda", "En “Mi tienda” cambiás el nombre, el logo, tu WhatsApp, tus redes, los textos de la portada, el aviso de arriba de la tienda, el color y la venta por mayor. También tu clave."],
     ["Los pedidos", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
   ];

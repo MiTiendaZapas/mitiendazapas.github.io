@@ -225,3 +225,22 @@
 
 /* "Mis pares" sin pares todavía: gris en vez de verde */
 .panel-stock.is-none { background: var(--color-surface-2); color: var(--color-text-muted); }
+
+/* Recuadro "Oferta" */
+.panel-offer__body { display: grid; gap: var(--space-3); }
+.panel-offer__body[hidden] { display: none; }
+.panel-offer__chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.panel-offer__chips .panel-chip { min-height: 44px; padding: 0 16px; font-size: 15px; }
+.panel-offer__preview { padding: 12px; border-radius: var(--radius-control); background: var(--color-surface-2); font-size: 16px; line-height: 1.6; }
+.panel-offer__preview p { margin: 0; }
+.panel-offer__tag { padding: 2px 8px; border-radius: 999px; background: var(--color-danger); color: #fff; font-size: 12px; font-weight: 700; }
+
+/* Cambiar precios: pasos con botones grandes y ejemplos */
+.panel-pc { display: grid; gap: var(--space-3); }
+.panel-pc__choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.panel-pc__choices .panel-chip { min-height: 48px; padding: 0 18px; font-size: 16px; }
+.panel-pc__examples h2 { margin: 0 0 var(--space-2); }
+.panel-pc__examples ul { display: grid; gap: 6px; margin: 0 0 var(--space-2); padding: 0; list-style: none; }
+.panel-pc__examples li { display: flex; justify-content: space-between; gap: var(--space-3); padding: 10px 12px; border-radius: var(--radius-control); background: var(--color-surface-2); font-size: 15px; }
+.panel-pc__examples li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-pc__examples li > span:last-child { flex: none; }
