@@ -35,11 +35,11 @@ const COLORS = [
   { value: "#c2410c", label: "Naranja" }, { value: "#0f766e", label: "Turquesa" },
 ];
 const TABS = [
-  { id: "inicio", label: "Inicio" },
-  { id: "productos", label: "Productos" },
-  { id: "categorias", label: "Categorías" },
-  { id: "tienda", label: "Mi tienda" },
-  { id: "ayuda", label: "Ayuda" },
+  { id: "inicio", label: "Inicio", icon: "home" },
+  { id: "productos", label: "Productos", icon: "bag" },
+  { id: "categorias", label: "Categorías", icon: "tag" },
+  { id: "tienda", label: "Mi tienda", icon: "store" },
+  { id: "ayuda", label: "Ayuda", icon: "help" },
 ];
 
 const state = {
@@ -67,6 +67,36 @@ function h(tag, attrs = {}, ...children) {
   }
   return el;
 }
+
+/** Ícono (los mismos dibujos de la tienda) como elemento, para usar dentro de h(). */
+function ico(name, cls = "") {
+  const box = document.createElement("span");
+  box.innerHTML = icon(name, `panel-ico ${cls}`);
+  return box.firstElementChild;
+}
+const withCaret = (text) => [text, ico("chevronDown", "panel-caret")];
+
+/**
+ * Pregunta propia (en vez del cartel del navegador, que dice "mitiendastock.com dice").
+ * Devuelve true si toca el botón de aceptar.
+ */
+function ask(message, { ok = "Sí", cancel = "Cancelar", danger = false } = {}) {
+  return new Promise((resolve) => {
+    const finish = (value) => { dialog.close(); dialog.remove(); resolve(value); };
+    const dialog = h("dialog", { class: "panel-ask", "aria-label": message },
+      h("div", { class: "panel-card" },
+        h("p", { class: "panel-ask__text" }, message),
+        h("div", { class: "panel-ask__actions" },
+          h("button", { class: "btn btn--outline btn--lg", type: "button", onclick: () => finish(false) }, cancel),
+          h("button", { class: `btn btn--lg ${danger ? "panel-btn--danger" : "btn--primary"}`, type: "button", onclick: () => finish(true) }, ok))));
+    dialog.addEventListener("cancel", (event) => { event.preventDefault(); finish(false); });
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+}
+
+/** Una vibración cortita (solo en los celulares que lo permiten), al cambiar el stock. */
+const buzz = () => { try { navigator.vibrate?.(12); } catch { /* sin vibración */ } };
 
 function toast(text, kind = "ok") {
   const item = h("p", { class: `panel-toast__item panel-toast__item--${kind}` }, text);
@@ -186,7 +216,7 @@ async function shareStore() {
 }
 const shareButton = (cls = "btn btn--outline btn--sm") => h("button", { class: cls, type: "button", onclick: shareStore }, "Compartir mi tienda");
 const viewLink = (product, cls = "btn btn--ghost btn--sm") =>
-  h("a", { class: cls, href: productLink(product), target: "_blank", rel: "noopener" }, "Ver en la tienda ↗");
+  h("a", { class: cls, href: productLink(product), target: "_blank", rel: "noopener" }, "Ver en la tienda", ico("external"));
 const totalStock = (product) => product.sizes.reduce((sum, s) => sum + s.stock, 0);
 const categoryName = (id) => (Object.hasOwn(state.categories, id) ? state.categories[id] : id);
 const field = (id, label, input, help) => h("div", { class: "panel-field" },
@@ -227,7 +257,8 @@ function renderTop({ loggedIn }) {
         loggedIn ? h("a", { class: "btn btn--outline btn--sm", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda") : null,
         loggedIn ? h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: logout }, "Salir") : null)),
     ...(loggedIn && !editing ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
-      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id ? "page" : null }, t.label)))] : []));
+      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id ? "page" : null },
+        ico(t.icon), h("span", {}, t.label))))] : []));
 }
 
 // --- ingreso ---------------------------------------------------------------------
@@ -346,7 +377,7 @@ function renderPriceChange() {
     event.preventDefault();
     const n = percent();
     const what = { todos: "todos tus productos", propios: "tus productos", brasil: "los modelos de Brasil" }[state.br ? scope : "propios"];
-    if (!confirm(`¿${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios de ${what}?`)) return;
+    if (!await ask(`¿${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios de ${what}?`, { ok: direction > 0 ? "Sí, subir" : "Sí, bajar" })) return;
     const done = await busy(apply, async () => {
       await api("/precios", { method: "POST", body: {
         percent: direction * n,
@@ -362,7 +393,7 @@ function renderPriceChange() {
     }
   } },
     h("div", { class: "panel-editor__head" },
-      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, "← Volver"),
+      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, ico("chevronLeft"), "Volver"),
       h("h1", {}, "Cambiar precios")),
     h("p", { class: "panel-muted panel-intro" }, "Cambiá todos los precios de una vez, por ejemplo cuando aumenta todo."),
     steps,
@@ -397,7 +428,9 @@ function renderOwnProducts() {
     const canOrder = state.settings.productOrder === "manual" && state.filter === "todos" && !term;
     list.replaceChildren(...(shown.length
       ? shown.map((p) => itemView(p, canOrder, renderAll))
-      : [h("li", { class: "panel-empty" }, state.products.length ? "No hay productos con ese filtro." : "Todavía no cargaste productos. Tocá “Nuevo producto” para empezar.")]));
+      : [state.products.length
+        ? emptyState("search", "No hay productos con ese filtro.", "Ver todos", () => { state.filter = "todos"; state.search = ""; renderProducts(); })
+        : emptyState("bag", "Todavía no cargaste productos propios.", "+ Cargar el primero", () => openEditor(null))]));
   }
   function renderAll() { renderChips(); renderItems(); }
 
@@ -407,7 +440,7 @@ function renderOwnProducts() {
       pricesButton(),
       h("span", { class: "panel-muted" }, `${state.products.length} de ${state.limits.products} productos`)),
     // En el celular, "Nuevo producto" también queda abajo a la derecha, cerca del dedo.
-    full ? null : h("button", { class: "panel-fab", type: "button", "aria-label": "Nuevo producto", onclick: () => openEditor(null) }, "+"),
+    full ? null : h("button", { class: "panel-fab", type: "button", "aria-label": "Nuevo producto", onclick: () => openEditor(null) }, ico("plus")),
     h("input", { class: "panel-input", type: "search", placeholder: "Buscar producto", value: state.search, "aria-label": "Buscar producto",
       oninput: (e) => { state.search = e.target.value; renderItems(); } }),
     chips, list);
@@ -430,7 +463,7 @@ function itemView(product, canOrder, refresh) {
       stockBox.hidden = !open;
       badge.setAttribute("aria-expanded", String(open));
       if (open) renderQuickStock(product, stockBox, badge);
-    } }, total === 0 ? "Sin stock ▾" : `Stock: ${total} ▾`);
+    } }, ...withCaret(total === 0 ? "Sin stock" : `Stock: ${total}`));
 
   const move = (delta) => async (event) => busy(event.currentTarget, async () => {
     const list = [...state.products];
@@ -468,10 +501,10 @@ function itemView(product, canOrder, refresh) {
         h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => openEditor(product) }, "Editar"),
         h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: togglePause }, product.hidden ? "Mostrar" : "Pausar"),
         h("details", { class: "panel-more" },
-          h("summary", { class: "btn btn--ghost btn--sm", "aria-label": `Más opciones de ${product.name}` }, "Más ▾"),
+          h("summary", { class: "btn btn--ghost btn--sm", "aria-label": `Más opciones de ${product.name}` }, ...withCaret("Más")),
           h("div", { class: "panel-more__menu" },
             h("button", { type: "button", onclick: copy }, "Copiar (otro color)"),
-            h("a", { href: productLink(product), target: "_blank", rel: "noopener" }, "Ver en la tienda ↗"),
+            h("a", { href: productLink(product), target: "_blank", rel: "noopener" }, "Ver en la tienda", ico("external")),
             canOrder && neighbor(-1) ? h("button", { type: "button", onclick: move(-1) }, "Subir un lugar") : null,
             canOrder && neighbor(1) ? h("button", { type: "button", onclick: move(1) }, "Bajar un lugar") : null)))),
     stockBox);
@@ -486,16 +519,17 @@ function renderQuickStock(product, box, badge) {
         const { stock } = await api("/stock", { method: "POST", body: { id: product.id, size: s.size, delta } });
         s.stock = stock;
         value.textContent = stock;
+        buzz();
         const total = totalStock(product);
-        badge.textContent = total === 0 ? "Sin stock ▾" : `Stock: ${total} ▾`;
+        badge.replaceChildren(...withCaret(total === 0 ? "Sin stock" : `Stock: ${total}`));
         badge.classList.toggle("is-empty", total === 0);
       });
       return h("div", { class: "panel-quick__size" },
         h("span", { class: "panel-quick__label" }, h("strong", {}, `Talle ${s.size}`)),
         h("div", { class: "panel-stepper" },
-          h("button", { type: "button", "aria-label": `Restar uno al talle ${s.size}`, onclick: change(-1) }, "−"),
+          h("button", { type: "button", "aria-label": `Restar uno al talle ${s.size}`, onclick: change(-1) }, ico("minus")),
           value,
-          h("button", { type: "button", "aria-label": `Sumar uno al talle ${s.size}`, onclick: change(1) }, "+")));
+          h("button", { type: "button", "aria-label": `Sumar uno al talle ${s.size}`, onclick: change(1) }, ico("plus"))));
     })));
 }
 
@@ -563,10 +597,19 @@ function priceLine(price, compareAt, note) {
     note ? h("small", { class: "panel-muted" }, note) : null);
 }
 
+/** Lista vacía: un dibujo, qué pasa y un botón para seguir. */
+function emptyState(iconName, text, action, onAction) {
+  return h("li", { class: "panel-empty" }, ico(iconName, "panel-empty__icon"), h("p", {}, text),
+    action ? h("button", { class: "btn btn--outline", type: "button", onclick: onAction }, action) : null);
+}
+
 /** Etiquetas chicas en la lista: destacado y oferta. */
 function tagsFor(product) {
-  const tags = [product.featured ? "★ Destacado" : null, product.compareAt ? "Oferta" : null].filter(Boolean);
-  return tags.length ? h("span", { class: "panel-tags" }, tags.map((tag) => h("span", { class: "panel-tag" }, tag))) : null;
+  const tags = [
+    product.featured ? h("span", { class: "panel-tag" }, ico("star"), "Destacado") : null,
+    product.compareAt ? h("span", { class: "panel-tag panel-tag--offer" }, "Oferta") : null,
+  ].filter(Boolean);
+  return tags.length ? h("span", { class: "panel-tags" }, tags) : null;
 }
 
 /**
@@ -632,7 +675,7 @@ function renderBrProducts() {
     const shown = products.filter((p) => matchesBrFilter(p) && (!term || `${p.name} ${p.brand ?? ""}`.toLowerCase().includes(term)));
     list.replaceChildren(...(shown.length
       ? shown.map((p) => brItemView(p, () => { renderChips(); renderItems(); }))
-      : [h("li", { class: "panel-empty" }, "No hay modelos con ese filtro.")]));
+      : [emptyState("search", "No hay modelos con ese filtro.", "Ver todos", () => { state.brFilter = "todos"; state.brSearch = ""; renderProducts(); })]));
   }
 
   root.replaceChildren(
@@ -670,7 +713,7 @@ function brItemView(product, refresh) {
   const paintPairs = () => {
     const mine = brTotal(product, "casa");
     stockLine.textContent = stockText(mine);
-    pairsButton.textContent = mine ? `Mis pares: ${mine} ▾` : "Mis pares ▾";
+    pairsButton.replaceChildren(...withCaret(mine ? `Mis pares: ${mine}` : "Mis pares"));
     pairsButton.classList.toggle("is-none", !mine);
   };
   // "Mis pares": sumar o restar al toque los pares que el cliente tiene en su casa.
@@ -681,7 +724,7 @@ function brItemView(product, refresh) {
       quick.hidden = !open;
       pairsButton.setAttribute("aria-expanded", String(open));
       if (open) renderQuickPairs(product, quick, paintPairs);
-    } }, own ? `Mis pares: ${own} ▾` : "Mis pares ▾");
+    } }, ...withCaret(own ? `Mis pares: ${own}` : "Mis pares"));
   return h("li", { class: `panel-item${product.hidden ? " is-paused" : ""}` },
     h("div", { class: "panel-item__row" },
       h("div", { class: "panel-thumb" }, thumb),
@@ -713,15 +756,16 @@ function renderQuickPairs(product, box, onChange) {
         s.casa = next;
         s.stock = s.br + s.casa;
         value.textContent = next;
+        buzz();
         onChange();
       });
       return h("div", { class: "panel-quick__size" },
         h("span", { class: "panel-quick__label" }, h("strong", {}, `Talle ${s.size}`),
           h("small", { class: "panel-muted" }, s.br ? `En Brasil: ${s.br}` : "Brasil no tiene")),
         h("div", { class: "panel-stepper" },
-          h("button", { type: "button", "aria-label": `Restar un par tuyo del talle ${s.size}`, onclick: change(-1) }, "−"),
+          h("button", { type: "button", "aria-label": `Restar un par tuyo del talle ${s.size}`, onclick: change(-1) }, ico("minus")),
           value,
-          h("button", { type: "button", "aria-label": `Sumar un par tuyo al talle ${s.size}`, onclick: change(1) }, "+")));
+          h("button", { type: "button", "aria-label": `Sumar un par tuyo al talle ${s.size}`, onclick: change(1) }, ico("plus"))));
     })));
 }
 
@@ -769,11 +813,11 @@ function renderBrEditor(product) {
             : h("strong", {}, s.size),
           h("span", { class: "panel-muted" }, s.br ? `${s.br}` : "—"),
           h("div", { class: "panel-stepper" },
-            h("button", { type: "button", "aria-label": `Restar uno al talle ${s.size}`, onclick: () => set(s.casa - 1) }, "−"),
+            h("button", { type: "button", "aria-label": `Restar uno al talle ${s.size}`, onclick: () => set(s.casa - 1) }, ico("minus")),
             value,
-            h("button", { type: "button", "aria-label": `Sumar uno al talle ${s.size}`, onclick: () => set(s.casa + 1) }, "+")),
+            h("button", { type: "button", "aria-label": `Sumar uno al talle ${s.size}`, onclick: () => set(s.casa + 1) }, ico("plus"))),
           removable ? h("button", { type: "button", class: "panel-size-row__remove", "aria-label": `Quitar talle ${s.size}`,
-            onclick: () => { draft.sizes.splice(i, 1); renderSizes(); } }, "×") : h("span", {}));
+            onclick: () => { draft.sizes.splice(i, 1); renderSizes(); } }, ico("close")) : h("span", {}));
       }));
   }
 
@@ -799,7 +843,7 @@ function renderBrEditor(product) {
     }, "Cambios guardados.");
   } },
     h("div", { class: "panel-editor__head" },
-      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, "← Volver"),
+      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, ico("chevronLeft"), "Volver"),
       h("h1", {}, product.name),
       product.hidden ? null : viewLink(product)),
     h("section", { class: "panel-card panel-br-head" },
@@ -823,8 +867,8 @@ function renderBrEditor(product) {
         renderSizes();
         sizesBox.querySelector(".panel-br-row:last-child input")?.focus();
       } }, "+ Otro talle")),
-    brChanged(product) ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: () => {
-      if (confirm("¿Volver este modelo a lo automático? Se borran tu precio y tus pares de este modelo.")) save({ id: product.id }, "El modelo volvió a lo automático.");
+    brChanged(product) ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: async () => {
+      if (await ask("¿Volver este modelo a lo automático? Se borran tu precio y tus pares de este modelo.", { ok: "Sí, volver", danger: true })) save({ id: product.id }, "El modelo volvió a lo automático.");
     } }, "Volver todo a lo automático") : null,
     h("div", { class: "panel-savebar" }, saveButton));
 
@@ -865,10 +909,10 @@ function renderEditor(product) {
       h("img", { src: storeUrl(img.sm), alt: `Foto ${i + 1}` }),
       i === 0 ? h("span", { class: "panel-photo__tag" }, "Portada") : null,
       h("button", { type: "button", class: "panel-photo__btn", "aria-label": `Quitar foto ${i + 1}`,
-        onclick: () => { draft.images.splice(i, 1); renderPhotos(); } }, "×"),
+        onclick: () => { draft.images.splice(i, 1); renderPhotos(); } }, ico("close")),
       h("div", { class: "panel-photo__move" },
-        i > 0 ? h("button", { type: "button", "aria-label": `Mover foto ${i + 1} a la izquierda`, onclick: () => movePhoto(i, -1) }, "←") : null,
-        i < last ? h("button", { type: "button", "aria-label": `Mover foto ${i + 1} a la derecha`, onclick: () => movePhoto(i, 1) }, "→") : null)));
+        i > 0 ? h("button", { type: "button", "aria-label": `Mover foto ${i + 1} a la izquierda`, onclick: () => movePhoto(i, -1) }, ico("chevronLeft")) : null,
+        i < last ? h("button", { type: "button", "aria-label": `Mover foto ${i + 1} a la derecha`, onclick: () => movePhoto(i, 1) }, ico("chevronRight")) : null)));
     const canAdd = draft.images.length + uploading < state.limits.imagesPerProduct;
     const loading = [...progress.values()].map((percent) => h("div", { class: "panel-photo panel-photo--loading" },
       h("span", {}, percent < 100 ? `Subiendo… ${percent}%` : "Guardando…"),
@@ -954,10 +998,10 @@ function renderEditor(product) {
         return h("div", { class: "panel-size-row" },
           h("input", { class: "panel-input panel-size-row__name", value: s.size, maxlength: 12, "aria-label": "Talle", placeholder: "Talle", oninput: (e) => { s.size = e.target.value; } }),
           h("div", { class: "panel-stepper" },
-            h("button", { type: "button", "aria-label": "Restar uno", onclick: () => set(s.stock - 1) }, "−"),
+            h("button", { type: "button", "aria-label": "Restar uno", onclick: () => set(s.stock - 1) }, ico("minus")),
             value,
-            h("button", { type: "button", "aria-label": "Sumar uno", onclick: () => set(s.stock + 1) }, "+")),
-          h("button", { type: "button", class: "panel-size-row__remove", "aria-label": `Quitar talle ${s.size}`, onclick: () => { draft.sizes.splice(i, 1); renderSizes(); } }, "×"));
+            h("button", { type: "button", "aria-label": "Sumar uno", onclick: () => set(s.stock + 1) }, ico("plus"))),
+          h("button", { type: "button", class: "panel-size-row__remove", "aria-label": `Quitar talle ${s.size}`, onclick: () => { draft.sizes.splice(i, 1); renderSizes(); } }, ico("close")));
       }),
       ...(draft.sizes.length ? [] : [h("p", { class: "panel-muted" }, "Agregá los talles que tenés y cuántas unidades de cada uno.")]));
   }
@@ -965,11 +1009,11 @@ function renderEditor(product) {
    * Botones de talles: dejan EXACTAMENTE esos talles (en su orden). Los que siguen
    * conservan su cantidad; si se va a sacar alguno que tiene unidades, se pregunta antes.
    */
-  const usePreset = (sizes) => {
+  const usePreset = async (sizes) => {
     const key = (size) => size.trim().toLowerCase();
     const wanted = new Set(sizes.map(key));
     const losing = draft.sizes.filter((s) => s.size.trim() && !wanted.has(key(s.size)) && s.stock > 0);
-    if (losing.length && !confirm(`Se van a sacar los talles ${losing.map((s) => s.size).join(", ")}, que tienen unidades cargadas. ¿Seguir?`)) return;
+    if (losing.length && !await ask(`Se van a sacar los talles ${losing.map((s) => s.size).join(", ")}, que tienen unidades cargadas. ¿Seguir?`, { ok: "Sí, sacarlos", danger: true })) return;
     const kept = new Map(draft.sizes.filter((s) => wanted.has(key(s.size))).map((s) => [key(s.size), s.stock]));
     draft.sizes = sizes.map((size) => ({ size, stock: kept.get(key(size)) ?? 0 }));
     renderSizes();
@@ -1015,7 +1059,7 @@ function renderEditor(product) {
     }
   } },
     h("div", { class: "panel-editor__head" },
-      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, "← Volver"),
+      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, ico("chevronLeft"), "Volver"),
       h("h1", {}, product ? "Editar producto" : "Nuevo producto"),
       product && !product.hidden ? viewLink(product) : null),
     h("section", { class: "panel-card" }, h("h2", {}, "Fotos"), photosHelp, photos),
@@ -1050,7 +1094,7 @@ function renderEditor(product) {
 }
 
 async function removeProduct(product) {
-  if (!confirm(`¿Borrar "${product.name}"? Se borran también sus fotos. No se puede deshacer.`)) return;
+  if (!await ask(`¿Borrar "${product.name}"? Se borran también sus fotos. No se puede deshacer.`, { ok: "Sí, borrar", danger: true })) return;
   const done = await busy(null, async () => {
     await api(`/productos/${encodeURIComponent(product.id)}`, { method: "DELETE" });
     await loadData();
@@ -1135,16 +1179,16 @@ function renderCategories() {
           onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } } }),
         h("span", { class: "panel-muted panel-cat__count" }, count === 1 ? "1 producto" : `${count} productos`),
         h("div", { class: "panel-cat__actions" },
-          h("button", { type: "button", "aria-label": "Subir", disabled: !manual() || i === 0 || !row.id, onclick: () => move(i, -1) }, "↑"),
-          h("button", { type: "button", "aria-label": "Bajar", disabled: !manual() || i === rows.length - 1 || !row.id, onclick: () => move(i, 1) }, "↓"),
+          h("button", { type: "button", "aria-label": "Subir", disabled: !manual() || i === 0 || !row.id, onclick: () => move(i, -1) }, ico("arrowUp")),
+          h("button", { type: "button", "aria-label": "Bajar", disabled: !manual() || i === rows.length - 1 || !row.id, onclick: () => move(i, 1) }, ico("arrowDown")),
           h("button", { type: "button", "aria-label": `Borrar ${row.label}`, disabled: count > 0, title: count > 0 ? "Tiene productos: cambiales la categoría antes de borrarla" : null,
-            onclick: () => {
+            onclick: async () => {
               if (!row.id) { rows.splice(i, 1); return renderRows(); }
-              if (!confirm(`¿Borrar la categoría "${row.label}"?`)) return;
+              if (!await ask(`¿Borrar la categoría "${row.label}"?`, { ok: "Sí, borrar", danger: true })) return;
               rows.splice(i, 1);
               renderRows();
               saveCategories("Categoría borrada.");
-            } }, "×")));
+            } }, ico("trash"))));
     }), ...(rows.length ? [] : [h("p", { class: "panel-muted" }, "Todavía no tenés categorías. Agregá la primera.")]));
   }
 
@@ -1509,9 +1553,12 @@ window.addEventListener("beforeunload", (event) => {
 
 function route() {
   if (!state.store) return;
-  if (location.hash !== currentHash && state.guard?.()
-    && !confirm("Tenés cambios sin guardar. ¿Salir igual? Se van a perder.")) {
-    history.replaceState(null, "", currentHash || "#productos");
+  if (location.hash !== currentHash && state.guard?.()) {
+    // Se queda donde estaba y pregunta; si dice que sí, recién ahí se va.
+    const target = location.hash || "#inicio";
+    history.replaceState(null, "", currentHash || "#inicio");
+    ask("Tenés cambios sin guardar. ¿Salir igual? Se van a perder.", { ok: "Salir sin guardar", cancel: "Seguir editando", danger: true })
+      .then((leave) => { if (leave) { state.guard = null; location.hash = target; } });
     return;
   }
   state.guard = null;
@@ -1546,7 +1593,10 @@ function route() {
 }
 
 async function start() {
-  root.replaceChildren(h("p", { class: "panel-muted panel-loading" }, "Cargando…"));
+  // Mientras carga: la forma del panel en gris (se entiende que está cargando, sin saltos).
+  root.replaceChildren(h("div", { class: "panel-skeleton", "aria-busy": "true", "aria-label": "Cargando tu panel" },
+    ...[1, 2, 3, 4].map(() => h("div", { class: "panel-skeleton__item" },
+      h("span", { class: "panel-skeleton__thumb" }), h("span", { class: "panel-skeleton__lines" }, h("span", {}), h("span", {}))))));
   let session;
   try {
     session = await api("/yo");
