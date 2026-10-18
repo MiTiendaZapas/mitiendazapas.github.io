@@ -108,7 +108,7 @@
 .panel-savebar .btn { width: 100%; max-width: 728px; }
 
 /* Avisos */
-.panel-toast { position: fixed; top: 72px; left: 50%; z-index: 20; display: grid; gap: 8px; width: min(92vw, 420px); transform: translateX(-50%); pointer-events: none; }
+.panel-toast { position: fixed; bottom: calc(88px + env(safe-area-inset-bottom)); left: 50%; z-index: 30; display: grid; gap: 8px; width: min(92vw, 420px); transform: translateX(-50%); pointer-events: none; }
 .panel-toast__item { padding: 12px 16px; border-radius: var(--radius-control); background: var(--color-text); color: var(--color-bg); font-size: 14px; font-weight: 600; box-shadow: var(--shadow-raised); }
 .panel-toast__item--error { background: var(--color-danger); color: #fff; }
 
@@ -244,3 +244,69 @@
 .panel-pc__examples li { display: flex; justify-content: space-between; gap: var(--space-3); padding: 10px 12px; border-radius: var(--radius-control); background: var(--color-surface-2); font-size: 15px; }
 .panel-pc__examples li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-pc__examples li > span:last-child { flex: none; }
+
+/* --- Revisión de uso en celular (18/10) --- */
+/* Error al lado del campo */
+.panel-field__error { margin: 0; color: var(--color-danger); font-size: 14px; font-weight: 600; }
+.panel-input[aria-invalid="true"] { border-color: var(--color-danger); }
+
+/* Ventanita para volver a ingresar sin perder lo cargado */
+.panel-relogin { width: min(92vw, 420px); padding: 0; border: 0; border-radius: var(--radius-card); background: transparent; color: var(--color-text); }
+.panel-relogin::backdrop { background: rgb(0 0 0 / 0.55); }
+.panel-relogin h2 { margin: 0; }
+
+/* Arriba más chico: el título en un renglón y, al editar, sin pestañas */
+.panel-top__inner { padding-block: 6px; }
+.panel-top.is-editing { position: static; }
+
+/* Los filtros siguen hacia el costado: el borde se desvanece para que se note */
+.panel-chips { mask-image: linear-gradient(to right, #000 85%, transparent); -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); padding-right: 24px; }
+
+/* "Más": también tiene enlaces (Ver en la tienda) */
+.panel-more__menu a { display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; color: var(--color-text); font-size: 14px; text-decoration: none; }
+.panel-more__menu a:hover { background: var(--color-surface-2); }
+
+/* Botón "+" abajo a la derecha (solo celular) */
+.panel-fab {
+  position: fixed; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 15;
+  width: 60px; height: 60px; border: 0; border-radius: 50%; background: var(--color-text); color: var(--color-bg);
+  font-size: 32px; line-height: 1; box-shadow: 0 6px 20px rgb(0 0 0 / 0.3); cursor: pointer;
+}
+@media (min-width: 700px) { .panel-fab { display: none; } }
+.panel-main[data-section="productos"] { padding-bottom: 96px; }
+
+/* Explicación con "Entendido" */
+.panel-intro-box { display: grid; gap: var(--space-2); justify-items: start; padding: 12px; border-radius: var(--radius-control); background: var(--color-surface-2); }
+
+/* Inicio */
+.panel-home h1 { margin: 0; }
+.panel-home__link { margin: 0; overflow-wrap: anywhere; }
+.panel-home__actions, .panel-home__quick { display: flex; flex-wrap: wrap; gap: 8px; }
+.panel-home__actions .btn, .panel-home__quick .btn { min-height: 48px; }
+.panel-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 700px) { .panel-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.panel-tile {
+  display: grid; gap: 2px; justify-items: start; min-height: 76px; padding: 12px; border: 1px solid var(--color-border);
+  border-radius: var(--radius-control); background: var(--color-surface); color: var(--color-text); font: inherit; text-align: left; cursor: pointer;
+}
+.panel-tile strong { font-size: 26px; line-height: 1.1; }
+.panel-tile span { color: var(--color-text-muted); font-size: 14px; }
+.panel-tile.is-warn { border-color: var(--color-danger); }
+.panel-tile.is-warn strong { color: var(--color-danger); }
+
+/* Computadora: las listas en dos columnas, con más ancho; los formularios siguen angostos */
+@media (min-width: 1100px) {
+  .panel-main[data-section="productos"], .panel-main[data-section="inicio"] { max-width: 1120px; }
+  .panel-main[data-section="productos"] .panel-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .panel-main[data-section="productos"] .panel-list > .panel-empty { grid-column: 1 / -1; }
+}
+
+/* Botones de cada producto: cada uno en un renglón (la flechita ▾ no baja sola); si no entran, pasan abajo */
+.panel-item__actions { flex-wrap: wrap; }
+.panel-item__actions > *, .panel-item__actions summary { white-space: nowrap; }
+.panel-item__actions .btn--sm, .panel-item__actions summary { padding-inline: 10px; }
+/* En dos columnas (computadora) los botones van abajo, así el nombre se lee entero */
+@media (min-width: 1100px) {
+  .panel-main[data-section="productos"] .panel-item__row { grid-template-columns: 64px minmax(0, 1fr); }
+  .panel-main[data-section="productos"] .panel-item__actions { grid-column: 1 / -1; }
+}

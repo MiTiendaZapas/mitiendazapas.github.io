@@ -35,6 +35,7 @@ const COLORS = [
   { value: "#c2410c", label: "Naranja" }, { value: "#0f766e", label: "Turquesa" },
 ];
 const TABS = [
+  { id: "inicio", label: "Inicio" },
   { id: "productos", label: "Productos" },
   { id: "categorias", label: "Categorías" },
   { id: "tienda", label: "Mi tienda" },
@@ -46,7 +47,8 @@ const state = {
   limits: { imagesPerProduct: 6, products: 150 }, search: "", filter: "todos",
   // Stock de Brasil (solo algunas tiendas): modelos, precios de la lista y qué se está mirando.
   br: null, listPricing: null, view: "br", brSearch: "", brFilter: "todos",
-  guard: null,   // cambios sin guardar en la pantalla abierta (ver route)
+  guard: null,
+  listScroll: {},   // dónde estaba en cada lista, para volver ahí después de editar   // cambios sin guardar en la pantalla abierta (ver route)
 };
 
 // --- piezas chicas ---------------------------------------------------------------
@@ -87,17 +89,56 @@ async function api(path, { method = "GET", body, form } = {}) {
   }
   const data = await response.json().catch(() => ({}));
   if (response.status === 401 && path !== "/ingresar") {
-    // Al abrir el panel sin haber ingresado no es un error: solo se pide ingresar.
-    showLogin(state.store ? "Tu sesión terminó. Ingresá de nuevo." : "");
-    throw new Error("Tenés que ingresar de nuevo.");
+    sessionEnded();
+    throw new Error("Tu sesión terminó. Ingresá de nuevo y volvé a tocar Guardar.");
   }
   if (!response.ok) throw new Error(data.error || "Hubo un problema. Probá de nuevo.");
   return data;
 }
 
-/** Botón que se desactiva mientras trabaja y muestra el error si falla. */
+/**
+ * Sesión vencida. Si hay algo sin guardar en pantalla, se pide la clave en una ventanita
+ * encima (así no se pierde lo cargado); si no, se muestra la pantalla de ingreso.
+ */
+function sessionEnded() {
+  if (!state.store) return showLogin("");
+  if (!state.guard?.()) return showLogin("Tu sesión terminó. Ingresá de nuevo.");
+  if (document.querySelector(".panel-relogin")) return;
+  const user = h("input", { id: "re-usuario", class: "panel-input", autocomplete: "username", autocapitalize: "none", value: state.usuario ?? "", required: true });
+  const pass = h("input", { id: "re-clave", class: "panel-input", type: "password", autocomplete: "current-password", required: true });
+  const error = h("p", { class: "panel-error", role: "alert" });
+  const button = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Ingresar");
+  const dialog = h("dialog", { class: "panel-relogin" },
+    h("form", { class: "panel-card", onsubmit: async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      error.textContent = "";
+      try {
+        await api("/ingresar", { method: "POST", body: { usuario: user.value, clave: pass.value } });
+        dialog.close();
+        dialog.remove();
+        toast("Listo, ingresaste de nuevo. Tocá Guardar.");
+      } catch (e) {
+        error.textContent = e.message;
+        button.disabled = false;
+      }
+    } },
+      h("h2", {}, "Tu sesión terminó"),
+      h("p", { class: "panel-muted" }, "Ingresá de nuevo. Lo que estabas cargando no se pierde."),
+      field("re-usuario", "Usuario", user), field("re-clave", "Clave", pass), error, button));
+  document.body.append(dialog);
+  dialog.showModal();
+  pass.focus();
+}
+
+/**
+ * Botón que se desactiva mientras trabaja y muestra el error si falla.
+ * Los botones grandes (Guardar, Aplicar…) dicen "Guardando…" mientras tanto.
+ */
 async function busy(button, task) {
+  const label = button && (button.type === "submit" || button.classList.contains("btn--lg")) ? button.textContent : null;
   if (button) button.disabled = true;
+  if (label) button.textContent = "Guardando…";
   try {
     return await task();
   } catch (e) {
@@ -105,10 +146,47 @@ async function busy(button, task) {
     return undefined;
   } finally {
     if (button) button.disabled = false;
+    if (label) button.textContent = label;
   }
 }
 
+/** Error al lado del campo (y lo muestra en pantalla). Sin mensaje, lo borra. */
+function fieldError(input, message) {
+  const box = input.closest(".panel-field") ?? input.parentElement;
+  let note = box.querySelector(".panel-field__error");
+  if (!message) { note?.remove(); input.removeAttribute("aria-invalid"); return; }
+  if (!note) { note = h("p", { class: "panel-field__error", role: "alert" }); box.append(note); }
+  note.textContent = message;
+  input.setAttribute("aria-invalid", "true");
+  input.scrollIntoView({ block: "center", behavior: "smooth" });
+  input.focus({ preventScroll: true });
+}
+
 const storeUrl = (path) => `/api/tienda/${encodeURIComponent(state.store)}/${path}`;
+// Link público de la tienda (el panel está en /<tienda>/panel/).
+const storeLink = () => new URL("../", location.href).href;
+const productLink = (product) => `${storeLink()}#p/${encodeURIComponent(product.slug)}`;
+
+/**
+ * Compartir la tienda: en el celular abre el menú de compartir (WhatsApp, Instagram…);
+ * en la computadora copia el link.
+ */
+async function shareStore() {
+  const name = state.settings.name || config.name || "mi tienda";
+  const text = `¡Mirá ${name}! Elegí lo que te guste y pedilo por WhatsApp:`;
+  if (navigator.share) {
+    try { await navigator.share({ title: name, text, url: storeLink() }); return; } catch (e) { if (e?.name === "AbortError") return; }
+  }
+  try {
+    await navigator.clipboard.writeText(storeLink());
+    toast("Link copiado. Pegalo donde quieras compartirlo.");
+  } catch {
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${storeLink()}`)}`, "_blank", "noopener");
+  }
+}
+const shareButton = (cls = "btn btn--outline btn--sm") => h("button", { class: cls, type: "button", onclick: shareStore }, "Compartir mi tienda");
+const viewLink = (product, cls = "btn btn--ghost btn--sm") =>
+  h("a", { class: cls, href: productLink(product), target: "_blank", rel: "noopener" }, "Ver en la tienda ↗");
 const totalStock = (product) => product.sizes.reduce((sum, s) => sum + s.stock, 0);
 const categoryName = (id) => (Object.hasOwn(state.categories, id) ? state.categories[id] : id);
 const field = (id, label, input, help) => h("div", { class: "panel-field" },
@@ -132,8 +210,13 @@ function themeButton() {
   return button;
 }
 
+const EDIT_SCREENS = ["editar", "nuevo", "br", "precios"];
+
 function renderTop({ loggedIn }) {
-  const current = (location.hash.slice(1).split("/")[0]) || "productos";
+  const current = (location.hash.slice(1).split("/")[0]) || "inicio";
+  const editing = EDIT_SCREENS.includes(current);
+  top.classList.toggle("is-editing", loggedIn && editing);
+  root.dataset.section = current;
   top.replaceChildren(
     h("div", { class: "panel-top__inner" },
       h("div", { class: "panel-top__title" },
@@ -143,8 +226,8 @@ function renderTop({ loggedIn }) {
         themeButton(),
         loggedIn ? h("a", { class: "btn btn--outline btn--sm", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda") : null,
         loggedIn ? h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: logout }, "Salir") : null)),
-    ...(loggedIn ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
-      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id || (t.id === "productos" && ["editar", "nuevo", "br", "precios"].includes(current)) ? "page" : null }, t.label)))] : []));
+    ...(loggedIn && !editing ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
+      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id ? "page" : null }, t.label)))] : []));
 }
 
 // --- ingreso ---------------------------------------------------------------------
@@ -323,6 +406,8 @@ function renderOwnProducts() {
       h("button", { class: "btn btn--primary", type: "button", disabled: full, onclick: () => openEditor(null) }, "+ Nuevo producto"),
       pricesButton(),
       h("span", { class: "panel-muted" }, `${state.products.length} de ${state.limits.products} productos`)),
+    // En el celular, "Nuevo producto" también queda abajo a la derecha, cerca del dedo.
+    full ? null : h("button", { class: "panel-fab", type: "button", "aria-label": "Nuevo producto", onclick: () => openEditor(null) }, "+"),
     h("input", { class: "panel-input", type: "search", placeholder: "Buscar producto", value: state.search, "aria-label": "Buscar producto",
       oninput: (e) => { state.search = e.target.value; renderItems(); } }),
     chips, list);
@@ -345,7 +430,7 @@ function itemView(product, canOrder, refresh) {
       stockBox.hidden = !open;
       badge.setAttribute("aria-expanded", String(open));
       if (open) renderQuickStock(product, stockBox, badge);
-    } }, total === 0 ? "Sin stock" : `${total} en stock`);
+    } }, total === 0 ? "Sin stock ▾" : `Stock: ${total} ▾`);
 
   const move = (delta) => async (event) => busy(event.currentTarget, async () => {
     const list = [...state.products];
@@ -375,17 +460,18 @@ function itemView(product, canOrder, refresh) {
       h("div", { class: "panel-item__info" },
         h("strong", {}, product.name),
         h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
-        h("span", {}, money(product.price), product.wholesalePrice ? h("small", { class: "panel-muted" }, ` · por mayor ${money(product.wholesalePrice)}`) : null),
+        priceLine(product.price, product.compareAt, product.wholesalePrice ? ` · por mayor ${money(product.wholesalePrice)}` : null),
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Pausado: no se ve en la tienda") : null,
         tagsFor(product)),
       h("div", { class: "panel-item__actions" },
         badge,
         h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => openEditor(product) }, "Editar"),
+        h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: togglePause }, product.hidden ? "Mostrar" : "Pausar"),
         h("details", { class: "panel-more" },
-          h("summary", { class: "btn btn--ghost btn--sm", "aria-label": `Más opciones de ${product.name}` }, "Más"),
+          h("summary", { class: "btn btn--ghost btn--sm", "aria-label": `Más opciones de ${product.name}` }, "Más ▾"),
           h("div", { class: "panel-more__menu" },
-            h("button", { type: "button", onclick: togglePause }, product.hidden ? "Mostrar en la tienda" : "Pausar (ocultar)"),
             h("button", { type: "button", onclick: copy }, "Copiar (otro color)"),
+            h("a", { href: productLink(product), target: "_blank", rel: "noopener" }, "Ver en la tienda ↗"),
             canOrder && neighbor(-1) ? h("button", { type: "button", onclick: move(-1) }, "Subir un lugar") : null,
             canOrder && neighbor(1) ? h("button", { type: "button", onclick: move(1) }, "Bajar un lugar") : null)))),
     stockBox);
@@ -401,7 +487,7 @@ function renderQuickStock(product, box, badge) {
         s.stock = stock;
         value.textContent = stock;
         const total = totalStock(product);
-        badge.textContent = total === 0 ? "Sin stock" : `${total} en stock`;
+        badge.textContent = total === 0 ? "Sin stock ▾" : `Stock: ${total} ▾`;
         badge.classList.toggle("is-empty", total === 0);
       });
       return h("div", { class: "panel-quick__size" },
@@ -470,6 +556,13 @@ function offerBox(prefix, getNormal, initial = {}) {
   };
 }
 
+/** Precio en la lista: en oferta, con el de antes tachado (como en la tienda). */
+function priceLine(price, compareAt, note) {
+  return h("span", {}, price ? money(price) : "Sin precio",
+    compareAt ? [" ", h("s", { class: "panel-muted" }, money(compareAt))] : null,
+    note ? h("small", { class: "panel-muted" }, note) : null);
+}
+
 /** Etiquetas chicas en la lista: destacado y oferta. */
 function tagsFor(product) {
   const tags = [product.featured ? "★ Destacado" : null, product.compareAt ? "Oferta" : null].filter(Boolean);
@@ -511,6 +604,11 @@ function matchesBrFilter(p) {
   return true;
 }
 
+// "Entendido" en la explicación del stock de Brasil: se recuerda en ese celular.
+const INTRO_KEY = "panel:intro-brasil";
+function seenIntro() { try { return localStorage.getItem(INTRO_KEY) === "1"; } catch { return false; } }
+function rememberIntro() { try { localStorage.setItem(INTRO_KEY, "1"); } catch { /* sin memoria: se vuelve a mostrar */ } }
+
 function renderBrProducts() {
   const products = [...state.br.products].sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
   const list = h("ul", { class: "panel-list" });
@@ -539,8 +637,10 @@ function renderBrProducts() {
 
   root.replaceChildren(
     h("div", { class: "panel-toolbar" }, pricesButton()),
-    h("p", { class: "panel-muted panel-intro" },
-      "Estos modelos y su stock llegan solos y se actualizan solos. Tocá “Editar” en uno para ponerle tu precio, ocultarlo o sumar los pares que tenés en tu casa."),
+    seenIntro() ? null : h("div", { class: "panel-intro-box" },
+      h("p", { class: "panel-muted panel-intro" },
+        "Estos modelos y su stock llegan solos y se actualizan solos. Tocá “Editar” en uno para ponerle tu precio, ocultarlo o sumar los pares que tenés en tu casa."),
+      h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: (e) => { rememberIntro(); e.currentTarget.parentElement.remove(); } }, "Entendido")),
     h("input", { class: "panel-input", type: "search", placeholder: "Buscar modelo", value: state.brSearch, "aria-label": "Buscar modelo",
       oninput: (e) => { state.brSearch = e.target.value; renderItems(); } }),
     chips, list);
@@ -570,7 +670,7 @@ function brItemView(product, refresh) {
   const paintPairs = () => {
     const mine = brTotal(product, "casa");
     stockLine.textContent = stockText(mine);
-    pairsButton.textContent = mine ? `Mis pares: ${mine}` : "Mis pares";
+    pairsButton.textContent = mine ? `Mis pares: ${mine} ▾` : "Mis pares ▾";
     pairsButton.classList.toggle("is-none", !mine);
   };
   // "Mis pares": sumar o restar al toque los pares que el cliente tiene en su casa.
@@ -581,15 +681,14 @@ function brItemView(product, refresh) {
       quick.hidden = !open;
       pairsButton.setAttribute("aria-expanded", String(open));
       if (open) renderQuickPairs(product, quick, paintPairs);
-    } }, own ? `Mis pares: ${own}` : "Mis pares");
+    } }, own ? `Mis pares: ${own} ▾` : "Mis pares ▾");
   return h("li", { class: `panel-item${product.hidden ? " is-paused" : ""}` },
     h("div", { class: "panel-item__row" },
       h("div", { class: "panel-thumb" }, thumb),
       h("div", { class: "panel-item__info" },
         h("strong", {}, product.name),
         h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
-        h("span", {}, unit ? money(unit) : "Sin precio",
-          h("small", { class: "panel-muted" }, product.compareAt ? " · en oferta" : product.price ? " · tu precio" : " · precio de tu lista")),
+        priceLine(unit, product.compareAt, product.compareAt ? null : product.price ? " · tu precio" : " · precio de tu lista"),
         stockLine,
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Oculto: no se ve en tu tienda") : null,
         tagsFor(product)),
@@ -700,7 +799,8 @@ function renderBrEditor(product) {
   } },
     h("div", { class: "panel-editor__head" },
       h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, "← Volver"),
-      h("h1", {}, product.name)),
+      h("h1", {}, product.name),
+      product.hidden ? null : viewLink(product)),
     h("section", { class: "panel-card panel-br-head" },
       product.images[0] ? h("img", { src: product.images[0].sm || product.images[0].lg, alt: "", width: 96, height: 120 }) : null,
       h("div", {},
@@ -743,7 +843,7 @@ function openEditor(product) {
 function renderEditor(product) {
   const draft = product
     ? { ...structuredClone(product), sizes: sortSizes(product.sizes) }
-    : { name: "", brand: "", category: Object.keys(state.categories)[0] ?? "", price: "", wholesalePrice: "", sizes: [], images: [], hidden: false };
+    : { name: "", brand: "", category: "", price: "", wholesalePrice: "", sizes: [], images: [], hidden: false };
   let uploading = 0;
   const progress = new Map();   // foto que se está subiendo -> porcentaje
 
@@ -794,17 +894,19 @@ function renderEditor(product) {
   }
 
   // Datos
-  const name = h("input", { id: "f-name", class: "panel-input", maxlength: 80, required: true, value: draft.name });
+  const name = h("input", { id: "f-name", class: "panel-input", maxlength: 80, value: draft.name });
   const NEW = "__nueva__";
   const categorySelect = h("select", { id: "f-category", class: "panel-input" },
+    // Producto nuevo: hay que elegir la categoría (antes venía la primera y era fácil equivocarse).
+    draft.category ? null : h("option", { value: "", selected: true, disabled: true }, "Elegí una categoría"),
     Object.entries(state.categories).map(([id, label]) => h("option", { value: id, selected: id === draft.category }, label)),
-    h("option", { value: NEW, selected: Object.keys(state.categories).length === 0 }, "+ Nueva categoría…"));
+    h("option", { value: NEW }, "+ Nueva categoría…"));
   const newCategory = h("input", { id: "f-new-category", class: "panel-input", maxlength: 30, placeholder: "Ej: Remeras, Zapatillas, Buzos" });
   const newCategoryField = field("f-new-category", "Nombre de la categoría nueva", newCategory);
   const syncCategory = () => { newCategoryField.hidden = categorySelect.value !== NEW; };
   categorySelect.addEventListener("change", syncCategory);
   // En oferta, arriba va el precio normal (el que se ve tachado) y el de oferta en su recuadro.
-  const price = h("input", { id: "f-price", class: "panel-input", inputmode: "numeric", required: true,
+  const price = h("input", { id: "f-price", class: "panel-input", inputmode: "numeric",
     value: (draft.compareAt || draft.price) ?? "", placeholder: "Ej: 25000" });
   const wholesale = h("input", { id: "f-wholesale", class: "panel-input", inputmode: "numeric", value: draft.wholesalePrice ?? "", placeholder: "Opcional" });
   const min = state.settings.wholesaleMin || 5;
@@ -851,6 +953,15 @@ function renderEditor(product) {
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
     if (uploading) return toast("Esperá a que terminen de subir las fotos.", "error");
+    for (const input of [name, categorySelect, newCategory, price]) fieldError(input, "");
+    if (!name.value.trim()) return fieldError(name, "Escribí el nombre del producto.");
+    if (!categorySelect.value) return fieldError(categorySelect, "Elegí en qué categoría va.");
+    if (categorySelect.value === NEW && !newCategory.value.trim()) return fieldError(newCategory, "Escribí el nombre de la categoría nueva.");
+    if (!price.value.replace(/\D/g, "")) return fieldError(price, "Escribí el precio.");
+    if (!draft.sizes.some((s) => s.size.trim())) {
+      sizesBox.scrollIntoView({ block: "center", behavior: "smooth" });
+      return toast("Agregá al menos un talle (por ejemplo, tocá “Talle único”).", "error");
+    }
     try { offer.check(); } catch (e) { return toast(e.message, "error"); }
     const deal = offer.read();
     const category = categorySelect.value === NEW ? newCategory.value : categorySelect.value;
@@ -879,7 +990,8 @@ function renderEditor(product) {
   } },
     h("div", { class: "panel-editor__head" },
       h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, "← Volver"),
-      h("h1", {}, product ? "Editar producto" : "Nuevo producto")),
+      h("h1", {}, product ? "Editar producto" : "Nuevo producto"),
+      product && !product.hidden ? viewLink(product) : null),
     h("section", { class: "panel-card" }, h("h2", {}, "Fotos"),
       h("p", { class: "panel-muted" }, `Hasta ${state.limits.imagesPerProduct}. La primera es la portada; con las flechas cambiás el orden.`), photos),
     h("section", { class: "panel-card" }, h("h2", {}, "Datos"),
@@ -1147,6 +1259,70 @@ function passwordCard() {
     button);
 }
 
+// --- inicio: resumen de la tienda y accesos rápidos -----------------------------------
+// Instalar el panel como aplicación (ícono en la pantalla del celular).
+let installPrompt = null;
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  if (root.dataset.section === "inicio") renderHome();
+});
+const installed = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+function renderHome() {
+  const own = state.products;
+  const br = state.br?.products ?? [];
+  const go = (view, filter) => () => {
+    state.view = view;
+    if (view === "propios") state.filter = filter ?? "todos";
+    else state.brFilter = filter ?? "todos";
+    state.listScroll[view] = 0;
+    location.hash = "#productos";
+  };
+  const tile = (count, label, onclick, warn = false) => h("button", { class: `panel-tile${warn && count ? " is-warn" : ""}`, type: "button", onclick },
+    h("strong", {}, String(count)), h("span", {}, label));
+  const tiles = [
+    tile(own.length, own.length === 1 ? "producto tuyo" : "productos tuyos", go("propios")),
+    tile(own.filter((p) => totalStock(p) === 0).length, "sin stock", go("propios", "sin-stock"), true),
+    tile(own.filter((p) => p.compareAt).length + br.filter((p) => p.compareAt).length, "en oferta", go(own.some((p) => p.compareAt) || !state.br ? "propios" : "br", own.some((p) => p.compareAt) || !state.br ? "todos" : "cambios")),
+    tile(own.filter((p) => p.hidden).length, "pausados", go("propios", "pausados")),
+    ...(state.br ? [
+      tile(br.length, "modelos de Brasil", go("br")),
+      tile(br.filter((p) => brTotal(p, "casa") > 0).length, "con pares tuyos", go("br", "casa")),
+    ] : []),
+  ];
+  const ios = /iphone|ipad/i.test(navigator.userAgent);
+  const installCard = installed() ? null : h("section", { class: "panel-card" },
+    h("h2", {}, "Tené el panel en tu celular"),
+    installPrompt
+      ? [h("p", { class: "panel-muted" }, "Instalalo y entrás directo desde un ícono, como una aplicación."),
+        h("button", { class: "btn btn--outline", type: "button", onclick: async () => {
+          installPrompt.prompt();
+          await installPrompt.userChoice.catch(() => null);
+          installPrompt = null;
+          renderHome();
+        } }, "Instalar el panel")]
+      : h("p", { class: "panel-muted" }, ios
+        ? "En Safari tocá el botón Compartir (el cuadrado con la flecha) y después “Agregar a inicio”. Te queda un ícono para entrar directo."
+        : "En el menú del navegador (los tres puntitos) tocá “Agregar a la pantalla de inicio” o “Instalar”. Te queda un ícono para entrar directo."));
+
+  root.replaceChildren(
+    h("section", { class: "panel-card panel-home" },
+      h("h1", {}, state.settings.name || config.name || "Tu tienda"),
+      h("p", { class: "panel-muted panel-home__link" }, storeLink()),
+      h("div", { class: "panel-home__actions" },
+        shareButton("btn btn--primary"),
+        h("a", { class: "btn btn--outline", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda"))),
+    h("section", { class: "panel-card" }, h("h2", {}, "Tu tienda hoy"), h("div", { class: "panel-tiles" }, tiles)),
+    h("section", { class: "panel-card" }, h("h2", {}, "Accesos rápidos"),
+      h("div", { class: "panel-home__quick" },
+        h("button", { class: "btn btn--outline", type: "button", onclick: () => { state.view = "propios"; openEditor(null); } }, "+ Nuevo producto"),
+        h("a", { class: "btn btn--outline", href: "#precios" }, "Cambiar precios"),
+        h("a", { class: "btn btn--outline", href: "#tienda" }, state.settings.notice ? "Cambiar el aviso" : "Poner un aviso"),
+        h("a", { class: "btn btn--outline", href: "#ayuda" }, "¿Cómo se usa?"))),
+    installCard);
+}
+
 // --- ayuda -------------------------------------------------------------------------
 /** Condiciones de uso de Mi Tienda Stock (las aprobó el dueño de la plataforma el 16/10/2026). */
 const TERMS = [
@@ -1177,6 +1353,8 @@ function renderHelp() {
     ["Poner algo en oferta", "Tocá “Editar” en el producto, prendé “Poner en oferta” y elegí el descuento (10%, 20%, 30% u otro precio). En la tienda se ve el precio rebajado, el de antes tachado y el cartel “Oferta”. Para sacarla, apagá “Poner en oferta”."],
     ["Destacados y descripción", "Al editar un producto, en “Más opciones”: con “Destacado” sale primero en su categoría, y podés escribir una descripción."],
     ["Tu tienda", "En “Mi tienda” cambiás el nombre, el logo, tu WhatsApp, tus redes, los textos de la portada, el aviso de arriba de la tienda, el color y la venta por mayor. También tu clave."],
+    ["Tenerlo como aplicación", "En “Inicio” está cómo instalar el panel en tu celular: te queda un ícono para entrar directo."],
+    ["Compartir tu tienda", "En “Inicio” tocá “Compartir mi tienda” y elegí WhatsApp, Instagram o donde quieras."],
     ["Los pedidos", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
   ];
   if (state.br) steps.unshift(
@@ -1305,6 +1483,8 @@ function route() {
     return;
   }
   state.guard = null;
+  const leaving = currentHash.slice(1).split("/")[0];
+  if (leaving === "productos") state.listScroll[state.view] = scrollY;
   currentHash = location.hash;
   const [section, id] = location.hash.slice(1).split("/");
   renderTop({ loggedIn: true });
@@ -1321,7 +1501,14 @@ function route() {
   if (section === "precios") return renderPriceChange();
   if (section === "tienda") return renderStoreSettings();
   if (section === "ayuda") return renderHelp();
-  renderProducts();
+  if (section === "productos") {
+    renderProducts();
+    // Volver a donde estaba en la lista (si venía de editar uno, por ejemplo).
+    const saved = state.listScroll?.[state.view];
+    if (saved) requestAnimationFrame(() => window.scrollTo(0, saved));
+    return;
+  }
+  renderHome();
 }
 
 async function start() {
