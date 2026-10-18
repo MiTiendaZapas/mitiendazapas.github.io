@@ -123,7 +123,9 @@ def unpushed_files(repo):
     """Archivos que cambian los commits guardados acá y todavía no subidos a GitHub
     (por ejemplo, de una vuelta anterior que no pudo subir). None si no se puede saber."""
     git("fetch", "origin", check=False, repo=repo)
-    diff = git("diff", "--name-only", "@{upstream}...HEAD", check=False, repo=repo)
+    # core.quotepath=false: sin esto git escribe los nombres con emojis o tildes entre comillas y con códigos (\"Fotos/Nike dunk \360\237...\"),
+    # y el piloto los tomaba por archivos ajenos a Fotos y dejaba de subir el stock de casa (pasó del 16 al 18/10).
+    diff = git("-c", "core.quotepath=false", "diff", "--name-only", "@{upstream}...HEAD", check=False, repo=repo)
     if diff.returncode != 0:
         return None
     return [line for line in diff.stdout.splitlines() if line.strip()]
