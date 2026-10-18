@@ -491,7 +491,7 @@ function renderQuickStock(product, box, badge) {
         badge.classList.toggle("is-empty", total === 0);
       });
       return h("div", { class: "panel-quick__size" },
-        h("span", { class: "panel-quick__label" }, `Talle ${s.size}`),
+        h("span", { class: "panel-quick__label" }, h("strong", {}, `Talle ${s.size}`)),
         h("div", { class: "panel-stepper" },
           h("button", { type: "button", "aria-label": `Restar uno al talle ${s.size}`, onclick: change(-1) }, "−"),
           value,
@@ -702,7 +702,7 @@ function brItemView(product, refresh) {
 /** Pares de casa al toque: + y − por talle, se guarda solo (como "vendí uno" en los productos propios). */
 function renderQuickPairs(product, box, onChange) {
   box.replaceChildren(
-    h("p", { class: "panel-muted" }, "Los pares que tenés vos. Sumá o restá: se guarda solo. Para un talle que Brasil no tiene, entrá a “Editar”."),
+    h("p", { class: "panel-muted" }, "Tus pares de cada talle. Tocá − cuando vendas uno y + cuando te llegue. Se guarda solo."),
     h("div", { class: "panel-quick__grid" }, product.sizes.map((s) => {
       const value = h("output", { class: "panel-quick__value" }, s.casa);
       const change = (delta) => (event) => busy(event.currentTarget, async () => {
@@ -716,7 +716,8 @@ function renderQuickPairs(product, box, onChange) {
         onChange();
       });
       return h("div", { class: "panel-quick__size" },
-        h("span", { class: "panel-quick__label" }, `Talle ${s.size}`, s.br ? h("small", { class: "panel-muted" }, ` · Brasil ${s.br}`) : null),
+        h("span", { class: "panel-quick__label" }, h("strong", {}, `Talle ${s.size}`),
+          h("small", { class: "panel-muted" }, s.br ? `En Brasil: ${s.br}` : "Brasil no tiene")),
         h("div", { class: "panel-stepper" },
           h("button", { type: "button", "aria-label": `Restar un par tuyo del talle ${s.size}`, onclick: change(-1) }, "−"),
           value,
@@ -1047,7 +1048,11 @@ function renderCategories() {
   const select = (id, options, value) => h("select", { id, class: "panel-input" },
     options.map((o) => h("option", { value: o.value, selected: o.value === value }, o.label)));
   const categoryOrder = select("o-categories", CATEGORY_ORDERS, state.settings.categoryOrder ?? "alfabetico");
-  const productOrder = select("o-products", PRODUCT_ORDERS, state.settings.productOrder ?? "alfabetico");
+  // Con stock de Brasil no va "en el orden que yo elijo": los modelos de Brasil no se pueden
+  // ordenar a mano y para poner algo primero está "Destacado".
+  const orders = state.br ? PRODUCT_ORDERS.filter((o) => o.value !== "manual") : PRODUCT_ORDERS;
+  const currentOrder = orders.some((o) => o.value === state.settings.productOrder) ? state.settings.productOrder : (state.br ? "marca" : "alfabetico");
+  const productOrder = select("o-products", orders, currentOrder);
   const manual = () => categoryOrder.value === "manual";
   // Cuántos productos usan cada categoría (los propios y, si hay, los de Brasil).
   const used = (id) => state.products.filter((p) => p.category === id).length
@@ -1125,7 +1130,7 @@ function renderCategories() {
       h("div", { class: "panel-two" },
         field("o-categories", "Categorías", categoryOrder),
         field("o-products", "Productos dentro de cada categoría", productOrder, state.br
-          ? "“En el orden que yo elijo” y “Lo último que cargo” valen para tus productos; los de Brasil quedan por marca y modelo."
+          ? "Para que un producto salga primero, marcalo como “Destacado” al editarlo."
           : "“En el orden que yo elijo”: en Productos → Más → Subir o Bajar."))),
     h("section", { class: "panel-card" },
       h("h2", {}, "Categorías"),
@@ -1471,6 +1476,8 @@ async function loadPriceTable() {
  * si hay algo sin guardar. Si se va a otra pestaña o cierra la página, se pregunta antes.
  */
 let currentHash = location.hash;
+// La posición de la pantalla la maneja el panel (si no, el celular la acomoda solo y salta).
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 window.addEventListener("beforeunload", (event) => {
   if (state.guard?.()) event.preventDefault();
 });
@@ -1487,6 +1494,8 @@ function route() {
   if (leaving === "productos") state.listScroll[state.view] = scrollY;
   currentHash = location.hash;
   const [section, id] = location.hash.slice(1).split("/");
+  // Cualquier pantalla que no sea la lista abre desde arriba, sin verse el salto.
+  if (section !== "productos") window.scrollTo({ top: 0, behavior: "instant" });
   renderTop({ loggedIn: true });
   if (section === "editar") {
     const product = state.products.find((p) => p.id === decodeURIComponent(id ?? ""));
@@ -1504,8 +1513,8 @@ function route() {
   if (section === "productos") {
     renderProducts();
     // Volver a donde estaba en la lista (si venía de editar uno, por ejemplo).
-    const saved = state.listScroll?.[state.view];
-    if (saved) requestAnimationFrame(() => window.scrollTo(0, saved));
+    // Enseguida, antes de que se vea: así no aparece arriba y después baja.
+    window.scrollTo({ top: state.listScroll?.[state.view] ?? 0, behavior: "instant" });
     return;
   }
   renderHome();
