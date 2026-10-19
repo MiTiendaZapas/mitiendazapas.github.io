@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-const { brModel, brProducts, changePrices, cleanBrChange, cleanupPhotos, cleanCategories, cleanProduct, publicMixedCatalog, storeCategories } = await import("../servidor/panel.js");
+const { brModel, brProducts, applyGroupOffers, changePrices, cleanBrChange, cleanupPhotos, cleanCategories, cleanProduct, publicMixedCatalog, storeCategories } = await import("../servidor/panel.js");
 const { createPricing } = await import("../motor/js/pricing.js");
 
 const brazil = {
@@ -154,5 +154,18 @@ describe("stock de Brasil", () => {
     // Precio por cantidad: 3 buzos del mismo modelo, cada uno a 26.000 (aunque no llegue al por mayor).
     assert.deepEqual(pricing.quote([line(buzo, 3)], "unidad").lines.map((l) => l.price), [26000]);
     assert.deepEqual(pricing.quote([line(buzo, 2)], "unidad").lines.map((l) => l.price), [30000]);
+  });
+
+  test("ofertas en grupo: pone y saca oferta a productos propios y modelos automáticos", () => {
+    const catalog = store({ products: [{ id: "m-1", name: "Remera", price: 20000, wholesalePrice: 17000, images: [], sizes: [] }], br: {} });
+    const brIds = new Set(["vp-1"]);
+    applyGroupOffers(catalog, brIds, [{ id: "m-1", price: 16000, compareAt: 20000 }, { id: "vp-1", price: 48000, compareAt: 60000 }, { id: "no-existe", price: 1 }]);
+    assert.deepEqual([catalog.products[0].price, catalog.products[0].compareAt, catalog.products[0].wholesalePrice], [16000, 20000, null]);
+    assert.deepEqual(catalog.br["vp-1"], { price: 48000, compareAt: 60000 });
+    // Sacar: el propio vuelve a su precio; el automático vuelve al general/base (sin precio propio).
+    applyGroupOffers(catalog, brIds, [{ id: "m-1", price: 20000, compareAt: null }, { id: "vp-1", price: null, compareAt: null }]);
+    assert.deepEqual([catalog.products[0].price, catalog.products[0].compareAt], [20000, null]);
+    assert.equal(catalog.br["vp-1"], undefined);
+    assert.throws(() => applyGroupOffers(catalog, brIds, [{ id: "m-1", price: 20000, compareAt: 15000 }]), /más alto/);
   });
 });

@@ -640,6 +640,41 @@ export function changePrices(catalog, settings, { percent, own, br }) {
   return count;
 }
 
+/**
+ * Ofertas en grupo (una categoría o varios productos): items = [{ id, price, compareAt }].
+ *   - producto propio: precio = el de oferta, compareAt = el de antes (sin compareAt = sin oferta);
+ *   - modelo del stock automático: price null = vuelve al precio general o base.
+ * Devuelve cuántos cambió.
+ */
+export const MAX_GROUP_ITEMS = 400;
+export function applyGroupOffers(catalog, brIds, items) {
+  if (!Array.isArray(items) || items.length === 0) throw new Error("No elegiste productos.");
+  if (items.length > MAX_GROUP_ITEMS) throw new Error(`Máximo ${MAX_GROUP_ITEMS} productos por vez.`);
+  let count = 0;
+  for (const item of items) {
+    const price = cleanPrice(item?.price, "el precio");
+    const compareAt = cleanPrice(item?.compareAt, "el precio de antes");
+    const own = catalog.products.find((p) => p.id === item?.id);
+    if (own) {
+      if (!price) throw new Error(`Falta el precio de "${own.name}".`);
+      if (compareAt && compareAt <= price) throw new Error(`En "${own.name}", el precio de antes tiene que ser más alto.`);
+      if (own.wholesalePrice && own.wholesalePrice >= price) own.wholesalePrice = null;   // un por mayor que ya no conviene
+      Object.assign(own, { price, compareAt: compareAt || null });
+      count += 1;
+    } else if (brIds.has(item?.id)) {
+      if (compareAt && price && compareAt <= price) throw new Error("El precio de antes tiene que ser más alto que el de oferta.");
+      const change = { ...(catalog.br?.[item.id] ?? {}) };
+      if (price) change.price = price; else delete change.price;
+      if (compareAt) change.compareAt = compareAt; else delete change.compareAt;
+      if (change.wholesalePrice && price && change.wholesalePrice >= price) delete change.wholesalePrice;
+      catalog.br = { ...(catalog.br ?? {}) };
+      if (Object.keys(change).length) catalog.br[item.id] = change; else delete catalog.br[item.id];
+      count += 1;
+    }
+  }
+  return count;
+}
+
 /** Fotos del depósito que ya no usa ningún producto (subidas y no guardadas): se borran después de un día. */
 export async function cleanupPhotos(env, store, data) {
   const used = new Set(data.products.flatMap((p) => p.images.flatMap((img) => [img.lg, img.sm])));
