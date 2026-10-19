@@ -1825,7 +1825,7 @@ function renderHome() {
         } }, "Instalar el panel")]
       : h("p", { class: "panel-muted" }, ios
         ? "En Safari tocá el botón Compartir (el cuadrado con la flecha) y después “Agregar a inicio”. Te queda un ícono para entrar directo."
-        : "En el menú del navegador (los tres puntitos) tocá “Agregar a la pantalla de inicio” o “Instalar”. Te queda un ícono para entrar directo."));
+        : "Abrí el panel en Google Chrome, tocá los tres puntitos de arriba y elegí “Agregar a la pantalla principal”. Te queda un ícono para entrar directo. (Con otros navegadores, el celular puede mostrar un aviso de seguridad: usá Chrome.)"));
 
   show(
     h("section", { class: "panel-card panel-home" },
@@ -1884,7 +1884,7 @@ function renderHelp() {
     ["Venta por mayor", "En “Productos” → “Por mayor” (o desde Inicio) la prendés, elegís desde cuántos productos y, si querés, otro mínimo para cada categoría."],
     ["Precio por cantidad", "Al editar un producto, en “Precio por cantidad”: por ejemplo “llevando 3 o más, $12.000 cada uno” de ese mismo producto."],
     ["Tu tienda", "En “Mi tienda” cambiás el nombre, el logo, tu WhatsApp, tus redes, los textos de la portada, el aviso de arriba de la tienda, el mensaje de los pedidos y el color. También tu clave."],
-    ["Tenerlo como aplicación", "En “Inicio” está cómo instalar el panel en tu celular: te queda un ícono para entrar directo."],
+    ["Tenerlo como aplicación", "Abrí el panel en Google Chrome → tres puntitos → “Agregar a la pantalla principal”. En iPhone: Safari → Compartir → “Agregar a inicio”."],
     ["Compartir tu tienda", "En “Inicio” tocá “Compartir mi tienda” y elegí WhatsApp, Instagram o donde quieras."],
     ["Los pedidos", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
   ];
