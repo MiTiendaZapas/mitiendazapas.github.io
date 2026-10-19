@@ -5,7 +5,7 @@
  * se coordinan en el chat.
  */
 import { escapeHtml, money, plural, readStorage, whatsappLink, writeStorage } from "../utils.js";
-import { buildOrderMessage, orderLink } from "../whatsapp.js";
+import { buildOrderMessage, isFootwear, orderLink } from "../whatsapp.js";
 import { icon } from "./icons.js";
 import { sizeLabel } from "./g5.js";
 import { socialLinksHtml } from "./social.js";
@@ -85,7 +85,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   // --- resumen (header + barra) ------------------------------------------------
   /** "3 pares" si son todos calzados; "3 productos" si hay indumentaria. */
   function itemsText(count) {
-    const onlyFootwear = !pricing.allProducts && cart.lines().every((line) => line.product.category !== "indumentaria");
+    const onlyFootwear = !pricing.allProducts && cart.lines().every((line) => isFootwear(line.product));
     return onlyFootwear ? plural(count, "par", "pares") : plural(count, "producto");
   }
 

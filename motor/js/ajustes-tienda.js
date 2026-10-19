@@ -26,6 +26,9 @@ export function applyStoreSettings(config, channel, settings) {
   if (settings.tagline) config.tagline = settings.tagline;
   config.logo = settings.logo ? { small: base + settings.logo.small, large: base + settings.logo.large, alt: settings.name } : null;
   if (settings.whatsapp) config.contact = { ...config.contact, whatsappQueries: settings.whatsapp, whatsappOrders: settings.whatsapp };
+  // Mensaje de los pedidos: el saludo y el texto al final que eligió el cliente.
+  if (settings.orderGreeting) config.orderGreeting = settings.orderGreeting;
+  if (settings.orderFooter) config.orderFooter = settings.orderFooter;
   config.social = Object.entries(NETWORKS)
     .filter(([network]) => settings[network])
     .map(([network, n]) => ({ network, label: n.label, handle: n.handle(settings[network]), url: n.url(settings[network]) }));

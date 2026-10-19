@@ -502,6 +502,10 @@ export function cleanSettings(input, current = {}) {
     logo,
     // Aviso arriba de la tienda (por ejemplo "Envío gratis este fin de semana").
     notice: cleanText(input?.notice, 120, "el aviso"),
+    // Mensaje de los pedidos por WhatsApp: el saludo del principio y un texto al final.
+    // La lista de productos, talles, precios y total se arma sola (no se puede tocar).
+    orderGreeting: cleanText(input?.orderGreeting, 120, "el saludo del pedido"),
+    orderFooter: cleanText(input?.orderFooter, 300, "el texto al final del pedido"),
     // Cuánto subió o bajó los precios de su lista de Brasil con "Cambiar precios" (0.1 = 10% más).
     brPercent: cleanPercent(input?.brPercent),
   };

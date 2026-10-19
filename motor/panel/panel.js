@@ -1227,6 +1227,21 @@ function renderStoreSettings() {
   const heroTitle = input("s-hero-title", s.heroTitle, { maxlength: 40, placeholder: "Ej: Ropa y zapatillas" });
   const heroHighlight = input("s-hero-highlight", s.heroHighlight, { maxlength: 40, placeholder: "Ej: al mejor precio" });
   const notice = input("s-notice", s.notice, { maxlength: 120, placeholder: "Ej: ¡Envío gratis este fin de semana!" });
+  const DEFAULT_GREETING = "¡Hola! Quiero hacer el siguiente pedido del catálogo:";
+  const orderGreeting = input("s-order-greeting", s.orderGreeting, { maxlength: 120, placeholder: DEFAULT_GREETING });
+  const orderFooter = h("textarea", { id: "s-order-footer", class: "panel-input panel-textarea", maxlength: 300, rows: 3,
+    placeholder: "Ej: Pago por transferencia o efectivo. Envíos a todo el país." }, s.orderFooter ?? "");
+  // Vista previa con un pedido de ejemplo: se actualiza mientras escribe.
+  const orderPreview = h("pre", { class: "panel-order-preview", "aria-live": "polite" });
+  const paintPreview = () => {
+    const footer = orderFooter.value.trim();
+    orderPreview.textContent = [orderGreeting.value.trim() || DEFAULT_GREETING, "",
+      "Remera básica (M) $15.000", "Zapatillas urbanas (40) $60.000", "",
+      "Total: 2 productos - $75.000", ...(footer ? ["", footer] : [])].join("\n");
+  };
+  orderGreeting.addEventListener("input", paintPreview);
+  orderFooter.addEventListener("input", paintPreview);
+  paintPreview();
   const heroText = h("textarea", { id: "s-hero-text", class: "panel-input panel-textarea", maxlength: 220, rows: 3,
     placeholder: "Ej: Elegí tu producto y talle, armá el pedido y envialo por WhatsApp." }, s.heroText ?? "");
   let color = s.color || COLORS[0].value;
@@ -1273,6 +1288,7 @@ function renderStoreSettings() {
       name: name.value, tagline: tagline.value, whatsapp: whatsapp.value,
       instagram: instagram.value, tiktok: tiktok.value, facebook: facebook.value,
       heroTitle: heroTitle.value, heroHighlight: heroHighlight.value, heroText: heroText.value, notice: notice.value,
+      orderGreeting: orderGreeting.value, orderFooter: orderFooter.value,
       color, wholesale: wholesaleOn.checked, wholesaleMin: Number(wholesaleMin.value),
     } }));
     if (result) {
@@ -1294,6 +1310,11 @@ function renderStoreSettings() {
         field("s-instagram", "Instagram", instagram, "Solo tu usuario, sin @."),
         field("s-tiktok", "TikTok", tiktok, "Solo tu usuario, sin @.")),
       field("s-facebook", "Facebook", facebook, "El nombre de tu página (lo que va después de facebook.com/).")),
+    h("section", { class: "panel-card" }, h("h2", {}, "Mensaje de los pedidos"),
+      h("p", { class: "panel-muted" }, "Así te llega cada pedido por WhatsApp. Los productos, talles, precios y el total se completan solos."),
+      field("s-order-greeting", "Saludo", orderGreeting, "Lo primero del mensaje. Vacío = el saludo de siempre."),
+      field("s-order-footer", "Texto al final (opcional)", orderFooter, "Por ejemplo cómo te pagan, envíos o dónde retirar."),
+      h("div", { class: "panel-field" }, h("span", { class: "panel-label" }, "Así se ve"), orderPreview)),
     h("section", { class: "panel-card" }, h("h2", {}, "Aviso arriba de la tienda"),
       field("s-notice", "Aviso (opcional)", notice, "Una franja arriba de todo en tu tienda. Dejalo vacío para no mostrar nada.")),
     h("section", { class: "panel-card" }, h("h2", {}, "Portada"),
@@ -1310,7 +1331,7 @@ function renderStoreSettings() {
     h("div", { class: "panel-savebar" }, saveButton));
   root.replaceChildren(form);
   // Si sale sin guardar, se le pregunta (ver route). La clave va aparte y no cuenta.
-  const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, notice, wholesaleMin];
+  const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, notice, orderGreeting, orderFooter, wholesaleMin];
   const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color, wholesaleOn.checked]);
   let initial = snapshot();
   state.guard = () => snapshot() !== initial;
