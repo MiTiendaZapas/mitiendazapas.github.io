@@ -140,6 +140,10 @@ def build(dist, test=False):
     pages = sorted({html.parent.relative_to(dist).as_posix() for html in dist.rglob("index.html")} - {"."})
     redirects += [f"/{page} /{page}/ 301" for page in pages]
     (dist / "_redirects").write_text("\n".join(redirects) + "\n", encoding="utf-8")
+    # El programa de fondo del panel (para instalarlo en el celular) vive en /motor/panel/ pero
+    # atiende el panel de cada tienda (/<tienda>/panel/): Cloudflare tiene que permitirlo.
+    (dist / "_headers").write_text(
+        "/motor/panel/sw.js\n  Service-Worker-Allowed: /\n  Cache-Control: no-cache\n", encoding="utf-8")
     # El programa del panel (functions/) corre SOLO en /api/ y en la portada de las tiendas
     # con stock propio (para poner su nombre y logo al compartir). El resto se entrega directo.
     manual = [name for name, folder in clients.items()

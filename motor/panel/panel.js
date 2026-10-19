@@ -1784,6 +1784,10 @@ window.addEventListener("beforeinstallprompt", (event) => {
   if (root.dataset.section === "inicio") renderHome();
 });
 const installed = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+// Programa de fondo: lo pide el celular para dejar instalar el panel (ver motor/panel/sw.js).
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/motor/panel/sw.js", { scope: location.pathname.replace(/[^/]*$/, "") }).catch(() => {});
+}
 
 function renderHome() {
   const own = state.products;
