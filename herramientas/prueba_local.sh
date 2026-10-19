@@ -18,5 +18,6 @@ for extra in demo-br; do
 done
 # El stock de Brasil de la prueba: el de esta computadora.
 npx wrangler r2 object put mitiendastock-catalogo/productos.json --file catalogo/productos.json --content-type application/json --local > /dev/null 2>&1 || true
+npx wrangler r2 object put mitiendastock-catalogo/productos-g5.json --file catalogo/productos-g5.json --content-type application/json --local > /dev/null 2>&1 || true
 echo "Listo: abrí http://localhost:8788/demo-br/panel/   (para cortar: Ctrl+C)"
 npx wrangler pages dev dist --port 8788 --ip 127.0.0.1

@@ -98,6 +98,25 @@ function ask(message, { ok = "Sí", cancel = "Cancelar", danger = false } = {}) 
   });
 }
 
+/**
+ * Guardado "por detrás": cada toque cambia el número al instante y, cuando deja de tocar un
+ * momento, se guarda una sola vez. Si falla, avisa y deshace.
+ *   key: qué se está cambiando · save(): guarda · undo(): vuelve atrás si no se pudo
+ */
+const pendingSaves = new Map();
+function saveSoon(key, save, undo) {
+  const entry = pendingSaves.get(key) ?? {};
+  clearTimeout(entry.timer);
+  entry.undo = undo;
+  entry.timer = setTimeout(async () => {
+    pendingSaves.delete(key);
+    try { await save(); } catch (e) { entry.undo?.(); toast(e.message, "error"); }
+  }, 700);
+  pendingSaves.set(key, entry);
+}
+// Si cierra la página con algo por guardar, se avisa.
+window.addEventListener("beforeunload", (event) => { if (pendingSaves.size) event.preventDefault(); });
+
 /** Una vibración cortita (solo en los celulares que lo permiten), al cambiar el stock. */
 const buzz = () => { try { navigator.vibrate?.(12); } catch { /* sin vibración */ } };
 
@@ -243,7 +262,7 @@ function themeButton() {
   return button;
 }
 
-const EDIT_SCREENS = ["editar", "nuevo", "br", "precios"];
+const EDIT_SCREENS = ["editar", "nuevo", "br", "precios", "precios-generales"];
 
 function renderTop({ loggedIn }) {
   const current = (location.hash.slice(1).split("/")[0]) || "inicio";
@@ -407,6 +426,74 @@ function renderPriceChange() {
   window.scrollTo(0, 0);
 }
 
+/**
+ * Precios generales: un precio para todos los modelos de Brasil y otro para todas las G5, y qué
+ * pasa con los modelos nuevos (aparecen solos con ese precio o esperan a que les pongas precio).
+ */
+function renderGeneralPricing() {
+  const current = state.pricing ?? { mode: "auto", br: {}, g5: {} };
+  let mode = current.mode ?? "auto";
+  const money0 = (n) => (n ? String(n) : "");
+  const input = (id, value, placeholder) => h("input", { id, class: "panel-input", inputmode: "numeric", value: money0(value), placeholder });
+  const sample = state.br.products.find((p) => p.category !== "g5");
+  const listUnit = sample ? listPrice(sample).unit : null;
+  const block = (key, title, help, placeholder) => {
+    const general = current[key] ?? {};
+    const unit = input(`gp-${key}-unit`, general.unit, placeholder);
+    const wholesale = input(`gp-${key}-wholesale`, general.wholesale, "Opcional");
+    const resaleUnit = TWO_VERSIONS ? input(`gp-${key}-r-unit`, general.mayorista?.price, "Opcional") : null;
+    const resaleWholesale = TWO_VERSIONS ? input(`gp-${key}-r-wholesale`, general.mayorista?.wholesalePrice, "Opcional") : null;
+    return {
+      node: h("section", { class: "panel-card" }, h("h2", {}, title), h("p", { class: "panel-muted" }, help),
+        h("div", { class: "panel-two" },
+          field(`gp-${key}-unit`, TWO_VERSIONS ? "Precio al público" : "Precio", unit),
+          field(`gp-${key}-wholesale`, TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale)),
+        TWO_VERSIONS ? h("div", { class: "panel-two" },
+          field(`gp-${key}-r-unit`, "Precio para revendedores", resaleUnit),
+          field(`gp-${key}-r-wholesale`, "Por mayor para revendedores", resaleWholesale)) : null),
+      read: () => ({
+        unit: unit.value.replace(/\D/g, ""), wholesale: wholesale.value.replace(/\D/g, ""),
+        ...(TWO_VERSIONS ? { mayorista: { price: resaleUnit.value.replace(/\D/g, ""), wholesalePrice: resaleWholesale.value.replace(/\D/g, "") } } : {}),
+      }),
+    };
+  };
+  const br = block("br", "Modelos de Brasil",
+    listUnit ? `Un precio para todos los modelos de Brasil que no tengan el suyo. Vacío = el de tu lista (por ejemplo ${money(listUnit)}).` : "Un precio para todos los modelos de Brasil que no tengan el suyo.",
+    listUnit ? String(listUnit) : "Ej: 60000");
+  const g5 = block("g5", "Calidad G5", "Un precio para todas las G5 que no tengan el suyo. Mientras no tengan precio, las G5 no se ven en tu tienda.", "Ej: 30000");
+  const modes = h("div", { class: "panel-pc__choices", role: "radiogroup", "aria-label": "Modelos nuevos" });
+  const paintModes = () => modes.replaceChildren(...[["auto", "Que aparezcan solos con el precio general"], ["manual", "Que esperen a que les ponga precio"]]
+    .map(([value, label]) => h("button", { type: "button", class: "panel-chip", role: "radio", "aria-checked": String(mode === value), "aria-pressed": String(mode === value),
+      onclick: () => { mode = value; paintModes(); } }, label)));
+  paintModes();
+  const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar");
+  const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
+    event.preventDefault();
+    const done = await busy(saveButton, async () => {
+      await api("/precios-generales", { method: "POST", body: { mode, br: br.read(), g5: g5.read() } });
+      await loadData();
+      return true;
+    });
+    if (done) {
+      toast("Precios generales guardados. Tu tienda ya los usa.");
+      state.guard = null;
+      location.hash = "#productos";
+    }
+  } },
+    h("div", { class: "panel-editor__head" },
+      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, ico("chevronLeft"), "Volver"),
+      h("h1", {}, "Precios generales")),
+    br.node, g5.node,
+    h("section", { class: "panel-card" }, h("h2", {}, "Modelos nuevos"),
+      h("p", { class: "panel-muted" }, "Cuando entra un modelo nuevo de Brasil o de G5:"), modes,
+      h("p", { class: "panel-muted" }, "Si elegís esperar, los nuevos aparecen en “Sin precio, no se ven” y en Inicio, para que les pongas precio.")),
+    h("div", { class: "panel-savebar" }, saveButton));
+  root.replaceChildren(form);
+  const snapshot = () => JSON.stringify([mode, br.read(), g5.read()]);
+  const initial = snapshot();
+  state.guard = () => snapshot() !== initial;
+}
+
 function renderOwnProducts() {
   const full = state.products.length >= state.limits.products;
   const list = h("ul", { class: "panel-list" });
@@ -519,15 +606,27 @@ function renderQuickStock(product, box, badge) {
   box.replaceChildren(h("p", { class: "panel-muted" }, "Sumá o restá unidades. Se guarda solo."),
     h("div", { class: "panel-quick__grid" }, product.sizes.map((s) => {
       const value = h("output", { class: "panel-quick__value" }, s.stock);
-      const change = (delta) => (event) => busy(event.currentTarget, async () => {
-        const { stock } = await api("/stock", { method: "POST", body: { id: product.id, size: s.size, delta } });
-        s.stock = stock;
-        value.textContent = stock;
-        buzz();
+      let pending = 0;   // toques que todavía no se guardaron
+      const paint = () => {
+        value.textContent = s.stock;
         const total = totalStock(product);
         badge.replaceChildren(...withCaret(total === 0 ? "Sin stock" : `Stock: ${total}`));
         badge.classList.toggle("is-empty", total === 0);
-      });
+      };
+      const change = (delta) => () => {
+        if (s.stock + delta < 0) return;
+        s.stock += delta;
+        pending += delta;
+        paint();
+        buzz();
+        saveSoon(`stock:${product.id}:${s.size}`, async () => {
+          const sent = pending;
+          pending = 0;
+          if (!sent) return;
+          const { stock } = await api("/stock", { method: "POST", body: { id: product.id, size: s.size, delta: sent } });
+          if (!pending) { s.stock = stock; paint(); }
+        }, () => { s.stock -= pending; pending = 0; paint(); });
+      };
       return h("div", { class: "panel-quick__size" },
         h("span", { class: "panel-quick__label" }, h("strong", {}, `Talle ${s.size}`)),
         h("div", { class: "panel-stepper" },
@@ -657,6 +756,17 @@ const brTotal = (product, part) => product.sizes.reduce((sum, s) => sum + s[part
 const brChanged = (p) => Boolean(p.price || p.wholesalePrice || p.hidden || p.description || p.compareAt || p.featured || brTotal(p, "casa"));
 
 /** Precio de la lista para un modelo de Brasil (sin el precio propio que le haya puesto el cliente). */
+/** Precio general (Brasil o G5) que puso el cliente para los modelos sin precio propio. */
+function generalPrice(product, version = "publico") {
+  const general = state.pricing?.[product.category === "g5" ? "g5" : "br"] ?? {};
+  return version === "mayorista" ? general.mayorista?.price ?? null : general.unit ?? null;
+}
+/** Qué se cobra en un modelo sin precio propio: el precio general, o si no, el de la lista (G5: nada). */
+function autoPrice(product, version = "publico") {
+  return generalPrice(product, version) || (product.category === "g5" && version !== "mayorista" ? null : listPrice(product, version).unit);
+}
+const STATUS_TEXT = { nuevo: "Nuevo: no se ve hasta que le pongas precio", "sin-precio-g5": "No se ve: las G5 necesitan precio" };
+
 function listPrice(product, version = "publico") {
   const pricing = version === "mayorista" ? state.resalePricing : state.listPricing;
   const prices = pricing?.forProduct({ ...product, price: null, wholesalePrice: null, manual: false });
@@ -666,6 +776,7 @@ function listPrice(product, version = "publico") {
 function matchesBrFilter(p) {
   if (state.brFilter === "cambios") return brChanged(p);
   if (state.brFilter === "ocultos") return p.hidden;
+  if (state.brFilter === "sin-precio") return p.status === "nuevo" || p.status === "sin-precio-g5";
   if (state.brFilter === "casa") return brTotal(p, "casa") > 0;
   if (state.brFilter.startsWith("cat:")) return p.category === state.brFilter.slice(4);
   return true;
@@ -689,6 +800,8 @@ function renderBrProducts() {
       { id: "cambios", label: `Con cambios tuyos (${count(brChanged)})` },
       { id: "casa", label: `Con pares tuyos (${count((p) => brTotal(p, "casa") > 0)})` },
       { id: "ocultos", label: `Ocultos (${count((p) => p.hidden)})` },
+      ...(count((p) => p.status === "nuevo" || p.status === "sin-precio-g5")
+        ? [{ id: "sin-precio", label: `Sin precio, no se ven (${count((p) => p.status === "nuevo" || p.status === "sin-precio-g5")})` }] : []),
       ...(brCategories.length > 1 ? brCategories.map((id) => ({ id: `cat:${id}`, label: categoryName(id) })) : []),
     ];
     chips.replaceChildren(...options.map((o) => h("button", { type: "button", class: "panel-chip", "aria-pressed": String(state.brFilter === o.id),
@@ -703,7 +816,7 @@ function renderBrProducts() {
   }
 
   root.replaceChildren(
-    h("div", { class: "panel-toolbar" }, pricesButton()),
+    h("div", { class: "panel-toolbar" }, h("a", { class: "btn btn--primary btn--sm", href: "#precios-generales" }, "Precios generales"), pricesButton()),
     seenIntro() ? null : h("div", { class: "panel-intro-box" },
       h("p", { class: "panel-muted panel-intro" },
         "Estos modelos y su stock llegan solos y se actualizan solos. Tocá “Editar” en uno para ponerle tu precio, ocultarlo o sumar los pares que tenés en tu casa."),
@@ -718,7 +831,7 @@ function renderBrProducts() {
 function brItemView(product, refresh) {
   const fromBrazil = brTotal(product, "br");
   const own = brTotal(product, "casa");
-  const unit = product.price || listPrice(product).unit;
+  const unit = product.price || autoPrice(product);
   const image = product.images[0];
   const thumb = image
     ? h("img", { src: image.sm || image.lg, alt: "", width: 64, height: 80, loading: "lazy" })
@@ -755,12 +868,21 @@ function brItemView(product, refresh) {
       h("div", { class: "panel-item__info" },
         h("strong", {}, product.name),
         h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
-        priceLine(unit, product.compareAt, product.compareAt ? null : product.price ? " · tu precio" : " · precio de tu lista"),
-        TWO_VERSIONS ? h("small", { class: "panel-muted" }, `Revendedores: ${money(product.mayorista?.price || listPrice(product, "mayorista").unit)}`) : null,
+        priceLine(unit, product.compareAt, product.compareAt ? null : product.price ? " · tu precio" : generalPrice(product) ? " · precio general" : unit ? " · precio de tu lista" : null),
+        TWO_VERSIONS ? h("small", { class: "panel-muted" }, `Revendedores: ${money(product.mayorista?.price || autoPrice(product, "mayorista"))}`) : null,
+        STATUS_TEXT[product.status] ? h("span", { class: "panel-paused-tag" }, STATUS_TEXT[product.status]) : null,
         stockLine,
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Oculto: no se ve en tu tienda") : null,
         tagsFor(product)),
       h("div", { class: "panel-item__actions" },
+        // Modelo nuevo con precio automático disponible: se puede mostrar con ese precio, al toque.
+        product.status === "nuevo" && autoPrice(product)
+          ? h("button", { class: "btn btn--primary btn--sm", type: "button", onclick: (e) => busy(e.currentTarget, async () => {
+            await api("/br", { method: "POST", body: brBody(product, { approve: true }) });
+            await loadData();
+            toast(`Listo: ya se ve en tu tienda a ${money(autoPrice(product))}.`);
+            renderProducts();
+          }) }, `Mostrar a ${money(autoPrice(product))}`) : null,
         pairsButton,
         h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => { location.hash = `#br/${encodeURIComponent(product.id)}`; } }, "Editar"),
         h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: toggle }, product.hidden ? "Mostrar" : "Ocultar"))),
@@ -773,17 +895,22 @@ function renderQuickPairs(product, box, onChange) {
     h("p", { class: "panel-muted" }, "Tus pares de cada talle. Tocá − cuando vendas uno y + cuando te llegue. Se guarda solo."),
     h("div", { class: "panel-quick__grid" }, product.sizes.map((s) => {
       const value = h("output", { class: "panel-quick__value" }, s.casa);
-      const change = (delta) => (event) => busy(event.currentTarget, async () => {
+      const change = (delta) => () => {
+        const before = product.sizes.map((x) => x.casa);
         const next = Math.max(0, s.casa + delta);
         if (next === s.casa) return;
-        const extra = product.sizes.map((x) => ({ size: x.size, stock: x === s ? next : x.casa })).filter((x) => x.stock > 0);
-        await api("/br", { method: "POST", body: brBody(product, { extra }) });
         s.casa = next;
         s.stock = s.br + s.casa;
         value.textContent = next;
         buzz();
         onChange();
-      });
+        // Se guarda una sola vez cuando deja de tocar (con todos los talles como quedaron).
+        saveSoon(`pares:${product.id}`, () => api("/br", { method: "POST", body: brBody(product) }), () => {
+          product.sizes.forEach((x, i) => { x.casa = before[i]; x.stock = x.br + x.casa; });
+          renderQuickPairs(product, box, onChange);
+          onChange();
+        });
+      };
       return h("div", { class: "panel-quick__size" },
         h("span", { class: "panel-quick__label" }, h("strong", {}, `Talle ${s.size}`),
           h("small", { class: "panel-muted" }, s.br ? `En Brasil: ${s.br}` : "Brasil no tiene")),
@@ -808,7 +935,11 @@ function brBody(product, changes = {}) {
 
 function renderBrEditor(product) {
   const draft = structuredClone(product);
-  const list = listPrice(product);
+  const listed = listPrice(product);
+  const generalUnit = generalPrice(product);
+  // Si queda vacío: el precio general (si lo puso), si no la lista. Las G5 no tienen lista.
+  const list = { unit: product.category === "g5" ? generalUnit : generalUnit || listed.unit,
+    wholesale: generalUnit ? state.pricing?.[product.category === "g5" ? "g5" : "br"]?.wholesale ?? null : product.category === "g5" ? null : listed.wholesale };
   // En oferta, arriba va el precio normal (vacío si es el de la lista) y el de oferta en su recuadro.
   const normalValue = draft.compareAt ? (draft.compareAt === list.unit ? "" : draft.compareAt) : draft.price;
   const price = h("input", { id: "b-price", class: "panel-input", inputmode: "numeric", value: normalValue ?? "",
@@ -885,7 +1016,9 @@ function renderBrEditor(product) {
         h("p", { class: "panel-muted" }, "Modelo del stock de Brasil: las fotos, el nombre y el stock de Brasil se actualizan solos."))),
     h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
       h("div", { class: "panel-two" },
-        field("b-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, list.unit ? `Vacío = el de tu lista (${money(list.unit)}).` : "Vacío = el de tu lista."),
+        field("b-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, list.unit
+          ? `Vacío = ${generalUnit ? "el precio general" : "el de tu lista"} (${money(list.unit)}).`
+          : "Las G5 necesitan un precio para verse en tu tienda (o poné uno general en “Precios generales”)."),
         sellsWholesale ? field("b-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, list.wholesale ? `Vacío = el de tu lista (${money(list.wholesale)}).` : "Opcional.") : null),
       h("label", { class: "panel-switch", for: "b-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
@@ -1421,6 +1554,7 @@ function renderHome() {
     tile(own.filter((p) => p.compareAt).length + br.filter((p) => p.compareAt).length, "en oferta", go(own.some((p) => p.compareAt) || !state.br ? "propios" : "br", own.some((p) => p.compareAt) || !state.br ? "todos" : "cambios")),
     tile(own.filter((p) => p.hidden).length, "pausados", go("propios", "pausados")),
     ...(state.br ? [
+      tile(br.filter((p) => p.status === "nuevo" || p.status === "sin-precio-g5").length, "sin precio (no se ven)", go("br", "sin-precio"), true),
       tile(br.length, "modelos de Brasil", go("br")),
       tile(br.filter((p) => brTotal(p, "casa") > 0).length, "con pares tuyos", go("br", "casa")),
     ] : []),
@@ -1493,7 +1627,9 @@ function renderHelp() {
   ];
   if (state.br) steps.unshift(
     ["El stock de Brasil", "En “Productos” → “Stock de Brasil” están los modelos que llegan solos. No hace falta cargarlos: el stock se actualiza solo."],
-    ["Tu precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el de tu lista."],
+    ["Precios generales", "En “Stock de Brasil” → “Precios generales” ponés un precio para todos los modelos de Brasil y otro para todas las G5. Las G5 no se ven en tu tienda hasta que tengan precio."],
+    ["Modelos nuevos", "Si en “Precios generales” elegís que los nuevos esperen, los que entren aparecen en Inicio como “sin precio”: tocá “Mostrar” o ponéles un precio."],
+    ["Tu precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el precio general (o el de tu lista)."],
     ["Pares que tenés en tu casa", "En el mismo modelo, en “En tu casa”, sumá con “+” los pares que tenés vos. En la tienda se ven junto con los de Brasil. Cuando vendas uno tuyo, restalo con “−”."],
     ["Ocultar un modelo", "Con “Ocultar” deja de verse en tu tienda. Con “Mostrar” vuelve."],
     ["Otras cosas que vendas", "Ropa, accesorios o lo que quieras: en “Mis productos” → “Nuevo producto”, con tus fotos y la categoría que elijas."],
@@ -1583,6 +1719,7 @@ async function loadData() {
   state.limits = data.limits ?? state.limits;
   state.settings = settings ?? {};
   state.br = data.stockBR ? { products: data.brProducts ?? [], options: data.stockBR, updatedAt: data.brUpdatedAt } : null;
+  state.pricing = data.pricing ?? null;
   if (state.br && !state.priceTable) state.priceTable = await loadPriceTable(Object.values(config.channels ?? {})[0]?.prices);
   if (state.br && TWO_VERSIONS && !state.resaleTable) state.resaleTable = await loadPriceTable(config.channels.mayorista.prices);
   // Las listas con lo que subió o bajó en "Cambiar precios".
@@ -1642,6 +1779,7 @@ function route() {
   }
   if (section === "categorias") return renderCategories();
   if (section === "precios") return renderPriceChange();
+  if (section === "precios-generales" && state.br) return renderGeneralPricing();
   if (section === "tienda") return renderStoreSettings();
   if (section === "ayuda") return renderHelp();
   if (section === "productos") {

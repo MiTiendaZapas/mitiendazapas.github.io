@@ -59,10 +59,10 @@ describe("stock de Brasil", () => {
 
   test("las categorías de Brasil siempre están; se pueden renombrar pero no borrar", () => {
     const data = store({ categories: { remeras: "Remeras" } });
-    assert.deepEqual(Object.keys(storeCategories(data)), ["zapatillas", "ojotas", "remeras"]);
-    const renamed = cleanCategories([{ id: "remeras", label: "Remeras" }, { id: "zapatillas", label: "Zapas" }, { id: "ojotas", label: "Ojotas" }], data);
+    assert.deepEqual(Object.keys(storeCategories(data)), ["zapatillas", "ojotas", "g5", "remeras"]);
+    const renamed = cleanCategories([{ id: "remeras", label: "Remeras" }, { id: "zapatillas", label: "Zapas" }, { id: "ojotas", label: "Ojotas" }, { id: "g5", label: "Calidad G5" }], data);
     assert.equal(renamed.zapatillas, "Zapas");
-    assert.throws(() => cleanCategories([{ id: "remeras", label: "Remeras" }, { id: "ojotas", label: "Ojotas" }], data), /no borrar/);
+    assert.throws(() => cleanCategories([{ id: "remeras", label: "Remeras" }, { id: "ojotas", label: "Ojotas" }, { id: "g5", label: "Calidad G5" }], data), /no borrar/);
   });
 
   test("los productos propios van marcados y se cobran solo con su precio", () => {
@@ -122,5 +122,22 @@ describe("stock de Brasil", () => {
     const pricing = createPricing({ wholesale: false, unit: { default: 60000, rules: [{ price: 20000, contains: ["remera"], bulk: { min: 10, price: 15000 } }] } });
     const own = { id: "m-9", name: "Remera básica", category: "remeras", price: 12000, manual: true };
     assert.deepEqual(pricing.forProduct(own), { unit: 12000, wholesale: null, bulk: null });
+  });
+
+  test("G5: no se ven hasta que tienen precio; modelos nuevos en modo manual esperan precio", () => {
+    const withG5 = { ...brazil, products: [...brazil.products,
+      { id: "g5-1", slug: "dunk-g5", name: "Dunk G5", category: "g5", sizes: [{ size: "40", stock: 2 }], images: [] }] };
+    const ids = (data) => publicMixedCatalog(data, withG5).products.map((p) => p.id);
+    assert.deepEqual(ids(store()), ["vp-1", "vp-2"]);                                   // G5 sin precio: no se ve
+    const g5 = publicMixedCatalog(store({ pricing: { g5: { unit: 30000 } } }), withG5).products.find((p) => p.id === "g5-1");
+    assert.deepEqual([g5.price, g5.wholesalePrice, g5.noWholesale], [30000, null, true]); // precio general, sin por mayor
+    // Modo manual: los que ya estaban se ven; uno nuevo espera hasta tener precio propio.
+    const manual = store({ pricing: { mode: "manual", g5: { unit: 30000 } }, known: ["vp-1", "g5-1"] });
+    assert.deepEqual(ids(manual), ["vp-1", "g5-1"]);
+    assert.equal(brProducts(manual, withG5).find((p) => p.id === "vp-2").status, "nuevo");
+    assert.deepEqual(ids({ ...manual, br: { "vp-2": { price: 50000 } } }), ["vp-1", "vp-2", "g5-1"]);
+    // Precio general de Brasil: los modelos sin precio propio salen con ese precio.
+    const general = publicMixedCatalog(store({ pricing: { br: { unit: 55000, wholesale: 40000 } } }), withG5).products.find((p) => p.id === "vp-1");
+    assert.deepEqual([general.price, general.wholesalePrice], [55000, 40000]);
   });
 });

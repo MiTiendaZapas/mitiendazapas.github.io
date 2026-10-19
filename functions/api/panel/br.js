@@ -21,6 +21,10 @@ export async function onRequestPost({ request, env, data }) {
       catalog.br = { ...(catalog.br ?? {}) };
       if (cleaned) catalog.br[input.id] = cleaned;
       else delete catalog.br[input.id];
+      // Modelo nuevo: con precio propio, o si el cliente lo aprueba con el precio general, ya se ve.
+      if ((input.approve === true || cleaned?.price) && !(catalog.known ?? []).includes(input.id)) {
+        catalog.known = [...(catalog.known ?? []), input.id];
+      }
       return cleaned;
     });
     return json({ ok: true, change });

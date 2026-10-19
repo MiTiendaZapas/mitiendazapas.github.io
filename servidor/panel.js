@@ -242,13 +242,15 @@ export function publicCatalog(data) {
 // data.stockBR = { casa: true|false, g5: true|false } lo pone herramientas/activar_stock_br.mjs
 // (el cliente no lo puede cambiar).
 export const BR_CATEGORIES = { zapatillas: "Zapatillas", ojotas: "Ojotas", g5: "Calidad G5" };
-const brCategoryIds = (data) => ["zapatillas", "ojotas", ...(data.stockBR?.g5 ? ["g5"] : [])];
+// Todas las tiendas con stock de Brasil reciben también la calidad G5 (19/10). Las G5 se ven
+// recién cuando el cliente les pone precio (ver precios generales).
+const brCategoryIds = () => ["zapatillas", "ojotas", "g5"];
 const BR_FILES_URL = "https://catalogo.mitiendastock.com/";
 const MAX_EXTRA_SIZES = 30;
 
 /** Stock del proveedor tal como lo publicó el piloto (con o sin G5). */
-export async function readBrStock(env, options = {}) {
-  const files = ["productos.json", ...(options.g5 ? ["productos-g5.json"] : [])];
+export async function readBrStock(env) {
+  const files = ["productos.json", "productos-g5.json"];
   const lists = await Promise.all(files.map(async (key) => {
     const object = await env.CATALOGO.get(key);
     return object ? object.json() : { products: [] };
@@ -286,6 +288,27 @@ function withChanges(base, change = {}) {
   };
 }
 
+// --- precios generales y modelos nuevos -------------------------------------------
+// data.pricing = {
+//   br: { unit, wholesale, mayorista? },  precio para todos los modelos de Brasil (vacío = su lista)
+//   g5: { unit, wholesale, mayorista? },  precio para todas las G5 (sin precio, las G5 no se ven)
+//   mode: "auto" | "manual",             modelos nuevos: aparecen solos o esperan a tener precio
+// }
+// data.known = códigos de los modelos que ya estaban (o que el cliente aprobó). En modo "manual",
+// un modelo que no está ahí y no tiene precio propio queda esperando (no se ve).
+const isG5 = (product) => product.category === "g5";
+export const pricingOf = (data) => ({ mode: "auto", br: {}, g5: {}, ...(data.pricing ?? {}) });
+
+/** Si un modelo se ve o no en la tienda, y por qué (para mostrarlo en el panel). */
+function visibility(product, data) {
+  const pricing = pricingOf(data);
+  if (product.hidden) return "oculto";
+  const ownPrice = Boolean(product.price);
+  if (!ownPrice && pricing.mode === "manual" && !(data.known ?? []).includes(product.id)) return "nuevo";
+  if (!ownPrice && isG5(product) && !pricing.g5.unit) return "sin-precio-g5";
+  return "visible";
+}
+
 /**
  * Todos los modelos de Brasil de la tienda, con los cambios del cliente. Si Brasil agotó un
  * modelo del que el cliente tiene pares en su casa, sigue (con la foto y el nombre guardados).
@@ -300,14 +323,45 @@ export function brProducts(data, br) {
   for (const [id, change] of Object.entries(changes)) {
     if (!seen.has(id) && change.model && change.extra) list.push(withChanges({ ...change.model, id, sizes: [] }, change));
   }
+  for (const product of list) product.status = visibility(product, data);
   return list;
+}
+
+/**
+ * Precio general (Brasil o G5) para los modelos sin precio propio. Va como precio del modelo,
+ * así la tienda no usa la lista. G5 sin precio por mayor general = sin precio por mayor.
+ */
+function withGeneralPrice(product, data) {
+  if (product.price) return product;
+  const general = pricingOf(data)[isG5(product) ? "g5" : "br"];
+  if (!general?.unit) return product;
+  return {
+    ...product, price: general.unit, wholesalePrice: general.wholesale ?? null,
+    noWholesale: isG5(product) && !general.wholesale,
+    mayorista: product.mayorista ?? general.mayorista ?? null,
+  };
+}
+
+/** Precios generales que manda el panel: { br: {unit, wholesale, mayorista}, g5: {...}, mode }. */
+export function cleanGeneralPricing(input) {
+  const block = (value, label) => {
+    const unit = cleanPrice(value?.unit, `el precio de ${label}`);
+    const wholesale = cleanPrice(value?.wholesale, `el precio por mayor de ${label}`);
+    if (unit && wholesale && wholesale >= unit) throw new Error(`En ${label}, el precio por mayor tiene que ser menor que el precio.`);
+    if (wholesale && !unit) throw new Error(`En ${label}, poné también el precio por unidad.`);
+    const resale = cleanResale(value?.mayorista);
+    return { unit, wholesale, ...(resale ? { mayorista: resale } : {}) };
+  };
+  return { mode: input?.mode === "manual" ? "manual" : "auto", br: block(input?.br, "los modelos de Brasil"), g5: block(input?.g5, "las G5") };
 }
 
 /** Lo que ve el público en una tienda con stock de Brasil. */
 export function publicMixedCatalog(data, br) {
+  // Solo los que se ven: no ocultos, no nuevos esperando precio, y G5 recién con precio.
   const fromBrazil = brProducts(data, br)
-    .filter((p) => !p.hidden)
-    .map(({ hidden, sizes, ...p }) => ({ ...p, sizes: sizes.map(({ size, stock }) => ({ size, stock })) }));
+    .filter((p) => p.status === "visible")
+    .map((p) => withGeneralPrice(p, data))
+    .map(({ hidden, status, sizes, ...p }) => ({ ...p, sizes: sizes.map(({ size, stock }) => ({ size, stock })) }));
   const own = publicCatalog(data).products;
   const categories = storeCategories(data);
   const dates = [br.generatedAt, data.generatedAt].filter(Boolean).sort();
@@ -548,6 +602,15 @@ export function changePrices(catalog, settings, { percent, own, br }) {
   if (br) {
     for (const change of Object.values(catalog.br ?? {})) if (change.price || change.compareAt || change.mayorista) scale(change);
     settings.brPercent = cleanPercent((1 + (Number(settings.brPercent) || 0)) * factor - 1);
+    // Precios generales (Brasil y G5).
+    if (catalog.pricing) for (const key of ["br", "g5"]) {
+      const general = catalog.pricing[key];
+      if (!general) continue;
+      if (general.unit) general.unit = roundPrice(general.unit * factor);
+      if (general.wholesale) general.wholesale = roundPrice(general.wholesale * factor);
+      if (general.wholesale && general.unit && general.wholesale >= general.unit) general.wholesale = null;
+      if (general.mayorista) for (const k of ["price", "wholesalePrice"]) if (general.mayorista[k]) general.mayorista[k] = roundPrice(general.mayorista[k] * factor);
+    }
     count += 1;
   }
   return count;

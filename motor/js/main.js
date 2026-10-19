@@ -80,7 +80,8 @@ function loadStock() {
   return loadCatalog(catalogBase(config), {
     order: config.catalogOrder,
     includeHouseStock: config.includeHouseStock !== false,
-    showG5: config.showG5 === true,
+    // Tiendas con panel: las G5 llegan solo si el cliente les puso precio (las filtra el servidor).
+    showG5: config.showG5 === true || Boolean(config.manualStore),
   });
 }
 

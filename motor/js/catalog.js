@@ -73,6 +73,8 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
         description: typeof p.description === "string" && p.description ? p.description : null,
         compareAt: Number(p.compareAt) > 0 ? Number(p.compareAt) : null,
         featured: p.featured === true,
+        // Precio general de G5 sin precio por mayor (tiendas con panel).
+        noWholesale: p.noWholesale === true,
         // Tiendas con dos versiones: precios propios para la de revendedores.
         mayorista: p.mayorista && typeof p.mayorista === "object" ? {
           price: Number(p.mayorista.price) > 0 ? Number(p.mayorista.price) : null,
