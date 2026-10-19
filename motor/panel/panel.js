@@ -71,6 +71,11 @@ function h(tag, attrs = {}, ...children) {
   return el;
 }
 
+/** Dibuja la pantalla. Lo que viene vacío (null) se saltea: así nunca aparece escrito "null". */
+function show(...nodes) {
+  root.replaceChildren(...nodes.flat().filter((node) => node !== null && node !== undefined && node !== false));
+}
+
 /** Ícono (los mismos dibujos de la tienda) como elemento, para usar dentro de h(). */
 function ico(name, cls = "") {
   const box = document.createElement("span");
@@ -310,7 +315,7 @@ function showLogin(message = "") {
     h("a", { class: "panel-forgot", target: "_blank", rel: "noopener",
       href: `https://wa.me/${HELP_WHATSAPP}?text=${encodeURIComponent(`¡Hola! Me olvidé la clave del panel de mi tienda${config.name ? ` (${config.name})` : ""}.`)}` },
     "¿Te olvidaste la clave? Escribinos por WhatsApp"));
-  root.replaceChildren(form);
+  show(form);
   user.focus();
 }
 
@@ -355,41 +360,23 @@ function renderPriceChange() {
   const custom = h("input", { id: "pc-custom", class: "panel-input", inputmode: "decimal", placeholder: "Ej: 12", autocomplete: "off" });
   const customField = field("pc-custom", "Porcentaje", custom);
   const steps = h("div", { class: "panel-pc" });
-  const examples = h("div", { class: "panel-pc__examples", role: "status" });
   const apply = h("button", { class: "btn btn--primary btn--lg", type: "submit" });
 
   const percent = () => (amount === "otro" ? Number(String(custom.value).replace(",", ".")) || 0 : amount);
-  const after = (price) => roundPrice(price * (1 + (direction * percent()) / 100));
   const choice = (options, current, onPick) => h("div", { class: "panel-pc__choices" }, options.map(([value, label]) =>
     h("button", { type: "button", class: "panel-chip", "aria-pressed": String(current === value), onclick: () => onPick(value) }, label)));
 
-  /** Hasta 3 productos de verdad, con su precio de hoy y cómo queda. */
-  function sample() {
-    const own = scope !== "brasil" ? state.products.filter((p) => p.price).map((p) => ({ name: p.name, price: p.price })) : [];
-    const br = scope !== "propios" && state.br
-      ? state.br.products.map((p) => ({ name: p.name, price: p.price || listPrice(p).unit })).filter((p) => p.price) : [];
-    return [...own.slice(0, 2), ...br.slice(0, 3 - Math.min(own.length, 2))].slice(0, 3);
-  }
-
   function paint() {
-    steps.replaceChildren(
+    steps.replaceChildren(...[
       h("section", { class: "panel-card" }, h("h2", {}, "1. ¿Qué querés hacer?"),
         choice([[1, "Subir precios"], [-1, "Bajar precios"]], direction, (v) => { direction = v; paint(); })),
       h("section", { class: "panel-card" }, h("h2", {}, `2. ¿Cuánto querés ${direction > 0 ? "subirlos" : "bajarlos"}?`),
         choice([[5, "5%"], [10, "10%"], [15, "15%"], [20, "20%"], ["otro", "Otro"]], amount, (v) => { amount = v; paint(); if (v === "otro") custom.focus(); }),
         amount === "otro" ? customField : null),
       state.br ? h("section", { class: "panel-card" }, h("h2", {}, "3. ¿A cuáles?"),
-        choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["brasil", "Solo a los de Brasil"]], scope, (v) => { scope = v; paint(); })) : null);
+        choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["brasil", "Solo a los de Brasil"]], scope, (v) => { scope = v; paint(); })) : null].filter(Boolean));
     const n = percent();
     const valid = n > 0 && n <= (direction > 0 ? 100 : 50);
-    const list = sample();
-    examples.replaceChildren(
-      h("h2", {}, "Así quedan algunos"),
-      !valid ? h("p", { class: "panel-muted" }, "Elegí cuánto, arriba.")
-        : list.length ? h("ul", {}, list.map((item) => h("li", {}, h("span", {}, item.name),
-          h("span", {}, h("s", { class: "panel-muted" }, money(item.price)), " → ", h("strong", {}, money(after(item.price)))))))
-          : h("p", { class: "panel-muted" }, "Todavía no hay productos con precio."),
-      h("p", { class: "panel-muted" }, "Se redondea a los $100. También cambian el precio por mayor y las ofertas."));
     apply.textContent = valid ? `${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios` : "Elegí cuánto";
     apply.disabled = !valid;
   }
@@ -419,9 +406,9 @@ function renderPriceChange() {
       h("h1", {}, "Cambiar precios")),
     h("p", { class: "panel-muted panel-intro" }, "Cambiá todos los precios de una vez, por ejemplo cuando aumenta todo."),
     steps,
-    h("section", { class: "panel-card" }, examples),
+    h("p", { class: "panel-muted" }, "Se redondea a los $100. También cambian el precio por mayor y las ofertas."),
     h("div", { class: "panel-savebar" }, apply));
-  root.replaceChildren(form);
+  show(form);
   paint();
   window.scrollTo(0, 0);
 }
@@ -488,7 +475,7 @@ function renderGeneralPricing() {
       h("p", { class: "panel-muted" }, "Cuando entra un modelo nuevo de Brasil o de G5:"), modes,
       h("p", { class: "panel-muted" }, "Si elegís esperar, los nuevos aparecen en “Sin precio, no se ven” y en Inicio, para que les pongas precio.")),
     h("div", { class: "panel-savebar" }, saveButton));
-  root.replaceChildren(form);
+  show(form);
   const snapshot = () => JSON.stringify([mode, br.read(), g5.read()]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
@@ -524,7 +511,7 @@ function renderOwnProducts() {
   }
   function renderAll() { renderChips(); renderItems(); }
 
-  root.replaceChildren(
+  show(
     h("div", { class: "panel-toolbar" },
       h("button", { class: "btn btn--primary", type: "button", disabled: full, onclick: () => openEditor(null) }, "+ Nuevo producto"),
       pricesButton(),
@@ -815,7 +802,7 @@ function renderBrProducts() {
       : [emptyState("search", "No hay modelos con ese filtro.", "Ver todos", () => { state.brFilter = "todos"; state.brSearch = ""; renderProducts(); })]));
   }
 
-  root.replaceChildren(
+  show(
     h("div", { class: "panel-toolbar" }, h("a", { class: "btn btn--primary btn--sm", href: "#precios-generales" }, "Precios generales"), pricesButton()),
     seenIntro() ? null : h("div", { class: "panel-intro-box" },
       h("p", { class: "panel-muted panel-intro" },
@@ -1038,7 +1025,7 @@ function renderBrEditor(product) {
     } }, "Volver todo a lo automático") : null,
     h("div", { class: "panel-savebar" }, saveButton));
 
-  root.replaceChildren(form);
+  show(form);
   renderSizes();
   window.scrollTo(0, 0);
   const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read(), offer.read(), resale.read()]);
@@ -1253,7 +1240,7 @@ function renderEditor(product) {
     product ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: () => removeProduct(product) }, "Borrar este producto") : null,
     h("div", { class: "panel-savebar" }, saveButton));
 
-  root.replaceChildren(form);
+  show(form);
   syncCategory();
   renderPhotos();
   renderSizes();
@@ -1364,7 +1351,7 @@ function renderCategories() {
     }), ...(rows.length ? [] : [h("p", { class: "panel-muted" }, "Todavía no tenés categorías. Agregá la primera.")]));
   }
 
-  root.replaceChildren(
+  show(
     h("section", { class: "panel-card" },
       h("h1", {}, "Orden de tu tienda"),
       h("p", { class: "panel-muted" }, "Los productos se ven agrupados por categoría. Elegí en qué orden van las categorías y cómo se ordenan los productos dentro de cada una."),
@@ -1501,7 +1488,7 @@ function renderStoreSettings() {
       field("s-wholesale-min", "Desde cuántos productos surtidos", wholesaleMin)),
     passwordCard(),
     h("div", { class: "panel-savebar" }, saveButton));
-  root.replaceChildren(form);
+  show(form);
   // Si sale sin guardar, se le pregunta (ver route). La clave va aparte y no cuenta.
   const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, notice, orderGreeting, orderFooter, wholesaleMin];
   const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color, wholesaleOn.checked]);
@@ -1574,7 +1561,7 @@ function renderHome() {
         ? "En Safari tocá el botón Compartir (el cuadrado con la flecha) y después “Agregar a inicio”. Te queda un ícono para entrar directo."
         : "En el menú del navegador (los tres puntitos) tocá “Agregar a la pantalla de inicio” o “Instalar”. Te queda un ícono para entrar directo."));
 
-  root.replaceChildren(
+  show(
     h("section", { class: "panel-card panel-home" },
       h("h1", {}, state.settings.name || config.name || "Tu tienda"),
       h("p", { class: "panel-muted panel-home__link" }, storeLink()),
@@ -1634,7 +1621,7 @@ function renderHelp() {
     ["Ocultar un modelo", "Con “Ocultar” deja de verse en tu tienda. Con “Mostrar” vuelve."],
     ["Otras cosas que vendas", "Ropa, accesorios o lo que quieras: en “Mis productos” → “Nuevo producto”, con tus fotos y la categoría que elijas."],
   );
-  root.replaceChildren(h("section", { class: "panel-card" },
+  show(h("section", { class: "panel-card" },
     h("h1", {}, "Cómo usar tu panel"),
     h("ol", { class: "panel-help" }, steps.map(([title, text]) => h("li", {}, h("strong", {}, title), h("span", {}, text)))),
     h("p", { class: "panel-muted" }, "Tu link para compartir es el de “Ver tienda”. ¿Dudas? Escribinos por WhatsApp.")),
@@ -1794,7 +1781,7 @@ function route() {
 
 async function start() {
   // Mientras carga: la forma del panel en gris (se entiende que está cargando, sin saltos).
-  root.replaceChildren(h("div", { class: "panel-skeleton", "aria-busy": "true", "aria-label": "Cargando tu panel" },
+  show(h("div", { class: "panel-skeleton", "aria-busy": "true", "aria-label": "Cargando tu panel" },
     ...[1, 2, 3, 4].map(() => h("div", { class: "panel-skeleton__item" },
       h("span", { class: "panel-skeleton__thumb" }), h("span", { class: "panel-skeleton__lines" }, h("span", {}), h("span", {}))))));
   let session;
@@ -1805,7 +1792,7 @@ async function start() {
   }
   if (config.manualStore && session.tienda !== config.manualStore) {
     renderTop({ loggedIn: false });
-    root.replaceChildren(h("div", { class: "panel-card" },
+    show(h("div", { class: "panel-card" },
       h("p", {}, "Este usuario es de otra tienda."),
       h("button", { class: "btn btn--outline", type: "button", onclick: logout }, "Salir")));
     return;
@@ -1815,7 +1802,7 @@ async function start() {
   try {
     await loadData();
   } catch (e) {
-    root.replaceChildren(h("p", { class: "panel-error" }, e.message));
+    show(h("p", { class: "panel-error" }, e.message));
     return;
   }
   route();
