@@ -157,11 +157,22 @@ export function cleanCategories(input, data) {
  *   compareAt    "precio anterior": se muestra tachado con el cartel "Oferta"
  *   featured     destacado: sale primero en su categoría
  */
+/** Precio por cantidad del mismo producto: { min: 3, price: 12000 } ("llevando 3 o más, $12.000 c/u"). */
+function cleanBulk(input, price) {
+  const min = Number(input?.min);
+  const bulkPrice = cleanPrice(input?.price, "el precio por cantidad");
+  if (!input?.min && !bulkPrice) return null;
+  if (!Number.isInteger(min) || min < 2 || min > 999) throw new Error("En el precio por cantidad, la cantidad tiene que ser un número de 2 a 999.");
+  if (!bulkPrice) throw new Error("En el precio por cantidad, falta el precio.");
+  if (price && bulkPrice >= price) throw new Error("El precio por cantidad tiene que ser menor que el precio por unidad.");
+  return { min, price: bulkPrice };
+}
+
 function cleanExtras(input, price) {
   const description = cleanText(input?.description, 500, "la descripción");
   const compareAt = cleanPrice(input?.compareAt, "el precio anterior");
   if (compareAt && price && compareAt <= price) throw new Error("El precio anterior (tachado) tiene que ser más alto que el precio.");
-  return { description: description || null, compareAt, featured: input?.featured === true };
+  return { description: description || null, compareAt, featured: input?.featured === true, bulk: cleanBulk(input?.bulk, price) };
 }
 
 /**
@@ -285,6 +296,7 @@ function withChanges(base, change = {}) {
     ...base, sizes, price: change.price ?? null, wholesalePrice: change.wholesalePrice ?? null, hidden: change.hidden === true,
     description: change.description ?? null, compareAt: change.compareAt ?? null, featured: change.featured === true,
     mayorista: change.mayorista ?? null,
+    bulk: change.bulk ?? null,
   };
 }
 
@@ -394,6 +406,7 @@ export function cleanBrChange(input, base) {
   if (extras.description) change.description = extras.description;
   if (extras.compareAt) change.compareAt = extras.compareAt;
   if (extras.featured) change.featured = true;
+  if (extras.bulk) change.bulk = extras.bulk;
   if (Object.keys(extra).length) {
     change.extra = extra;
     // Por si Brasil lo agota: así el modelo sigue en la tienda con los pares del cliente.
@@ -523,6 +536,14 @@ const LOGO_PATH = /^marca\/[a-f0-9-]{36}-(512|160)\.(webp|jpg)$/;
 const COLORS = new Set(["#18181b", "#1d4ed8", "#047857", "#b91c1c", "#7c3aed", "#db2777", "#c2410c", "#0f766e"]);
 export const isLogoFile = (name) => /^[a-f0-9-]{36}-(512|160)\.(webp|jpg)$/.test(name ?? "");
 
+function cleanByCategory(value) {
+  const result = {};
+  for (const [id, min] of Object.entries(value && typeof value === "object" ? value : {}).slice(0, MAX_CATEGORIES)) {
+    const n = Number(min);
+    if (/^[a-z0-9-]{1,60}$/.test(id) && Number.isInteger(n) && n >= 2 && n <= 100) result[id] = n;
+  }
+  return result;
+}
 const cleanPercent = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? Math.min(Math.max(n, -0.9), 5) : 0;
@@ -568,6 +589,8 @@ export function cleanSettings(input, current = {}) {
     // Orden de la tienda: categorías (alfabético o el que eligió) y productos dentro de cada una.
     categoryOrder: input?.categoryOrder === "manual" ? "manual" : "alfabetico",
     productOrder: PRODUCT_ORDER_VALUES.includes(input?.productOrder) ? input.productOrder : "alfabetico",
+    // Mínimo de por mayor distinto por categoría ({ remeras: 10 }). Las que no están, usan el general.
+    wholesaleByCategory: cleanByCategory(input?.wholesaleByCategory),
     logo,
     // Aviso arriba de la tienda (por ejemplo "Envío gratis este fin de semana").
     notice: cleanText(input?.notice, 120, "el aviso"),
@@ -592,6 +615,7 @@ export function changePrices(catalog, settings, { percent, own, br }) {
   const factor = 1 + percent;
   const scale = (item) => {
     for (const key of ["price", "wholesalePrice", "compareAt"]) if (item[key]) item[key] = roundPrice(item[key] * factor);
+    if (item.bulk?.price) item.bulk.price = roundPrice(item.bulk.price * factor);
     // Precios para revendedores (tiendas con dos versiones).
     if (item.mayorista) for (const key of ["price", "wholesalePrice"]) if (item.mayorista[key]) item.mayorista[key] = roundPrice(item.mayorista[key] * factor);
     if (item.wholesalePrice && item.price && item.wholesalePrice >= item.price) item.wholesalePrice = null;

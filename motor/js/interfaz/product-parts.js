@@ -8,7 +8,7 @@ export function priceHtml(product, pricing) {
   if (prices.bulk) {
     bulkLine = `<p class="price__bulk">Llevando ${prices.bulk.min} o más: <strong class="money">${money(prices.bulk.price)}</strong></p>`;
   } else if (prices.wholesale) {
-    bulkLine = `<p class="price__bulk">${escapeHtml(pricing.wholesaleLabel)}: <strong class="money">${money(prices.wholesale)}</strong></p>`;
+    bulkLine = `<p class="price__bulk">${escapeHtml(pricing.wholesaleLabelFor?.(product) ?? pricing.wholesaleLabel)}: <strong class="money">${money(prices.wholesale)}</strong></p>`;
   }
   // Oferta: el "precio anterior" que cargó el cliente, tachado, con su cartel.
   const before = Number(product.compareAt) > prices.unit

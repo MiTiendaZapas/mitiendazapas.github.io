@@ -419,3 +419,11 @@
   .panel-top:not(.is-editing) ~ .panel-main .panel-savebar { bottom: calc(64px + env(safe-area-inset-bottom)); border-bottom: 1px solid var(--color-border); }
   .panel-top:not(.is-editing) ~ .panel-main[data-section="tienda"] { padding-bottom: 150px; }
 }
+
+/* Venta por mayor: mínimo por categoría */
+.panel-w-body[hidden] { display: none; }
+.panel-w-body { display: grid; gap: var(--space-3); }
+.panel-w-cats { display: grid; gap: 8px; }
+.panel-w-cat { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 56px; padding: 6px 8px 6px 12px; border-radius: var(--radius-control); background: var(--color-surface-2); font-weight: 600; }
+.panel-w-cat__field { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-weight: 500; font-size: 14px; }
+.panel-w-cat__input { width: 110px; }

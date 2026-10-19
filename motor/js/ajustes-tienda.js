@@ -84,5 +84,6 @@ export function applyWholesaleSettings(priceTable, settings, { twoVersions = fal
   if (twoVersions) return priceTable;
   if (!settings.wholesale) return { ...priceTable, wholesale: false };
   const min = settings.wholesaleMin || 5;
-  return { ...priceTable, wholesale: { ...(priceTable.wholesale || {}), minPairs: min, allProducts: true, label: `Llevando ${min} o más productos surtidos` } };
+  return { ...priceTable, wholesale: { ...(priceTable.wholesale || {}), minPairs: min, allProducts: true,
+    byCategory: settings.wholesaleByCategory ?? {}, label: `Llevando ${min} o más productos surtidos` } };
 }

@@ -123,7 +123,10 @@ function saveSoon(key, save, undo) {
 window.addEventListener("beforeunload", (event) => { if (pendingSaves.size) event.preventDefault(); });
 
 /** Una vibración cortita (solo en los celulares que lo permiten), al cambiar el stock. */
-const buzz = () => { try { navigator.vibrate?.(12); } catch { /* sin vibración */ } };
+const buzz = () => {
+  if (navigator.userActivation && !navigator.userActivation.isActive) return;   // solo justo después de un toque
+  try { navigator.vibrate?.(12); } catch { /* sin vibración */ }
+};
 
 function toast(text, kind = "ok") {
   const item = h("p", { class: `panel-toast__item panel-toast__item--${kind}` }, text);
@@ -267,7 +270,7 @@ function themeButton() {
   return button;
 }
 
-const EDIT_SCREENS = ["editar", "nuevo", "br", "precios", "precios-generales"];
+const EDIT_SCREENS = ["editar", "nuevo", "br", "precios", "precios-generales", "por-mayor"];
 
 function renderTop({ loggedIn }) {
   const current = (location.hash.slice(1).split("/")[0]) || "inicio";
@@ -481,6 +484,68 @@ function renderGeneralPricing() {
   state.guard = () => snapshot() !== initial;
 }
 
+/**
+ * Venta por mayor: prenderla, el mínimo general y, si quiere, un mínimo distinto por categoría
+ * (esas categorías cuentan sus productos aparte; las demás suman juntas para el general).
+ */
+function renderWholesale() {
+  const s = state.settings;
+  const on = h("input", { id: "w-on", type: "checkbox", checked: s.wholesale !== false });
+  const general = h("input", { id: "w-min", class: "panel-input", inputmode: "numeric", maxlength: 3, value: s.wholesaleMin || 5 });
+  const perCategory = Object.entries(state.categories).map(([id, label]) => {
+    const input = h("input", { id: `w-cat-${id}`, class: "panel-input panel-w-cat__input", inputmode: "numeric", maxlength: 3,
+      value: s.wholesaleByCategory?.[id] ?? "", "aria-label": `Mínimo para ${label}` });
+    return { id, label, input };
+  });
+  const generalValue = () => Number(general.value) || 5;
+  const paintPlaceholders = () => perCategory.forEach(({ input }) => { input.placeholder = `${generalValue()} (general)`; });
+  general.addEventListener("input", paintPlaceholders);
+  paintPlaceholders();
+  const body = h("div", { class: "panel-w-body" },
+    h("section", { class: "panel-card" }, h("h2", {}, "Mínimo general"),
+      field("w-min", "Desde cuántos productos surtidos", general, "Se pueden mezclar modelos y talles."),
+      h("p", { class: "panel-muted" }, "El precio por mayor de cada producto se pone al editarlo.")),
+    h("section", { class: "panel-card" }, h("h2", {}, "Mínimo por categoría (opcional)"),
+      h("p", { class: "panel-muted" }, "Si una categoría tiene otro mínimo, escribilo. Esa categoría cuenta sus productos aparte; las demás suman juntas para el mínimo general."),
+      h("div", { class: "panel-w-cats" }, perCategory.map(({ id, label, input }) =>
+        h("label", { class: "panel-w-cat", for: `w-cat-${id}` }, h("span", {}, label), h("span", { class: "panel-w-cat__field" }, "desde", input)))),
+      h("p", { class: "panel-muted" }, "Ejemplo: con Remeras desde 10 y el general en 5, quien lleva 5 zapatillas y 6 remeras paga las zapatillas por mayor y las remeras al precio normal.")));
+  const paintOn = () => { body.hidden = !on.checked; };
+  on.addEventListener("change", paintOn);
+  paintOn();
+  const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar");
+  const read = () => ({
+    wholesale: on.checked, wholesaleMin: generalValue(),
+    wholesaleByCategory: Object.fromEntries(perCategory.map(({ id, input }) => [id, Number(input.value)]).filter(([, n]) => n >= 2)),
+  });
+  const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
+    event.preventDefault();
+    const result = await busy(saveButton, () => api("/ajustes", { method: "POST", body: { ...state.settings, name: state.settings.name || config.name, ...read() } }));
+    if (result) {
+      state.settings = result.settings;
+      toast("Listo: tu tienda ya usa esta venta por mayor.");
+      state.guard = null;
+      location.hash = "#productos";
+    }
+  } },
+    h("div", { class: "panel-editor__head" },
+      h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, ico("chevronLeft"), "Volver"),
+      h("h1", {}, "Venta por mayor")),
+    TWO_VERSIONS
+      ? h("section", { class: "panel-card" }, h("p", {}, "Tu tienda tiene una versión para revendedores: ahí el por mayor sale de los precios para revendedores de cada producto."))
+      : [h("section", { class: "panel-card" },
+        h("label", { class: "panel-switch", for: "w-on" }, on, h("span", {}, "Vendo por mayor"),
+          h("small", { class: "panel-muted" }, "Apagado, en tu tienda no se muestra ningún precio por mayor."))), body],
+    TWO_VERSIONS ? null : h("div", { class: "panel-savebar" }, saveButton));
+  show(form);
+  const snapshot = () => JSON.stringify(read());
+  const initial = snapshot();
+  state.guard = () => !TWO_VERSIONS && snapshot() !== initial;
+}
+
+/** Botón "Por mayor" (arriba de las listas de productos). */
+const wholesaleButton = () => h("a", { class: "btn btn--outline btn--sm", href: "#por-mayor" }, "Por mayor");
+
 function renderOwnProducts() {
   const full = state.products.length >= state.limits.products;
   const list = h("ul", { class: "panel-list" });
@@ -515,6 +580,7 @@ function renderOwnProducts() {
     h("div", { class: "panel-toolbar" },
       h("button", { class: "btn btn--primary", type: "button", disabled: full, onclick: () => openEditor(null) }, "+ Nuevo producto"),
       pricesButton(),
+      wholesaleButton(),
       h("span", { class: "panel-muted" }, `${state.products.length} de ${state.limits.products} productos`)),
     // En el celular, "Nuevo producto" también queda abajo a la derecha, cerca del dedo.
     full ? null : h("button", { class: "panel-fab", type: "button", "aria-label": "Nuevo producto", onclick: () => openEditor(null) }, ico("plus")),
@@ -712,6 +778,33 @@ function resaleFields(prefix, draft, { unitHint, wholesaleHint }) {
   };
 }
 
+/**
+ * Precio por cantidad del mismo producto: "llevando 3 o más, $12.000 cada uno" (opcional).
+ * getPrice: el precio por unidad (para avisar si el de cantidad no es menor).
+ */
+function bulkFields(prefix, draft, getPrice) {
+  const current = draft.bulk ?? {};
+  const min = h("input", { id: `${prefix}-bulk-min`, class: "panel-input", inputmode: "numeric", maxlength: 3, value: current.min ?? "", placeholder: "Ej: 3" });
+  const price = h("input", { id: `${prefix}-bulk-price`, class: "panel-input", inputmode: "numeric", value: current.price ?? "", placeholder: "Ej: 12000" });
+  const preview = h("p", { class: "panel-muted", role: "status" });
+  const paint = () => {
+    const n = Number(min.value), each = Number(price.value.replace(/\D/g, ""));
+    preview.textContent = n >= 2 && each ? `En tu tienda dice: "Llevando ${n} o más: ${money(each)}" (de este producto, en cualquier talle).`
+      : "Opcional. Para premiar al que lleva varias unidades del mismo producto.";
+  };
+  min.addEventListener("input", paint);
+  price.addEventListener("input", paint);
+  paint();
+  return {
+    node: h("section", { class: "panel-card" }, h("h2", {}, "Precio por cantidad"),
+      h("div", { class: "panel-two" },
+        field(`${prefix}-bulk-min`, "Llevando (cantidad) o más", min),
+        field(`${prefix}-bulk-price`, "Precio de cada uno", price)),
+      preview),
+    read: () => ({ bulk: { min: min.value.replace(/\D/g, ""), price: price.value.replace(/\D/g, "") } }),
+  };
+}
+
 /** Etiquetas chicas en la lista: destacado y oferta. */
 function tagsFor(product) {
   const tags = [
@@ -803,7 +896,7 @@ function renderBrProducts() {
   }
 
   show(
-    h("div", { class: "panel-toolbar" }, h("a", { class: "btn btn--primary btn--sm", href: "#precios-generales" }, "Precios generales"), pricesButton()),
+    h("div", { class: "panel-toolbar" }, h("a", { class: "btn btn--primary btn--sm", href: "#precios-generales" }, "Precios generales"), pricesButton(), wholesaleButton()),
     seenIntro() ? null : h("div", { class: "panel-intro-box" },
       h("p", { class: "panel-muted panel-intro" },
         "Estos modelos y su stock llegan solos y se actualizan solos. Tocá “Editar” en uno para ponerle tu precio, ocultarlo o sumar los pares que tenés en tu casa."),
@@ -914,7 +1007,7 @@ function brBody(product, changes = {}) {
     id: product.id,
     price: product.price ?? "", wholesalePrice: product.wholesalePrice ?? "", hidden: product.hidden === true,
     description: product.description ?? "", compareAt: product.compareAt ?? "", featured: product.featured === true,
-    mayorista: product.mayorista ?? null,
+    mayorista: product.mayorista ?? null, bulk: product.bulk ?? null,
     extra: product.sizes.filter((s) => s.casa > 0).map((s) => ({ size: s.size, stock: s.casa })),
     ...changes,
   };
@@ -942,6 +1035,7 @@ function renderBrEditor(product) {
   });
   const offer = offerBox("b", () => Number(price.value.replace(/\D/g, "")) || list.unit || 0, { on: Boolean(draft.compareAt), sale: draft.compareAt ? draft.price : null });
   price.addEventListener("input", () => offer.refresh());
+  const bulk = bulkFields("b", draft);
   // Si la tienda no vende por mayor, no se pide precio por mayor.
   const sellsWholesale = TWO_VERSIONS || (state.settings.name ? state.settings.wholesale === true : state.listPricing?.hasWholesale !== false);
   const sizesBox = h("div", { class: "panel-sizes" });
@@ -989,6 +1083,7 @@ function renderBrEditor(product) {
       extra: sizes.filter((s) => s.casa > 0).map((s) => ({ size: s.size, stock: s.casa })),
       ...extras.read(),
       ...resale.read(),
+      ...bulk.read(),
       ...(deal.on ? { price: deal.sale, compareAt: deal.normal } : { compareAt: "" }),
     }, "Cambios guardados.");
   } },
@@ -1011,6 +1106,7 @@ function renderBrEditor(product) {
         h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
     resale.node,
     offer.node,
+    bulk.node,
     h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles"),
       h("p", { class: "panel-muted" }, "“De Brasil” se actualiza solo. En “En tu casa” sumá los pares que tenés vos: en la tienda se ven todos juntos."),
@@ -1028,7 +1124,7 @@ function renderBrEditor(product) {
   show(form);
   renderSizes();
   window.scrollTo(0, 0);
-  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read(), offer.read(), resale.read()]);
+  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read(), offer.read(), resale.read(), bulk.read()]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -1144,6 +1240,7 @@ function renderEditor(product) {
   });
   const offer = offerBox("f", () => Number(price.value.replace(/\D/g, "")) || 0, { on: Boolean(draft.compareAt), sale: draft.compareAt ? draft.price : null });
   price.addEventListener("input", () => offer.refresh());
+  const bulk = bulkFields("f", draft);
 
   // Talles
   const sizesBox = h("div", { class: "panel-sizes" });
@@ -1202,6 +1299,7 @@ function renderEditor(product) {
       hidden: !visible.checked,
       ...extras.read(),
       ...resale.read(),
+      ...bulk.read(),
       // En oferta: se cobra el de oferta y el normal se muestra tachado.
       ...(deal.on ? { price: deal.sale, compareAt: deal.normal } : { compareAt: "" }),
     };
@@ -1236,6 +1334,7 @@ function renderEditor(product) {
         h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, "+ Otro talle")),
       sizesBox),
     offer.node,
+    bulk.node,
     h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
     product ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: () => removeProduct(product) }, "Borrar este producto") : null,
     h("div", { class: "panel-savebar" }, saveButton));
@@ -1247,7 +1346,7 @@ function renderEditor(product) {
   window.scrollTo(0, 0);
   // Si sale sin guardar, se le pregunta (ver route).
   const snapshot = () => JSON.stringify([name.value, categorySelect.value, newCategory.value, price.value, wholesale.value,
-    visible.checked, draft.sizes, draft.images, uploading, extras.read(), offer.read(), resale.read()]);
+    visible.checked, draft.sizes, draft.images, uploading, extras.read(), offer.read(), resale.read(), bulk.read()]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -1409,8 +1508,6 @@ function renderStoreSettings() {
     type: "button", class: "panel-swatch", role: "radio", "aria-checked": String(c.value === color), "aria-label": c.label,
     style: `--swatch:${c.value}`, onclick: () => { color = c.value; renderSwatches(); } })));
   renderSwatches();
-  const wholesaleOn = h("input", { id: "s-wholesale", type: "checkbox", checked: s.wholesale !== false });
-  const wholesaleMin = input("s-wholesale-min", s.wholesaleMin || 5, { inputmode: "numeric", maxlength: 3 });
 
   // Logo
   const logoBox = h("div", { class: "panel-logo" });
@@ -1448,7 +1545,7 @@ function renderStoreSettings() {
       instagram: instagram.value, tiktok: tiktok.value, facebook: facebook.value,
       heroTitle: heroTitle.value, heroHighlight: heroHighlight.value, heroText: heroText.value, notice: notice.value,
       orderGreeting: orderGreeting.value, orderFooter: orderFooter.value,
-      color, wholesale: wholesaleOn.checked, wholesaleMin: Number(wholesaleMin.value),
+      color,
     } }));
     if (result) {
       state.settings = result.settings;
@@ -1483,15 +1580,14 @@ function renderStoreSettings() {
       field("s-hero-text", "Texto de bienvenida", heroText),
       h("div", { class: "panel-field" }, h("span", { class: "panel-label" }, "Color de los botones"), swatches)),
     TWO_VERSIONS ? null : h("section", { class: "panel-card" }, h("h2", {}, "Venta por mayor"),
-      h("label", { class: "panel-switch", for: "s-wholesale" }, wholesaleOn, h("span", {}, "Vendo por mayor"),
-        h("small", { class: "panel-muted" }, "Cada producto tiene su precio por mayor (si no le ponés, se cobra el normal).")),
-      field("s-wholesale-min", "Desde cuántos productos surtidos", wholesaleMin)),
+      h("p", { class: "panel-muted" }, "Ahora tiene su propia pantalla, con mínimos por categoría."),
+      h("a", { class: "btn btn--outline", href: "#por-mayor" }, "Configurar la venta por mayor")),
     passwordCard(),
     h("div", { class: "panel-savebar" }, saveButton));
   show(form);
   // Si sale sin guardar, se le pregunta (ver route). La clave va aparte y no cuenta.
-  const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, notice, orderGreeting, orderFooter, wholesaleMin];
-  const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color, wholesaleOn.checked]);
+  const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, notice, orderGreeting, orderFooter];
+  const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color]);
   let initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -1573,6 +1669,7 @@ function renderHome() {
       h("div", { class: "panel-home__quick" },
         h("button", { class: "btn btn--outline", type: "button", onclick: () => { state.view = "propios"; openEditor(null); } }, "+ Nuevo producto"),
         h("a", { class: "btn btn--outline", href: "#precios" }, "Cambiar precios"),
+        h("a", { class: "btn btn--outline", href: "#por-mayor" }, "Venta por mayor"),
         h("a", { class: "btn btn--outline", href: "#tienda" }, state.settings.notice ? "Cambiar el aviso" : "Poner un aviso"),
         h("a", { class: "btn btn--outline", href: "#ayuda" }, "¿Cómo se usa?"))),
     installCard);
@@ -1607,7 +1704,9 @@ function renderHelp() {
     ["Subir o bajar todos los precios", "En “Productos” tocá “Cambiar precios”: elegí subir o bajar, cuánto (5%, 10%…) y mirá cómo quedan antes de aplicar."],
     ["Poner algo en oferta", "Tocá “Editar” en el producto, prendé “Poner en oferta” y elegí el descuento (10%, 20%, 30% u otro precio). En la tienda se ve el precio rebajado, el de antes tachado y el cartel “Oferta”. Para sacarla, apagá “Poner en oferta”."],
     ["Destacados y descripción", "Al editar un producto, en “Más opciones”: con “Destacado” sale primero en su categoría, y podés escribir una descripción."],
-    ["Tu tienda", "En “Mi tienda” cambiás el nombre, el logo, tu WhatsApp, tus redes, los textos de la portada, el aviso de arriba de la tienda, el color y la venta por mayor. También tu clave."],
+    ["Venta por mayor", "En “Productos” → “Por mayor” (o desde Inicio) la prendés, elegís desde cuántos productos y, si querés, otro mínimo para cada categoría."],
+    ["Precio por cantidad", "Al editar un producto, en “Precio por cantidad”: por ejemplo “llevando 3 o más, $12.000 cada uno” de ese mismo producto."],
+    ["Tu tienda", "En “Mi tienda” cambiás el nombre, el logo, tu WhatsApp, tus redes, los textos de la portada, el aviso de arriba de la tienda, el mensaje de los pedidos y el color. También tu clave."],
     ["Tenerlo como aplicación", "En “Inicio” está cómo instalar el panel en tu celular: te queda un ícono para entrar directo."],
     ["Compartir tu tienda", "En “Inicio” tocá “Compartir mi tienda” y elegí WhatsApp, Instagram o donde quieras."],
     ["Los pedidos", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
@@ -1766,6 +1865,7 @@ function route() {
   }
   if (section === "categorias") return renderCategories();
   if (section === "precios") return renderPriceChange();
+  if (section === "por-mayor") return renderWholesale();
   if (section === "precios-generales" && state.br) return renderGeneralPricing();
   if (section === "tienda") return renderStoreSettings();
   if (section === "ayuda") return renderHelp();

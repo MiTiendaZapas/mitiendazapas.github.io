@@ -76,6 +76,11 @@ export function createPricing(table) {
   // Cómo se nombran las unidades en carrito y pedido: "pares" o, con ropa y calzado juntos, "productos".
   const words = allProducts ? ["producto", "productos"] : ["par", "pares"];
   const wholesaleLabel = table.wholesale?.label ?? `Llevando ${minPairs} o más pares surtidos`;
+  // Tiendas con panel: un mínimo distinto por categoría ({ remeras: 10 }). Esas categorías cuentan
+  // sus productos por separado; las demás suman juntas para el mínimo general.
+  const byCategory = table.wholesale?.byCategory ?? {};
+  const groupOf = (product) => (byCategory[product.category] ? `cat:${product.category}` : qualityOf(product));
+  const minOf = (key) => (key.startsWith("cat:") ? Number(byCategory[key.slice(4)]) || minPairs : minPairs);
   // Tiendas con panel: "Cambiar precios" sube (o baja) la lista en este porcentaje (0.1 = 10%).
   // No toca los productos con precio propio (esos ya se cambiaron uno por uno).
   const percent = Number(table.percent) || 0;
@@ -91,7 +96,9 @@ export function createPricing(table) {
     // Producto propio del cliente: solo su precio (ninguna regla de la lista, ni "llevando 10 o más").
     const unitRule = product.manual ? null : findRule(unitList, key, shortKey, product.category);
     const unit = Number(override.unit) || adjust(unitRule?.price || unitList.default);
-    const bulk = unitRule?.bulk ?? null;
+    // Precio por cantidad del mismo producto: el que puso el cliente en su panel, o el de la lista.
+    const own_bulk = product.bulk?.min && product.bulk?.price && product.bulk.price < unit ? { min: product.bulk.min, price: product.bulk.price } : null;
+    const bulk = own_bulk ?? (product.manual ? null : unitRule?.bulk ?? null);
     let wholesale = null;
     if (hasWholesale && !bulk && countsForWholesale(product)) {
       // Producto propio del cliente: solo su precio por mayor (nunca el de la lista de precios).
@@ -112,6 +119,11 @@ export function createPricing(table) {
     allProducts,
     words,
     wholesaleLabel,
+    /** El texto del por mayor de un producto (con su mínimo, si su categoría tiene uno propio). */
+    wholesaleLabelFor(product) {
+      const own = Number(byCategory[product?.category]);
+      return own ? `Llevando ${own} o más de esta categoría (surtidos)` : wholesaleLabel;
+    },
     forProduct: resolve,
 
     /** Cuenta pares (todo menos indumentaria) para saber si aplica precio por mayor. */
@@ -132,9 +144,10 @@ export function createPricing(table) {
       // Calidades (BR y G5): cada una cuenta SUS pares para el precio por mayor,
       // porque son de proveedores y precios distintos. Sin G5 hay un solo grupo
       // y todo funciona como siempre.
-      const groupKeys = [...new Set(lines.map((line) => qualityOf(line.product)))].sort();
-      const groupPairs = new Map(groupKeys.map((key) => [key, this.countPairs(lines.filter((l) => qualityOf(l.product) === key))]));
-      const qualifies = (key) => hasWholesale && groupPairs.get(key) >= minPairs;
+      // Con mínimos por categoría, esas categorías también son grupos aparte.
+      const groupKeys = [...new Set(lines.map((line) => groupOf(line.product)))].sort();
+      const groupPairs = new Map(groupKeys.map((key) => [key, this.countPairs(lines.filter((l) => groupOf(l.product) === key))]));
+      const qualifies = (key) => hasWholesale && groupPairs.get(key) >= minOf(key);
       const pairs = this.countPairs(lines);
       const canChoose = groupKeys.some(qualifies);
       const qtyByProduct = new Map();
@@ -144,7 +157,7 @@ export function createPricing(table) {
         const prices = resolve(line.product);
         let price = prices.unit;
         if (prices.bulk && qtyByProduct.get(line.product.id) >= prices.bulk.min) price = prices.bulk.price;
-        else if (useWholesale && prices.wholesale && qualifies(qualityOf(line.product))) price = prices.wholesale;
+        else if (useWholesale && prices.wholesale && qualifies(groupOf(line.product))) price = prices.wholesale;
         return { ...line, price, subtotal: price * line.qty, unitPrice: prices.unit };
       });
       const sum = (priced) => priced.reduce((acc, line) => acc + line.subtotal, 0);
@@ -154,13 +167,14 @@ export function createPricing(table) {
       const isWholesale = canChoose && mode === "mayor";
       const priced = isWholesale ? wholesaleLines : unitLines;
       const groups = groupKeys.map((key) => {
-        const groupLines = priced.filter((line) => qualityOf(line.product) === key);
+        const groupLines = priced.filter((line) => groupOf(line.product) === key);
         return {
           key,
           lines: groupLines,
           pairs: groupPairs.get(key),
           canChoose: qualifies(key),
-          pairsToWholesale: Math.max(minPairs - groupPairs.get(key), 0),
+          pairsToWholesale: Math.max(minOf(key) - groupPairs.get(key), 0),
+          min: minOf(key),
           subtotal: sum(groupLines),
         };
       });
@@ -170,6 +184,7 @@ export function createPricing(table) {
         groups,
         // true si hay G5 en el pedido: el carrito y el mensaje se muestran separados por calidad.
         byQuality: groupKeys.includes("g5"),
+        byCategory: groupKeys.some((key) => key.startsWith("cat:")),
         pairs,
         minPairs,
         words,
@@ -177,7 +192,7 @@ export function createPricing(table) {
         canChoose,
         mode: canChoose ? mode : "unidad",
         isWholesale,
-        pairsToWholesale: Math.max(minPairs - Math.max(0, ...groupPairs.values()), 0),
+        pairsToWholesale: Math.min(...groupKeys.map((key) => Math.max(minOf(key) - groupPairs.get(key), 0)), Math.max(minPairs, 0)),
         total: sum(priced),
         totals: { unidad: sum(unitLines), mayor: sum(wholesaleLines) },
       };

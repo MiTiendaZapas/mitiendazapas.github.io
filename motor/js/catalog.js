@@ -75,6 +75,8 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
         featured: p.featured === true,
         // Precio general de G5 sin precio por mayor (tiendas con panel).
         noWholesale: p.noWholesale === true,
+        // Precio por cantidad del mismo producto (lo pone el cliente): { min, price }.
+        bulk: Number(p.bulk?.min) > 1 && Number(p.bulk?.price) > 0 ? { min: Number(p.bulk.min), price: Number(p.bulk.price) } : null,
         // Tiendas con dos versiones: precios propios para la de revendedores.
         mayorista: p.mayorista && typeof p.mayorista === "object" ? {
           price: Number(p.mayorista.price) > 0 ? Number(p.mayorista.price) : null,

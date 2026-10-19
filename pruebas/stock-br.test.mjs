@@ -140,4 +140,19 @@ describe("stock de Brasil", () => {
     const general = publicMixedCatalog(store({ pricing: { br: { unit: 55000, wholesale: 40000 } } }), withG5).products.find((p) => p.id === "vp-1");
     assert.deepEqual([general.price, general.wholesalePrice], [55000, 40000]);
   });
+
+  test("por mayor: mínimo distinto por categoría (cuenta aparte) y precio por cantidad de un producto", () => {
+    const pricing = createPricing({ wholesale: { minPairs: 5, allProducts: true, byCategory: { remeras: 10 } }, unit: { default: 0, rules: [] } });
+    const zapa = { id: "m-z", name: "Zapa", category: "zapatillas", price: 50000, wholesalePrice: 40000, manual: true };
+    const remera = { id: "m-r", name: "Remera", category: "remeras", price: 15000, wholesalePrice: 12000, manual: true };
+    const buzo = { id: "m-b", name: "Buzo", category: "buzos", price: 30000, wholesalePrice: 25000, manual: true, bulk: { min: 3, price: 26000 } };
+    const line = (product, qty) => ({ product, productId: product.id, size: "M", qty });
+    // 5 zapatillas llegan al general (5); 6 remeras no llegan a su mínimo (10).
+    const q = pricing.quote([line(zapa, 5), line(remera, 6)], "mayor");
+    assert.deepEqual(q.lines.map((l) => l.price), [40000, 15000]);
+    assert.equal(pricing.wholesaleLabelFor(remera), "Llevando 10 o más de esta categoría (surtidos)");
+    // Precio por cantidad: 3 buzos del mismo modelo, cada uno a 26.000 (aunque no llegue al por mayor).
+    assert.deepEqual(pricing.quote([line(buzo, 3)], "unidad").lines.map((l) => l.price), [26000]);
+    assert.deepEqual(pricing.quote([line(buzo, 2)], "unidad").lines.map((l) => l.price), [30000]);
+  });
 });
