@@ -2,7 +2,8 @@
  * Crea (o cambia) el usuario y la clave del panel de una tienda con stock propio.
  *
  * Uso (desde la carpeta plataforma-zapas):
- *   node herramientas/crear_usuario_panel.mjs <tienda> <usuario> [--local]
+ *   node herramientas/crear_usuario_panel.mjs <tienda> <usuario> [--local] [--sin-elegir]
+ *   (también sirve para darle una clave nueva a quien se la olvidó: vuelve a pedirle que elija la suya)
  *
  * Inventa una clave segura (o usa la de PANEL_CLAVE), la muestra UNA vez (para pasársela al cliente) y guarda
  * en el depósito PRIVADO solo la clave cifrada. Con --local la guarda en la prueba
@@ -42,7 +43,10 @@ const password = chosen ?? letters.join("").replace(/(.{4})(?!$)/g, "$1-");
 
 const salt = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64");
 const iterations = 100000;
-const record = { usuario: user, tienda: store, salt, iterations, hash: await hashPassword(password, salt, iterations), creado: new Date().toISOString() };
+// La primera vez que entra, el panel le pide que elija su propia clave (salvo --sin-elegir, por
+// ejemplo para una tienda de demostración con una clave compartida).
+const record = { usuario: user, tienda: store, salt, iterations, hash: await hashPassword(password, salt, iterations), creado: new Date().toISOString(),
+  ...(process.argv.includes("--sin-elegir") ? {} : { elegirClave: true }) };
 
 const folder = mkdtempSync(join(tmpdir(), "panel-"));
 const file = join(folder, "usuario.json");
@@ -56,3 +60,4 @@ try {
 }
 console.log(`Listo. Tienda: ${store} · Usuario: ${user} · Clave: ${password}`);
 console.log("Pasale la clave al cliente por un medio privado. No queda guardada en ningún lado sin cifrar.");
+if (!process.argv.includes("--sin-elegir")) console.log("La primera vez que entre, el panel le va a pedir que elija su propia clave.");

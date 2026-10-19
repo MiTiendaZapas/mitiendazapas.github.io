@@ -323,6 +323,37 @@ function showLogin(message = "") {
   user.focus();
 }
 
+/**
+ * "Elegí tu clave": la primera vez que entra con la clave que le pasaron. No sigue hasta que
+ * la elige (así nadie se queda con la clave que conoce otra persona). Devuelve true al terminar.
+ */
+function chooseKey() {
+  return new Promise((resolve) => {
+    renderTop({ loggedIn: false });
+    const next = h("input", { id: "ck-new", class: "panel-input", type: "password", autocomplete: "new-password", minlength: 8 });
+    const repeat = h("input", { id: "ck-repeat", class: "panel-input", type: "password", autocomplete: "new-password" });
+    const error = h("p", { class: "panel-error", role: "alert" });
+    const button = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar mi clave");
+    show(h("form", { class: "panel-card panel-login", onsubmit: async (event) => {
+      event.preventDefault();
+      error.textContent = "";
+      if (next.value.length < 8) return (error.textContent = "La clave tiene que tener 8 letras o números como mínimo.");
+      if (next.value !== repeat.value) return (error.textContent = "Las dos claves no coinciden. Escribila igual las dos veces.");
+      const done = await busy(button, () => api("/clave-inicial", { method: "POST", body: { nueva: next.value } }));
+      if (!done) return;
+      toast("¡Listo! Desde ahora entrás con tu clave.");
+      resolve(true);
+    } },
+      h("h1", {}, "Elegí tu clave"),
+      h("p", { class: "panel-muted" }, "Es tu primera vez en el panel. Elegí una clave que solo sepas vos: la vas a usar para entrar desde ahora."),
+      field("ck-new", "Tu clave nueva", next, "8 letras o números como mínimo."),
+      field("ck-repeat", "Repetí la clave", repeat),
+      error, button,
+      h("button", { class: "btn btn--ghost", type: "button", onclick: () => { logout(); resolve(false); } }, "Salir")));
+    next.focus();
+  });
+}
+
 async function logout() {
   await api("/salir", { method: "POST" }).catch(() => {});
   showLogin("Saliste del panel.");
@@ -340,7 +371,7 @@ function matchesFilter(p) {
 function renderProducts() {
   if (!state.br) return renderOwnProducts();
   const switcher = h("div", { class: "panel-switcher", role: "group", "aria-label": "Qué productos ver" },
-    [["propios", `Mis productos (${state.products.length})`], ["br", `Stock de Brasil (${state.br.products.length})`]].map(([id, label]) =>
+    [["propios", `Mis productos (${state.products.length})`], ["br", `Stock automático (${state.br.products.length})`]].map(([id, label]) =>
       h("button", { type: "button", class: "panel-switcher__btn", "aria-pressed": String(state.view === id),
         onclick: () => { state.view = id; renderProducts(); } }, label)));
   if (state.view === "br") renderBrProducts();
@@ -813,6 +844,21 @@ function bulkFields(prefix, draft, getPrice) {
   };
 }
 
+/**
+ * "Opciones de precio y más" (oferta, precio por cantidad, descripción, destacado), plegado
+ * para que Editar sea corto. Si el producto ya usa alguna, viene abierto y dice cuáles.
+ */
+function optionsFold(draft, ...sections) {
+  const used = [draft.compareAt ? "en oferta" : null, draft.bulk?.min ? "precio por cantidad" : null,
+    draft.description ? "con descripción" : null, draft.featured ? "destacado" : null].filter(Boolean);
+  return h("details", { class: "panel-card panel-fold", open: used.length > 0 },
+    h("summary", { class: "panel-fold__summary" },
+      h("span", {}, h("strong", {}, "Opciones de precio y más"),
+        h("small", { class: "panel-muted" }, used.length ? `Usando: ${used.join(", ")}.` : "Oferta, precio por cantidad, descripción y destacado.")),
+      ico("chevronDown", "panel-caret")),
+    h("div", { class: "panel-fold__body" }, sections));
+}
+
 /** Etiquetas chicas en la lista: destacado y oferta. */
 function tagsFor(product) {
   const tags = [
@@ -907,7 +953,7 @@ function renderBrProducts() {
     h("div", { class: "panel-toolbar" }, h("a", { class: "btn btn--primary btn--sm", href: "#precios-generales" }, "Precios generales"), pricesButton(), wholesaleButton()),
     seenIntro() ? null : h("div", { class: "panel-intro-box" },
       h("p", { class: "panel-muted panel-intro" },
-        "Estos modelos y su stock llegan solos y se actualizan solos. Tocá “Editar” en uno para ponerle tu precio, ocultarlo o sumar los pares que tenés en tu casa."),
+        "Stock automático: estos modelos (de Brasil y calidad G5) y su stock llegan y se actualizan solos. Tocá “Editar” en uno para ponerle tu precio, ocultarlo o sumar los pares que tenés en tu casa."),
       h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: (e) => { rememberIntro(); e.currentTarget.parentElement.remove(); } }, "Entendido")),
     h("input", { class: "panel-input", type: "search", placeholder: "Buscar modelo", value: state.brSearch, "aria-label": "Buscar modelo",
       oninput: (e) => { state.brSearch = e.target.value; renderItems(); } }),
@@ -1113,9 +1159,7 @@ function renderBrEditor(product) {
       h("label", { class: "panel-switch", for: "b-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
     resale.node,
-    offer.node,
-    bulk.node,
-    h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
+    optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Más opciones"), ...extras.nodes)),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles"),
       h("p", { class: "panel-muted" }, "“De Brasil” se actualiza solo. En “En tu casa” sumá los pares que tenés vos: en la tienda se ven todos juntos."),
       sizesBox,
@@ -1232,14 +1276,21 @@ function renderEditor(product) {
   const newCategoryField = field("f-new-category", "Nombre de la categoría nueva", newCategory);
   const syncCategory = () => { newCategoryField.hidden = categorySelect.value !== NEW; };
   categorySelect.addEventListener("change", syncCategory);
+  categorySelect.addEventListener("change", () => {
+    const note = wholesale.closest(".panel-field")?.querySelector("small");
+    if (note) note.textContent = helpText(categorySelect.value);
+  });
   // En oferta, arriba va el precio normal (el que se ve tachado) y el de oferta en su recuadro.
   const price = h("input", { id: "f-price", class: "panel-input", inputmode: "numeric",
     value: (draft.compareAt || draft.price) ?? "", placeholder: "Ej: 25000" });
   const wholesale = h("input", { id: "f-wholesale", class: "panel-input", inputmode: "numeric", value: draft.wholesalePrice ?? "", placeholder: "Opcional" });
   const min = state.settings.wholesaleMin || 5;
-  const wholesaleHelp = TWO_VERSIONS ? `Opcional. Llevando ${min} o más productos surtidos.` : state.settings.wholesale === false
-    ? "Tu tienda no tiene venta por mayor (se activa en “Mi tienda”)."
-    : `Opcional. Se aplica llevando ${min} o más productos surtidos.`;
+  // El mínimo de la categoría elegida (si tiene uno propio) o el general; cambia al cambiar de categoría.
+  const minFor = (category) => Number(state.settings.wholesaleByCategory?.[category]) || min;
+  const helpText = (category) => (TWO_VERSIONS ? `Opcional. Llevando ${minFor(category)} o más productos surtidos.` : state.settings.wholesale === false
+    ? "Tu tienda no tiene venta por mayor (se activa en “Venta por mayor”)."
+    : `Opcional. Se aplica llevando ${minFor(category)} o más productos surtidos${state.settings.wholesaleByCategory?.[category] ? " de esta categoría" : ""}.`);
+  const wholesaleHelp = helpText(draft.category);
   const visible = h("input", { id: "f-visible", type: "checkbox", checked: !draft.hidden });
   const extras = extraFields("f", draft);
   const resale = resaleFields("f", draft, {
@@ -1341,9 +1392,7 @@ function renderEditor(product) {
       h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
         h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, "+ Otro talle")),
       sizesBox),
-    offer.node,
-    bulk.node,
-    h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
+    optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Más opciones"), ...extras.nodes)),
     product ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: () => removeProduct(product) }, "Borrar este producto") : null,
     h("div", { class: "panel-savebar" }, saveButton));
 
@@ -1646,7 +1695,7 @@ function renderHome() {
     tile(own.filter((p) => p.hidden).length, "pausados", go("propios", "pausados")),
     ...(state.br ? [
       tile(br.filter((p) => p.status === "nuevo").length, "nuevos sin precio", go("br", "sin-precio"), true),
-      tile(br.length, "modelos de Brasil", go("br")),
+      tile(br.length, "en el stock automático", go("br")),
       tile(br.filter((p) => brTotal(p, "casa") > 0).length, "con pares tuyos", go("br", "casa")),
     ] : []),
   ];
@@ -1725,8 +1774,8 @@ function renderHelp() {
     ["Los pedidos", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
   ];
   if (state.br) steps.unshift(
-    ["El stock de Brasil", "En “Productos” → “Stock de Brasil” están los modelos que llegan solos. No hace falta cargarlos: el stock se actualiza solo."],
-    ["Precios generales", "En “Stock de Brasil” → “Precios generales” ponés un precio para todos los modelos de Brasil y otro para todas las G5. Las G5 no se ven en tu tienda hasta que tengan precio."],
+    ["El stock automático", "En “Productos” → “Stock automático” están los modelos de Brasil y de calidad G5 que llegan solos. No hace falta cargarlos: el stock se actualiza solo."],
+    ["Precios generales", "En “Stock automático” → “Precios generales” ponés un precio para todos los modelos de Brasil y otro para todas las G5. Las G5 no se ven en tu tienda hasta que tengan precio."],
     ["Modelos nuevos", "Si en “Precios generales” elegís que los nuevos esperen, los que entren aparecen en Inicio como “sin precio”: tocá “Mostrar” o ponéles un precio."],
     ["Tu precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el precio general (o el precio base que ya trae)."],
     ["Pares que tenés en tu casa", "En el mismo modelo, en “En tu casa”, sumá con “+” los pares que tenés vos. En la tienda se ven junto con los de Brasil. Cuando vendas uno tuyo, restalo con “−”."],
@@ -1912,6 +1961,8 @@ async function start() {
   }
   state.store = session.tienda;
   state.usuario = session.usuario;
+  // Primera vez con la clave que le pasaron: antes de seguir, elige la suya.
+  if (session.elegirClave && !(await chooseKey())) return;
   try {
     await loadData();
   } catch (e) {

@@ -1,4 +1,6 @@
-// GET /api/panel/yo  ->  quién ingresó y a qué tienda
-import { json } from "../../../servidor/panel.js";
+// GET /api/panel/yo  ->  quién ingresó, a qué tienda y si todavía tiene que elegir su clave
+import { json, mustChooseKey } from "../../../servidor/panel.js";
 
-export const onRequestGet = ({ data }) => json(data.session);
+export async function onRequestGet({ env, data }) {
+  return json({ ...data.session, elegirClave: await mustChooseKey(env, data.session.usuario) });
+}

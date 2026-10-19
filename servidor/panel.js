@@ -668,6 +668,29 @@ export async function changePassword(env, usuario, current, next) {
   const hash = await hashPassword(String(current ?? ""), user.salt, user.iterations ?? PBKDF2_ITERATIONS);
   if (!sameText(hash, user.hash)) throw new Error("La clave actual no es correcta.");
   const salt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
-  const updated = { ...user, salt, iterations: PBKDF2_ITERATIONS, hash: await hashPassword(next, salt), cambiada: new Date().toISOString() };
-  await env.PRIVADO.put(`usuarios/${usuario}.json`, JSON.stringify(updated));
+  await savePassword(env, user, next);
+}
+
+/** Guarda la clave nueva (cifrada) y saca el aviso de "elegí tu clave". */
+async function savePassword(env, user, next) {
+  const salt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
+  const { elegirClave, ...rest } = user;
+  const updated = { ...rest, salt, iterations: PBKDF2_ITERATIONS, hash: await hashPassword(next, salt), cambiada: new Date().toISOString() };
+  await env.PRIVADO.put(`usuarios/${user.usuario}.json`, JSON.stringify(updated));
+}
+
+/** ¿Tiene que elegir su propia clave? (la primera vez que entra con la clave que le pasaron). */
+export async function mustChooseKey(env, usuario) {
+  const object = await env.PRIVADO.get(`usuarios/${usuario}.json`);
+  return object ? (await object.json()).elegirClave === true : false;
+}
+
+/** Primera clave propia: no pide la anterior (ya ingresó con ella), solo si le toca elegirla. */
+export async function chooseFirstKey(env, usuario, next) {
+  if (typeof next !== "string" || next.length < 8 || next.length > 100) throw new Error("La clave tiene que tener entre 8 y 100 letras o números.");
+  const object = await env.PRIVADO.get(`usuarios/${usuario}.json`);
+  const user = object ? await object.json() : null;
+  if (!user) throw new Error("Usuario inexistente.");
+  if (user.elegirClave !== true) throw new Error("Tu clave ya está elegida. Para cambiarla, entrá a “Mi tienda”.");
+  await savePassword(env, user, next);
 }
