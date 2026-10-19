@@ -49,7 +49,8 @@ const state = {
   store: null, usuario: null, products: [], categories: {}, settings: {},
   limits: { imagesPerProduct: 6, products: 150 }, search: "", filter: "todos",
   // Stock de Brasil (solo algunas tiendas): modelos, precios de la lista y qué se está mirando.
-  br: null, listPricing: null, view: "br", brSearch: "", brFilter: "todos",
+  // Al entrar a Productos se ven primero los productos propios; el stock de Brasil va segundo (se maneja casi solo).
+  br: null, listPricing: null, view: "propios", brSearch: "", brFilter: "todos",
   guard: null,
   listScroll: {},   // dónde estaba en cada lista, para volver ahí después de editar   // cambios sin guardar en la pantalla abierta (ver route)
 };
@@ -339,7 +340,7 @@ function matchesFilter(p) {
 function renderProducts() {
   if (!state.br) return renderOwnProducts();
   const switcher = h("div", { class: "panel-switcher", role: "group", "aria-label": "Qué productos ver" },
-    [["br", `Stock de Brasil (${state.br.products.length})`], ["propios", `Mis productos (${state.products.length})`]].map(([id, label]) =>
+    [["propios", `Mis productos (${state.products.length})`], ["br", `Stock de Brasil (${state.br.products.length})`]].map(([id, label]) =>
       h("button", { type: "button", class: "panel-switcher__btn", "aria-pressed": String(state.view === id),
         onclick: () => { state.view = id; renderProducts(); } }, label)));
   if (state.view === "br") renderBrProducts();
@@ -448,7 +449,7 @@ function renderGeneralPricing() {
     };
   };
   const br = block("br", "Modelos de Brasil",
-    listUnit ? `Un precio para todos los modelos de Brasil que no tengan el suyo. Vacío = el de tu lista (por ejemplo ${money(listUnit)}).` : "Un precio para todos los modelos de Brasil que no tengan el suyo.",
+    listUnit ? `Un precio para todos los modelos de Brasil que no tengan el suyo. Vacío = el precio base (por ejemplo ${money(listUnit)}).` : "Un precio para todos los modelos de Brasil que no tengan el suyo.",
     listUnit ? String(listUnit) : "Ej: 60000");
   const g5 = block("g5", "Calidad G5", "Un precio para todas las G5 que no tengan el suyo. Mientras no tengan precio, las G5 no se ven en tu tienda.", "Ej: 30000");
   const modes = h("div", { class: "panel-pc__choices", role: "radiogroup", "aria-label": "Modelos nuevos" });
@@ -510,7 +511,14 @@ function renderWholesale() {
       h("div", { class: "panel-w-cats" }, perCategory.map(({ id, label, input }) =>
         h("label", { class: "panel-w-cat", for: `w-cat-${id}` }, h("span", {}, label), h("span", { class: "panel-w-cat__field" }, "desde", input)))),
       h("p", { class: "panel-muted" }, "Ejemplo: con Remeras desde 10 y el general en 5, quien lleva 5 zapatillas y 6 remeras paga las zapatillas por mayor y las remeras al precio normal.")));
-  const paintOn = () => { body.hidden = !on.checked; };
+  // El texto de abajo dice lo que pasa con el interruptor como está ahora.
+  const onHint = h("small", { class: "panel-muted" });
+  const paintOn = () => {
+    body.hidden = !on.checked;
+    onHint.textContent = on.checked
+      ? "Prendido: en tu tienda se ve el precio por mayor de cada producto."
+      : "Apagado: en tu tienda no se muestra ningún precio por mayor.";
+  };
   on.addEventListener("change", paintOn);
   paintOn();
   const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar");
@@ -535,7 +543,7 @@ function renderWholesale() {
       ? h("section", { class: "panel-card" }, h("p", {}, "Tu tienda tiene una versión para revendedores: ahí el por mayor sale de los precios para revendedores de cada producto."))
       : [h("section", { class: "panel-card" },
         h("label", { class: "panel-switch", for: "w-on" }, on, h("span", {}, "Vendo por mayor"),
-          h("small", { class: "panel-muted" }, "Apagado, en tu tienda no se muestra ningún precio por mayor."))), body],
+          onHint)), body],
     TWO_VERSIONS ? null : h("div", { class: "panel-savebar" }, saveButton));
   show(form);
   const snapshot = () => JSON.stringify(read());
@@ -544,7 +552,7 @@ function renderWholesale() {
 }
 
 /** Botón "Por mayor" (arriba de las listas de productos). */
-const wholesaleButton = () => h("a", { class: "btn btn--outline btn--sm", href: "#por-mayor" }, "Por mayor");
+const wholesaleButton = () => h("a", { class: "btn btn--outline btn--sm", href: "#por-mayor" }, "Venta por mayor");
 
 function renderOwnProducts() {
   const full = state.products.length >= state.limits.products;
@@ -923,8 +931,8 @@ function brItemView(product, refresh) {
     refresh();
   });
   const stockText = (mine) => mine
-    ? `${fromBrazil} de Brasil + ${mine} tuyos`
-    : fromBrazil ? `${fromBrazil} de Brasil` : "Sin stock";
+    ? `${fromBrazil} ${product.category === "g5" ? "del proveedor" : "de Brasil"} + ${mine} tuyos`
+    : fromBrazil ? `${fromBrazil} ${product.category === "g5" ? "del proveedor" : "de Brasil"}` : "Sin stock";
   const stockLine = h("span", { class: "panel-muted" }, stockText(own));
   // Al sumar o restar pares, se actualizan los textos sin cerrar el cuadro.
   const paintPairs = () => {
@@ -948,7 +956,7 @@ function brItemView(product, refresh) {
       h("div", { class: "panel-item__info" },
         h("strong", {}, product.name),
         h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
-        priceLine(unit, product.compareAt, product.compareAt ? null : product.price ? " · tu precio" : generalPrice(product) ? " · precio general" : unit ? " · precio de tu lista" : null),
+        priceLine(unit, product.compareAt, product.compareAt ? null : product.price ? " · tu precio" : generalPrice(product) ? " · precio general" : unit ? " · precio base" : null),
         TWO_VERSIONS ? h("small", { class: "panel-muted" }, `Revendedores: ${money(product.mayorista?.price || autoPrice(product, "mayorista"))}`) : null,
         STATUS_TEXT[product.status] ? h("span", { class: "panel-paused-tag" }, STATUS_TEXT[product.status]) : null,
         stockLine,
@@ -1030,8 +1038,8 @@ function renderBrEditor(product) {
   const extras = extraFields("b", draft);
   const resaleList = listPrice(product, "mayorista");
   const resale = resaleFields("b", draft, {
-    unitHint: { placeholder: resaleList.unit ? `${resaleList.unit}` : "", help: resaleList.unit ? `Vacío = el de tu lista de revendedores (${money(resaleList.unit)}).` : "Vacío = el de tu lista de revendedores." },
-    wholesaleHint: { placeholder: resaleList.wholesale ? `${resaleList.wholesale}` : "Opcional", help: resaleList.wholesale ? `Vacío = el de tu lista (${money(resaleList.wholesale)}).` : "Opcional." },
+    unitHint: { placeholder: resaleList.unit ? `${resaleList.unit}` : "", help: resaleList.unit ? `Vacío = el precio base para revendedores (${money(resaleList.unit)}).` : "Vacío = el precio base para revendedores." },
+    wholesaleHint: { placeholder: resaleList.wholesale ? `${resaleList.wholesale}` : "Opcional", help: resaleList.wholesale ? `Vacío = el precio base (${money(resaleList.wholesale)}).` : "Opcional." },
   });
   const offer = offerBox("b", () => Number(price.value.replace(/\D/g, "")) || list.unit || 0, { on: Boolean(draft.compareAt), sale: draft.compareAt ? draft.price : null });
   price.addEventListener("input", () => offer.refresh());
@@ -1043,7 +1051,7 @@ function renderBrEditor(product) {
   function renderSizes() {
     sizesBox.replaceChildren(
       h("div", { class: "panel-br-row panel-br-row--head", "aria-hidden": "true" },
-        h("span", {}, "Talle"), h("span", {}, "De Brasil"), h("span", {}, "En tu casa")),
+        h("span", {}, "Talle"), h("span", {}, product.category === "g5" ? "Del proveedor" : "De Brasil"), h("span", {}, "En tu casa")),
       ...draft.sizes.map((s, i) => {
         const value = h("output", { class: "panel-quick__value" }, s.casa);
         const set = (n) => { s.casa = Math.max(0, n); value.textContent = s.casa; };
@@ -1099,9 +1107,9 @@ function renderBrEditor(product) {
     h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
       h("div", { class: "panel-two" },
         field("b-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, list.unit
-          ? `Vacío = ${generalUnit ? "el precio general" : "el de tu lista"} (${money(list.unit)}).`
+          ? `Vacío = ${generalUnit ? "el precio general" : "el precio base"} (${money(list.unit)}).`
           : "Las G5 necesitan un precio para verse en tu tienda (o poné uno general en “Precios generales”)."),
-        sellsWholesale ? field("b-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, list.wholesale ? `Vacío = el de tu lista (${money(list.wholesale)}).` : "Opcional.") : null),
+        sellsWholesale ? field("b-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, list.wholesale ? `Vacío = el precio base (${money(list.wholesale)}).` : "Opcional.") : null),
       h("label", { class: "panel-switch", for: "b-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
     resale.node,
@@ -1455,7 +1463,7 @@ function renderCategories() {
       h("h1", {}, "Orden de tu tienda"),
       h("p", { class: "panel-muted" }, "Los productos se ven agrupados por categoría. Elegí en qué orden van las categorías y cómo se ordenan los productos dentro de cada una."),
       h("div", { class: "panel-two" },
-        field("o-categories", "Categorías", categoryOrder),
+        field("o-categories", "Orden de las categorías", categoryOrder),
         field("o-products", "Productos dentro de cada categoría", productOrder, state.br
           ? "Para que un producto salga primero, marcalo como “Destacado” al editarlo."
           : "“En el orden que yo elijo”: en Productos → Más → Subir o Bajar."))),
@@ -1637,7 +1645,7 @@ function renderHome() {
     tile(own.filter((p) => p.compareAt).length + br.filter((p) => p.compareAt).length, "en oferta", go(own.some((p) => p.compareAt) || !state.br ? "propios" : "br", own.some((p) => p.compareAt) || !state.br ? "todos" : "cambios")),
     tile(own.filter((p) => p.hidden).length, "pausados", go("propios", "pausados")),
     ...(state.br ? [
-      tile(br.filter((p) => p.status === "nuevo" || p.status === "sin-precio-g5").length, "sin precio (no se ven)", go("br", "sin-precio"), true),
+      tile(br.filter((p) => p.status === "nuevo").length, "nuevos sin precio", go("br", "sin-precio"), true),
       tile(br.length, "modelos de Brasil", go("br")),
       tile(br.filter((p) => brTotal(p, "casa") > 0).length, "con pares tuyos", go("br", "casa")),
     ] : []),
@@ -1665,6 +1673,11 @@ function renderHome() {
         shareButton("btn btn--primary"),
         h("a", { class: "btn btn--outline", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda"))),
     h("section", { class: "panel-card" }, h("h2", {}, "Tu tienda hoy"), h("div", { class: "panel-tiles" }, tiles)),
+    // G5 sin precio: no es un problema (capaz no las quiere vender), pero se le cuenta cómo mostrarlas.
+    state.br && !state.pricing?.g5?.unit && br.some((p) => p.status === "sin-precio-g5")
+      ? h("section", { class: "panel-card" }, h("h2", {}, "¿Querés vender calidad G5?"),
+        h("p", { class: "panel-muted" }, `Tenés ${br.filter((p) => p.status === "sin-precio-g5").length} modelos G5 que todavía no se ven en tu tienda porque no tienen precio.`),
+        h("a", { class: "btn btn--outline", href: "#precios-generales" }, "Ponerles precio")) : null,
     h("section", { class: "panel-card" }, h("h2", {}, "Accesos rápidos"),
       h("div", { class: "panel-home__quick" },
         h("button", { class: "btn btn--outline", type: "button", onclick: () => { state.view = "propios"; openEditor(null); } }, "+ Nuevo producto"),
@@ -1715,7 +1728,7 @@ function renderHelp() {
     ["El stock de Brasil", "En “Productos” → “Stock de Brasil” están los modelos que llegan solos. No hace falta cargarlos: el stock se actualiza solo."],
     ["Precios generales", "En “Stock de Brasil” → “Precios generales” ponés un precio para todos los modelos de Brasil y otro para todas las G5. Las G5 no se ven en tu tienda hasta que tengan precio."],
     ["Modelos nuevos", "Si en “Precios generales” elegís que los nuevos esperen, los que entren aparecen en Inicio como “sin precio”: tocá “Mostrar” o ponéles un precio."],
-    ["Tu precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el precio general (o el de tu lista)."],
+    ["Tu precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el precio general (o el precio base que ya trae)."],
     ["Pares que tenés en tu casa", "En el mismo modelo, en “En tu casa”, sumá con “+” los pares que tenés vos. En la tienda se ven junto con los de Brasil. Cuando vendas uno tuyo, restalo con “−”."],
     ["Ocultar un modelo", "Con “Ocultar” deja de verse en tu tienda. Con “Mostrar” vuelve."],
     ["Otras cosas que vendas", "Ropa, accesorios o lo que quieras: en “Mis productos” → “Nuevo producto”, con tus fotos y la categoría que elijas."],

@@ -427,3 +427,12 @@
 .panel-w-cat { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 56px; padding: 6px 8px 6px 12px; border-radius: var(--radius-control); background: var(--color-surface-2); font-weight: 600; }
 .panel-w-cat__field { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); font-weight: 500; font-size: 14px; }
 .panel-w-cat__input { width: 110px; }
+
+/* Revisión 20/10: todos los botones chicos del panel con al menos 44 de alto (cómodos para el dedo) */
+.panel-page .btn--sm { min-height: 44px; }
+/* Las opciones largas (por ejemplo "Que aparezcan solos con el precio general") bajan de renglón
+   en vez de salirse de la pantalla. */
+.panel-pc__choices .panel-chip { white-space: normal; text-align: left; line-height: 1.25; padding-block: 8px; }
+.panel-toolbar { flex-wrap: wrap; }
+.panel-pc__choices .panel-chip { max-width: 100%; flex: 0 1 auto; }
+.panel-page .panel-toolbar .btn { min-height: 44px; }
