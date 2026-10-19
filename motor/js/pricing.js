@@ -88,7 +88,8 @@ export function createPricing(table) {
     const shortKey = withoutBrand(key, product.brand);
     const own = product.price ? { unit: product.price, wholesale: product.wholesalePrice } : {};
     const override = overrides[product.slug] ?? overrides[product.id] ?? own;
-    const unitRule = findRule(unitList, key, shortKey, product.category);
+    // Producto propio del cliente: solo su precio (ninguna regla de la lista, ni "llevando 10 o más").
+    const unitRule = product.manual ? null : findRule(unitList, key, shortKey, product.category);
     const unit = Number(override.unit) || adjust(unitRule?.price || unitList.default);
     const bulk = unitRule?.bulk ?? null;
     let wholesale = null;

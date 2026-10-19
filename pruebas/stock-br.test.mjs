@@ -117,4 +117,10 @@ describe("stock de Brasil", () => {
     assert.equal(await cleanupPhotos(env, "t", data), 1);
     assert.deepEqual(deleted, ["tiendas/t/fotos/b-lg.webp"]);
   });
+
+  test("producto propio: no le aplica ninguna regla de la lista (ni precio por cantidad)", () => {
+    const pricing = createPricing({ wholesale: false, unit: { default: 60000, rules: [{ price: 20000, contains: ["remera"], bulk: { min: 10, price: 15000 } }] } });
+    const own = { id: "m-9", name: "Remera básica", category: "remeras", price: 12000, manual: true };
+    assert.deepEqual(pricing.forProduct(own), { unit: 12000, wholesale: null, bulk: null });
+  });
 });

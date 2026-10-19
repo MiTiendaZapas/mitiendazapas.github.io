@@ -19,7 +19,7 @@ import { renderHeader, renderHero } from "./interfaz/layout.js";
 import { renderFooter, renderInfoPage } from "./interfaz/pages.js";
 import { keepStockFresh } from "./stock-vivo.js";
 import { orderedCategories, sortProducts } from "../vidriera/orden.js";
-import { applyStoreSettings, applyWholesaleSettings, loadStoreSettings } from "./ajustes-tienda.js";
+import { applyChannelPrices, applyStoreSettings, applyWholesaleSettings, loadStoreSettings } from "./ajustes-tienda.js";
 import { createProductView } from "./interfaz/product-view.js";
 import { createToaster } from "./interfaz/toast.js";
 import { renderLastPairs } from "./interfaz/ultimos-pares.js";
@@ -109,7 +109,10 @@ async function startStore() {
       loadStock(),
       loadJson(fromRoot(channel.prices)),
     ]);
-    const pricing = createPricing(applyWholesaleSettings(priceTable, storeSettings));
+    // Tiendas con dos versiones (público y revendedores): cada una con sus precios.
+    const twoVersions = Object.keys(config.channels ?? {}).length > 1;
+    if (config.manualStore) applyChannelPrices(catalog.products, channelKey);
+    const pricing = createPricing(applyWholesaleSettings(priceTable, storeSettings, { twoVersions }));
     // Tienda con panel: las categorías (sus nombres y su orden) y el orden de los productos
     // dentro de cada una los elige el cliente (Categorías → Orden de tu tienda).
     if (catalog.categories) {

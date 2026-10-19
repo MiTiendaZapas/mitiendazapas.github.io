@@ -20,6 +20,9 @@ const root = document.getElementById("panel");
 const top = document.getElementById("panel-top");
 const toastBox = document.getElementById("panel-toast");
 const API = "/api/panel";
+// Tiendas con dos versiones (público y revendedores, como L.A IMP o la de Fabri): cada producto
+// tiene también su precio para revendedores.
+const TWO_VERSIONS = Boolean(config.channels?.mayorista) && Object.keys(config.channels).length > 1;
 // WhatsApp de la plataforma (L.A IMP): para quien se olvidó la clave.
 const HELP_WHATSAPP = "5491153773771";
 const money = (n) => `$${Number(n || 0).toLocaleString("es-AR")}`;
@@ -494,6 +497,7 @@ function itemView(product, canOrder, refresh) {
         h("strong", {}, product.name),
         h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
         priceLine(product.price, product.compareAt, product.wholesalePrice ? ` · por mayor ${money(product.wholesalePrice)}` : null),
+        TWO_VERSIONS ? h("small", { class: "panel-muted" }, `Revendedores: ${money(product.mayorista?.price || product.price)}`) : null,
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Pausado: no se ve en la tienda") : null,
         tagsFor(product)),
       h("div", { class: "panel-item__actions" },
@@ -603,6 +607,25 @@ function emptyState(iconName, text, action, onAction) {
     action ? h("button", { class: "btn btn--outline", type: "button", onclick: onAction }, action) : null);
 }
 
+/**
+ * Precios para la tienda de revendedores (solo tiendas con dos versiones).
+ * placeholders: lo que se cobra si se deja vacío (la lista de revendedores o el precio al público).
+ */
+function resaleFields(prefix, draft, { unitHint, wholesaleHint }) {
+  if (!TWO_VERSIONS) return { node: null, read: () => ({}) };
+  const current = draft.mayorista ?? {};
+  const price = h("input", { id: `${prefix}-resale-price`, class: "panel-input", inputmode: "numeric", value: current.price ?? "", placeholder: unitHint.placeholder });
+  const wholesale = h("input", { id: `${prefix}-resale-wholesale`, class: "panel-input", inputmode: "numeric", value: current.wholesalePrice ?? "", placeholder: wholesaleHint.placeholder });
+  return {
+    node: h("section", { class: "panel-card" }, h("h2", {}, "Precio en la tienda de revendedores"),
+      h("p", { class: "panel-muted" }, "Tu tienda tiene dos versiones: al público y para revendedores (por mayor). Acá va el precio de la de revendedores."),
+      h("div", { class: "panel-two" },
+        field(`${prefix}-resale-price`, "Precio", price, unitHint.help),
+        field(`${prefix}-resale-wholesale`, "Precio por mayor", wholesale, wholesaleHint.help))),
+    read: () => ({ mayorista: { price: price.value.replace(/\D/g, ""), wholesalePrice: wholesale.value.replace(/\D/g, "") } }),
+  };
+}
+
 /** Etiquetas chicas en la lista: destacado y oferta. */
 function tagsFor(product) {
   const tags = [
@@ -634,8 +657,9 @@ const brTotal = (product, part) => product.sizes.reduce((sum, s) => sum + s[part
 const brChanged = (p) => Boolean(p.price || p.wholesalePrice || p.hidden || p.description || p.compareAt || p.featured || brTotal(p, "casa"));
 
 /** Precio de la lista para un modelo de Brasil (sin el precio propio que le haya puesto el cliente). */
-function listPrice(product) {
-  const prices = state.listPricing?.forProduct({ ...product, price: null, wholesalePrice: null, manual: false });
+function listPrice(product, version = "publico") {
+  const pricing = version === "mayorista" ? state.resalePricing : state.listPricing;
+  const prices = pricing?.forProduct({ ...product, price: null, wholesalePrice: null, manual: false });
   return prices ? { unit: prices.unit, wholesale: prices.wholesale } : { unit: null, wholesale: null };
 }
 
@@ -732,6 +756,7 @@ function brItemView(product, refresh) {
         h("strong", {}, product.name),
         h("span", { class: "panel-muted" }, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
         priceLine(unit, product.compareAt, product.compareAt ? null : product.price ? " · tu precio" : " · precio de tu lista"),
+        TWO_VERSIONS ? h("small", { class: "panel-muted" }, `Revendedores: ${money(product.mayorista?.price || listPrice(product, "mayorista").unit)}`) : null,
         stockLine,
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Oculto: no se ve en tu tienda") : null,
         tagsFor(product)),
@@ -775,6 +800,7 @@ function brBody(product, changes = {}) {
     id: product.id,
     price: product.price ?? "", wholesalePrice: product.wholesalePrice ?? "", hidden: product.hidden === true,
     description: product.description ?? "", compareAt: product.compareAt ?? "", featured: product.featured === true,
+    mayorista: product.mayorista ?? null,
     extra: product.sizes.filter((s) => s.casa > 0).map((s) => ({ size: s.size, stock: s.casa })),
     ...changes,
   };
@@ -791,10 +817,15 @@ function renderBrEditor(product) {
     placeholder: list.wholesale ? `${list.wholesale}` : "Opcional" });
   const visible = h("input", { id: "b-visible", type: "checkbox", checked: !draft.hidden });
   const extras = extraFields("b", draft);
+  const resaleList = listPrice(product, "mayorista");
+  const resale = resaleFields("b", draft, {
+    unitHint: { placeholder: resaleList.unit ? `${resaleList.unit}` : "", help: resaleList.unit ? `Vacío = el de tu lista de revendedores (${money(resaleList.unit)}).` : "Vacío = el de tu lista de revendedores." },
+    wholesaleHint: { placeholder: resaleList.wholesale ? `${resaleList.wholesale}` : "Opcional", help: resaleList.wholesale ? `Vacío = el de tu lista (${money(resaleList.wholesale)}).` : "Opcional." },
+  });
   const offer = offerBox("b", () => Number(price.value.replace(/\D/g, "")) || list.unit || 0, { on: Boolean(draft.compareAt), sale: draft.compareAt ? draft.price : null });
   price.addEventListener("input", () => offer.refresh());
   // Si la tienda no vende por mayor, no se pide precio por mayor.
-  const sellsWholesale = state.settings.name ? state.settings.wholesale === true : state.listPricing?.hasWholesale !== false;
+  const sellsWholesale = TWO_VERSIONS || (state.settings.name ? state.settings.wholesale === true : state.listPricing?.hasWholesale !== false);
   const sizesBox = h("div", { class: "panel-sizes" });
 
   function renderSizes() {
@@ -839,6 +870,7 @@ function renderBrEditor(product) {
       price: price.value.replace(/\D/g, ""), wholesalePrice: wholesale.value.replace(/\D/g, ""), hidden: !visible.checked,
       extra: sizes.filter((s) => s.casa > 0).map((s) => ({ size: s.size, stock: s.casa })),
       ...extras.read(),
+      ...resale.read(),
       ...(deal.on ? { price: deal.sale, compareAt: deal.normal } : { compareAt: "" }),
     }, "Cambios guardados.");
   } },
@@ -853,10 +885,11 @@ function renderBrEditor(product) {
         h("p", { class: "panel-muted" }, "Modelo del stock de Brasil: las fotos, el nombre y el stock de Brasil se actualizan solos."))),
     h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
       h("div", { class: "panel-two" },
-        field("b-price", "Precio", price, list.unit ? `Vacío = el de tu lista (${money(list.unit)}).` : "Vacío = el de tu lista."),
-        sellsWholesale ? field("b-wholesale", "Precio por mayor", wholesale, list.wholesale ? `Vacío = el de tu lista (${money(list.wholesale)}).` : "Opcional.") : null),
+        field("b-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, list.unit ? `Vacío = el de tu lista (${money(list.unit)}).` : "Vacío = el de tu lista."),
+        sellsWholesale ? field("b-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, list.wholesale ? `Vacío = el de tu lista (${money(list.wholesale)}).` : "Opcional.") : null),
       h("label", { class: "panel-switch", for: "b-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
+    resale.node,
     offer.node,
     h("section", { class: "panel-card" }, h("h2", {}, "Más opciones (no hace falta completarlas)"), ...extras.nodes),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles"),
@@ -875,7 +908,7 @@ function renderBrEditor(product) {
   root.replaceChildren(form);
   renderSizes();
   window.scrollTo(0, 0);
-  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read(), offer.read()]);
+  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read(), offer.read(), resale.read()]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -980,11 +1013,15 @@ function renderEditor(product) {
     value: (draft.compareAt || draft.price) ?? "", placeholder: "Ej: 25000" });
   const wholesale = h("input", { id: "f-wholesale", class: "panel-input", inputmode: "numeric", value: draft.wholesalePrice ?? "", placeholder: "Opcional" });
   const min = state.settings.wholesaleMin || 5;
-  const wholesaleHelp = state.settings.wholesale === false
+  const wholesaleHelp = TWO_VERSIONS ? `Opcional. Llevando ${min} o más productos surtidos.` : state.settings.wholesale === false
     ? "Tu tienda no tiene venta por mayor (se activa en “Mi tienda”)."
     : `Opcional. Se aplica llevando ${min} o más productos surtidos.`;
   const visible = h("input", { id: "f-visible", type: "checkbox", checked: !draft.hidden });
   const extras = extraFields("f", draft);
+  const resale = resaleFields("f", draft, {
+    unitHint: { placeholder: "Igual que al público", help: "Vacío = el mismo precio que al público." },
+    wholesaleHint: { placeholder: "Opcional", help: "Llevando varios productos (como en la tienda al público)." },
+  });
   const offer = offerBox("f", () => Number(price.value.replace(/\D/g, "")) || 0, { on: Boolean(draft.compareAt), sale: draft.compareAt ? draft.price : null });
   price.addEventListener("input", () => offer.refresh());
 
@@ -1044,6 +1081,7 @@ function renderEditor(product) {
       images: draft.images,
       hidden: !visible.checked,
       ...extras.read(),
+      ...resale.read(),
       // En oferta: se cobra el de oferta y el normal se muestra tachado.
       ...(deal.on ? { price: deal.sale, compareAt: deal.normal } : { compareAt: "" }),
     };
@@ -1067,11 +1105,12 @@ function renderEditor(product) {
       field("f-name", "Nombre", name),
       field("f-category", "Categoría", categorySelect), newCategoryField,
       h("div", { class: "panel-two" },
-        field("f-price", "Precio", price, "El precio normal. Para rebajarlo, usá “Oferta”, más abajo."),
+        field("f-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, "El precio normal. Para rebajarlo, usá “Oferta”, más abajo."),
         // Si la tienda no vende por mayor, no se pide (se activa en "Mi tienda").
-        state.settings.wholesale === false ? null : field("f-wholesale", "Precio por mayor", wholesale, wholesaleHelp)),
+        !TWO_VERSIONS && state.settings.wholesale === false ? null : field("f-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, wholesaleHelp)),
       h("label", { class: "panel-switch", for: "f-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para pausarlo sin borrarlo."))),
+    resale.node,
     h("section", { class: "panel-card" }, h("h2", {}, "Talles y cantidades"),
       h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
         h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, "+ Otro talle")),
@@ -1088,7 +1127,7 @@ function renderEditor(product) {
   window.scrollTo(0, 0);
   // Si sale sin guardar, se le pregunta (ver route).
   const snapshot = () => JSON.stringify([name.value, categorySelect.value, newCategory.value, price.value, wholesale.value,
-    visible.checked, draft.sizes, draft.images, uploading, extras.read(), offer.read()]);
+    visible.checked, draft.sizes, draft.images, uploading, extras.read(), offer.read(), resale.read()]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -1323,7 +1362,7 @@ function renderStoreSettings() {
         field("s-hero-highlight", "Parte destacada del título", heroHighlight, "Va abajo del título, en otro color.")),
       field("s-hero-text", "Texto de bienvenida", heroText),
       h("div", { class: "panel-field" }, h("span", { class: "panel-label" }, "Color de los botones"), swatches)),
-    h("section", { class: "panel-card" }, h("h2", {}, "Venta por mayor"),
+    TWO_VERSIONS ? null : h("section", { class: "panel-card" }, h("h2", {}, "Venta por mayor"),
       h("label", { class: "panel-switch", for: "s-wholesale" }, wholesaleOn, h("span", {}, "Vendo por mayor"),
         h("small", { class: "panel-muted" }, "Cada producto tiene su precio por mayor (si no le ponés, se cobra el normal).")),
       field("s-wholesale-min", "Desde cuántos productos surtidos", wholesaleMin)),
@@ -1544,14 +1583,16 @@ async function loadData() {
   state.limits = data.limits ?? state.limits;
   state.settings = settings ?? {};
   state.br = data.stockBR ? { products: data.brProducts ?? [], options: data.stockBR, updatedAt: data.brUpdatedAt } : null;
-  if (state.br && !state.priceTable) state.priceTable = await loadPriceTable();
-  // La lista con lo que subió o bajó en "Cambiar precios".
-  state.listPricing = state.priceTable ? createPricing({ ...state.priceTable, percent: state.settings.brPercent || 0 }) : null;
+  if (state.br && !state.priceTable) state.priceTable = await loadPriceTable(Object.values(config.channels ?? {})[0]?.prices);
+  if (state.br && TWO_VERSIONS && !state.resaleTable) state.resaleTable = await loadPriceTable(config.channels.mayorista.prices);
+  // Las listas con lo que subió o bajó en "Cambiar precios".
+  const percent = state.settings.brPercent || 0;
+  state.listPricing = state.priceTable ? createPricing({ ...state.priceTable, percent }) : null;
+  state.resalePricing = state.resaleTable ? createPricing({ ...state.resaleTable, percent }) : null;
 }
 
-/** Lista de precios de la tienda (la que se cobra en los modelos de Brasil sin precio propio). */
-async function loadPriceTable() {
-  const file = Object.values(config.channels ?? {})[0]?.prices;
+/** Lista de precios de una versión de la tienda (la que se cobra en los modelos de Brasil sin precio propio). */
+async function loadPriceTable(file) {
   if (!file) return null;
   try {
     const response = await fetch(`../${file}`, { cache: "no-cache" });

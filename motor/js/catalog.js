@@ -73,6 +73,11 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
         description: typeof p.description === "string" && p.description ? p.description : null,
         compareAt: Number(p.compareAt) > 0 ? Number(p.compareAt) : null,
         featured: p.featured === true,
+        // Tiendas con dos versiones: precios propios para la de revendedores.
+        mayorista: p.mayorista && typeof p.mayorista === "object" ? {
+          price: Number(p.mayorista.price) > 0 ? Number(p.mayorista.price) : null,
+          wholesalePrice: Number(p.mayorista.wholesalePrice) > 0 ? Number(p.mayorista.wholesalePrice) : null,
+        } : null,
         // Tiendas con stock de Brasil: esas fotos ya vienen con su dirección completa.
         images: (Array.isArray(p.images) ? p.images : []).map((img) => ({
           sm: img.sm ? fileUrl(base, img.sm) : null,

@@ -164,6 +164,17 @@ function cleanExtras(input, price) {
   return { description: description || null, compareAt, featured: input?.featured === true };
 }
 
+/**
+ * Tiendas con dos versiones (público y revendedores, como L.A IMP o la de Fabri): el precio
+ * y el precio por mayor de la versión de revendedores. Vacío = sin precio propio ahí.
+ */
+function cleanResale(input) {
+  const price = cleanPrice(input?.price, "el precio para revendedores");
+  const wholesalePrice = cleanPrice(input?.wholesalePrice, "el precio por mayor para revendedores");
+  if (price && wholesalePrice && wholesalePrice >= price) throw new Error("Para revendedores, el precio por mayor tiene que ser menor que el precio por unidad.");
+  return price || wholesalePrice ? { price, wholesalePrice } : null;
+}
+
 /** Revisa y ordena lo que mandó el panel para un producto. */
 export function cleanProduct(input, current, data) {
   const name = cleanText(input.name, 80, "el nombre", { required: true });
@@ -211,6 +222,7 @@ export function cleanProduct(input, current, data) {
     // Pausado: no se ve en la tienda, pero no se borra (por ejemplo, mientras llega mercadería).
     hidden: input.hidden === true,
     ...cleanExtras(input, price),
+    mayorista: cleanResale(input.mayorista),
     // Cuándo se cargó (para el orden "lo más nuevo primero").
     createdAt: current?.createdAt ?? new Date().toISOString(),
   };
@@ -270,6 +282,7 @@ function withChanges(base, change = {}) {
   return {
     ...base, sizes, price: change.price ?? null, wholesalePrice: change.wholesalePrice ?? null, hidden: change.hidden === true,
     description: change.description ?? null, compareAt: change.compareAt ?? null, featured: change.featured === true,
+    mayorista: change.mayorista ?? null,
   };
 }
 
@@ -322,6 +335,8 @@ export function cleanBrChange(input, base) {
   if (wholesalePrice) change.wholesalePrice = wholesalePrice;
   if (input?.hidden === true) change.hidden = true;
   const extras = cleanExtras(input, price);
+  const resale = cleanResale(input?.mayorista);
+  if (resale) change.mayorista = resale;
   if (extras.description) change.description = extras.description;
   if (extras.compareAt) change.compareAt = extras.compareAt;
   if (extras.featured) change.featured = true;
@@ -523,13 +538,15 @@ export function changePrices(catalog, settings, { percent, own, br }) {
   const factor = 1 + percent;
   const scale = (item) => {
     for (const key of ["price", "wholesalePrice", "compareAt"]) if (item[key]) item[key] = roundPrice(item[key] * factor);
+    // Precios para revendedores (tiendas con dos versiones).
+    if (item.mayorista) for (const key of ["price", "wholesalePrice"]) if (item.mayorista[key]) item.mayorista[key] = roundPrice(item.mayorista[key] * factor);
     if (item.wholesalePrice && item.price && item.wholesalePrice >= item.price) item.wholesalePrice = null;
     if (item.compareAt && item.price && item.compareAt <= item.price) item.compareAt = null;
   };
   let count = 0;
   if (own) for (const product of catalog.products) { scale(product); count += 1; }
   if (br) {
-    for (const change of Object.values(catalog.br ?? {})) if (change.price || change.compareAt) scale(change);
+    for (const change of Object.values(catalog.br ?? {})) if (change.price || change.compareAt || change.mayorista) scale(change);
     settings.brPercent = cleanPercent((1 + (Number(settings.brPercent) || 0)) * factor - 1);
     count += 1;
   }
