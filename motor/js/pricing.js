@@ -97,6 +97,7 @@ export function createPricing(table) {
       wholesale = product.manual
         ? Number(product.wholesalePrice) || null
         : Number(override.wholesale) || adjust(findRule(wholesaleList, key, shortKey, product.category)?.price || wholesaleList.default);
+      if (override.wholesale === false) wholesale = null;   // "sin precio por mayor" elegido a mano
       if (!wholesale || wholesale >= unit) wholesale = null;   // sin precio por mayor (0) se cobra el de unidad   // nunca mostrar un "precio por mayor" que no conviene
     }
     const result = { unit, wholesale, bulk };

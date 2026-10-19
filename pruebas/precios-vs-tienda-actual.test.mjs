@@ -47,6 +47,9 @@ const MIND = { "L.A IMP revendedores": [37000, 35000], "L.A IMP minorista": [400
 const SAME_AS = { "TL 1 blancas": "TL1 negras" };
 // 12/10: las Nike V2K pasan a $42.000 por mayor en todas las tiendas.
 const V2K_42 = { "Nike V2K marron": 42000 };
+// 19/10: dos modelos del stock de casa con precio propio en L.A IMP (los dos canales):
+// [precio por unidad, precio por mayor] (sin precio por mayor = el mismo de unidad).
+const OWN_PRICE = { "Shox blanca roja ⚡️": [35000, 33000], "Vans Haylan total black": [25000, 25000] };
 const intentional = {
   "L.A IMP revendedores": { ...SAMBAS_42, ...V2K_42 }, "L.A IMP minorista": { ...SAMBAS_42, ...V2K_42 },
   "ClienteA revendedores": V2K_42, "ClienteA minorista": V2K_42,
@@ -59,7 +62,9 @@ for (const [name, legacyFile, pricesFile] of cases) {
     const differences = catalog.flatMap((product) => {
       const now = pricing.forProduct(product);
       const nowWholesale = now.wholesale ?? now.unit;
-      const before = product.name === "Nike mind negras" && MIND[name]
+      const before = name.startsWith("L.A IMP") && OWN_PRICE[product.name]
+        ? OWN_PRICE[product.name]
+        : product.name === "Nike mind negras" && MIND[name]
         ? MIND[name]
         : [old.unit(SAME_AS[product.name] ?? product.name),
           intentional[name]?.[product.name] ?? old.wholesale(SAME_AS[product.name] ?? product.name)];

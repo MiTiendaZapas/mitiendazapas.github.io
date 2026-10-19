@@ -230,5 +230,9 @@
       }
     ]
   },
-  "overrides": {}
+  "overrides": {
+    "_ayuda": "19/10: precio propio de dos modelos del stock de casa. \"wholesale\": false = sin precio por mayor.",
+    "shox-blanca-roja": { "unit": 35000, "wholesale": 33000 },
+    "vans-haylan-total-black": { "unit": 25000, "wholesale": false }
+  }
 }
