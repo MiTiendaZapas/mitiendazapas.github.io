@@ -287,6 +287,7 @@ function renderTop({ loggedIn }) {
   top.classList.toggle("is-guest", !loggedIn);
   root.dataset.section = current;
   const storeName = state.settings.name || config.name || "Mi tienda";
+  if (loggedIn) paintFavicon();
   top.replaceChildren(
     h("div", { class: "panel-top__inner" },
       h("div", { class: "panel-top__title" },
@@ -307,6 +308,13 @@ function renderTop({ loggedIn }) {
     ...(loggedIn ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
       TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": section === t.id ? "page" : null },
         ico(t.icon), h("span", {}, t.label))))] : []));
+}
+
+/** Ícono de la pestaña: el logo que subió el cliente en "Mi tienda" (si no, queda el de la tienda). */
+function paintFavicon() {
+  const logo = state.settings?.logo;
+  if (!logo) return;
+  for (const link of document.querySelectorAll('link[rel="icon"]')) link.href = storeUrl(logo.small);
 }
 
 /** Título de la página (en la computadora; en el celular ya lo dice el menú de abajo). */

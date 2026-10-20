@@ -98,9 +98,48 @@ def add_panel(folder, store_id, name):
         raise RuntimeError(f"No se encontró el id en {config}")
     config.write_text(new, encoding="utf-8")
     (folder / "panel").mkdir(exist_ok=True)
-    (folder / "panel" / "index.html").write_text(PANEL_PAGE.replace("{name}", name), encoding="utf-8")
-    (folder / "panel" / "manifest.webmanifest").write_text(
-        json.dumps({**PANEL_MANIFEST, "name": f"Panel · {name}"}, ensure_ascii=False, indent=2), encoding="utf-8")
+    page = PANEL_PAGE.replace("{name}", name)
+    manifest = {**PANEL_MANIFEST, "name": f"Panel · {name}"}
+    # Con logo, el panel usa el logo de la tienda como ícono (pestaña del navegador, app instalada
+    # en el celular e iPhone), con un nombre de nuevo archivo (si no, los celulares muestran el viejo).
+    icons = panel_icons(folder)
+    if icons:
+        page = page.replace('<link rel="apple-touch-icon" href="/motor/panel/icono-192.png">',
+                            f'<link rel="apple-touch-icon" href="{icons["180"]}">\n'
+                            f'  <link rel="icon" type="image/png" sizes="32x32" href="{icons["32"]}">\n'
+                            f'  <link rel="icon" type="image/png" sizes="192x192" href="{icons["192"]}">')
+        manifest["short_name"] = name[:12]
+        manifest["icons"] = [
+            {"src": icons["192"], "sizes": "192x192", "type": "image/png"},
+            {"src": icons["512"], "sizes": "512x512", "type": "image/png"},
+            {"src": icons["512m"], "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ]
+    (folder / "panel" / "index.html").write_text(page, encoding="utf-8")
+    (folder / "panel" / "manifest.webmanifest").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def panel_icons(folder):
+    """Íconos del panel hechos con el logo de la tienda (marca/logo-512.*). {} si no tiene logo."""
+    logo = next((folder / "marca" / f"logo-512.{ext}" for ext in ("webp", "png", "jpg") if (folder / "marca" / f"logo-512.{ext}").exists()), None)
+    if not logo:
+        return {}
+    from PIL import Image
+    import hashlib
+    code = hashlib.sha1(logo.read_bytes()).hexdigest()[:8]
+    source = Image.open(logo).convert("RGBA")
+    out = {}
+    for key, size, pad in (("32", 32, 0), ("180", 180, 0), ("192", 192, 0), ("512", 512, 0), ("512m", 512, 0.12)):
+        # Fondo blanco (los íconos transparentes se ven mal en algunos celulares). "m": con margen,
+        # para los celulares que recortan el ícono en círculo.
+        canvas = Image.new("RGB", (size, size), "#ffffff")
+        inner = round(size * (1 - 2 * pad))
+        logo_img = source.copy()
+        logo_img.thumbnail((inner, inner), Image.LANCZOS)
+        canvas.paste(logo_img, ((size - logo_img.width) // 2, (size - logo_img.height) // 2), logo_img)
+        name = f"icono-{key}-{code}.png"
+        canvas.save(folder / "panel" / name, "PNG", optimize=True)
+        out[key] = name
+    return out
 
 
 def client_repos(test=False):

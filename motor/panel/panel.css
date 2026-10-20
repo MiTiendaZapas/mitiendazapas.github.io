@@ -735,3 +735,11 @@
 .panel-quick__head { flex-wrap: wrap; }
 .panel-quick__legend { margin-left: auto; font-size: 12px; }
 .panel-quick__head > small.panel-quick__legend { text-transform: none; letter-spacing: 0; font-weight: 400; }
+/* El logo de la tienda también arriba en el celular y la tablet */
+@media (max-width: 1023px) {
+  .panel-top__avatar { display: grid; flex: none; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--color-text); color: var(--color-surface); font-weight: 800; }
+  .panel-top__avatar.has-logo { overflow: hidden; background: var(--color-surface-2); }
+  .panel-top__avatar img { width: 100%; height: 100%; object-fit: cover; }
+}
+@media (max-width: 1023px) { .panel-top .panel-top__title > .panel-top__avatar { display: grid; } }
+.panel-jump > .panel-muted { flex: none; white-space: nowrap; }
