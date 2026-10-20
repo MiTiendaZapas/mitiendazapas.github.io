@@ -490,3 +490,33 @@
   .panel-main[data-section="productos"] .panel-chips { mask-image: none; -webkit-mask-image: none; flex-wrap: wrap; overflow: visible; padding-right: 0; }
   .panel-main[data-section="productos"] .panel-chip { min-height: 36px; }
 }
+
+/* --- Revisión UI/UX 20/10 (ui-ux-pro-max) --- */
+/* Celular: botones de ancho completo y círculos de color con 44 de alto (cómodos para el dedo) */
+.panel-page .btn:not(.btn--sm):not(.btn--lg) { min-height: 44px; }
+.panel-swatch { width: 44px; height: 44px; }
+/* Casillas (Destacado, Se ve en la tienda…): la fila entera se puede tocar */
+.panel-page label:has(> input[type="checkbox"]) { min-height: 44px; align-items: center; cursor: pointer; }
+.panel-page input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--color-text); }
+/* Menú de abajo: letra de 12 como mínimo */
+@media (max-width: 699px) { .panel-tab { font-size: 12px; } }
+/* "Ver en la tienda" del editor: sin franja gris al pasar el mouse */
+.panel-editor__head > a[target="_blank"]:hover { background: none; text-decoration: underline; }
+@media (min-width: 700px) {
+  .panel-editor__head > a[target="_blank"] { flex-basis: auto; margin-left: auto; padding-left: 10px; order: 3; }
+}
+/* PC: la barra de arriba y las pestañas con el mismo ancho que el contenido */
+@media (min-width: 900px) {
+  .panel-page:has(.panel-main[data-section="productos"]) :is(.panel-top__inner, .panel-tabs),
+  .panel-page:has(.panel-main[data-section="inicio"]) :is(.panel-top__inner, .panel-tabs) { max-width: 1040px; }
+  .panel-main[data-section="inicio"] { max-width: 1040px; }
+  /* Resumen: todos los números en una sola fila */
+  .panel-main[data-section="inicio"] .panel-tiles { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
+  /* Accesos y botones de PC: un poco más chicos que en el celular */
+  .panel-main :is(.panel-card, .panel-editor) .btn--sm { min-height: 40px; }
+}
+/* Movimiento reducido: sin animaciones de toque ni de entrada */
+@media (prefers-reduced-motion: reduce) {
+  .panel-page * { transition: none !important; animation: none !important; }
+  .panel-page :is(.btn, .panel-chip, .panel-stock):active { transform: none !important; }
+}

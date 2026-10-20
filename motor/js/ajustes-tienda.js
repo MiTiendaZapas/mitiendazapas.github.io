@@ -6,7 +6,8 @@
 const NETWORKS = {
   instagram: { label: "Instagram", url: (u) => `https://www.instagram.com/${u}/`, handle: (u) => `@${u}` },
   tiktok: { label: "TikTok", url: (u) => `https://www.tiktok.com/@${u}`, handle: (u) => `@${u}` },
-  facebook: { label: "Facebook", url: (u) => `https://www.facebook.com/${u}`, handle: (u) => u },
+  // Un link de compartir o de perfil ("share/…", "profile.php?id=…") no es un nombre: se muestra el de la tienda.
+  facebook: { label: "Facebook", url: (u) => `https://www.facebook.com/${u}`, handle: (u, name) => (/[/?=]/.test(u) ? name : u) },
 };
 
 export async function loadStoreSettings(config) {
@@ -24,14 +25,16 @@ export function applyStoreSettings(config, channel, settings) {
   const base = `/api/tienda/${encodeURIComponent(config.manualStore)}/`;
   config.name = settings.name;
   if (settings.tagline) config.tagline = settings.tagline;
-  config.logo = settings.logo ? { small: base + settings.logo.small, large: base + settings.logo.large, alt: settings.name } : null;
+  // Sin logo subido en el panel queda el de configuracion.js (si tiene).
+  if (settings.logo) config.logo = { small: base + settings.logo.small, large: base + settings.logo.large, alt: settings.name };
+  else if (config.logo) config.logo = { ...config.logo, alt: settings.name };
   if (settings.whatsapp) config.contact = { ...config.contact, whatsappQueries: settings.whatsapp, whatsappOrders: settings.whatsapp };
   // Mensaje de los pedidos: el saludo y el texto al final que eligió el cliente.
   if (settings.orderGreeting) config.orderGreeting = settings.orderGreeting;
   if (settings.orderFooter) config.orderFooter = settings.orderFooter;
   config.social = Object.entries(NETWORKS)
     .filter(([network]) => settings[network])
-    .map(([network, n]) => ({ network, label: n.label, handle: n.handle(settings[network]), url: n.url(settings[network]) }));
+    .map(([network, n]) => ({ network, label: n.label, handle: n.handle(settings[network], settings.name), url: n.url(settings[network]) }));
   if (config.footer) config.footer = { ...config.footer, description: settings.tagline || config.footer.description };
 
   const hero = channel.hero;

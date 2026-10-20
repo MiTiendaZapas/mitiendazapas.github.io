@@ -1680,8 +1680,30 @@ function renderCategories() {
 }
 
 // --- mi tienda --------------------------------------------------------------------
+/**
+ * Lo que la tienda ya muestra hoy (configuracion.js), para arrancar "Mi tienda" con eso si el
+ * cliente nunca guardó: así, al guardar, no se pierden el WhatsApp, las redes ni los textos.
+ */
+function settingsFromConfig() {
+  const handleOf = (network) => {
+    const entry = (config.social ?? []).find((n) => n.network === network);
+    if (!entry) return "";
+    try {
+      const path = new URL(entry.url).pathname.replace(/^\/+|\/+$/g, "").replace(/^@/, "");
+      return path || String(entry.handle ?? "").replace(/^@/, "");
+    } catch { return String(entry.handle ?? "").replace(/^@/, ""); }
+  };
+  const firstChannel = Object.values(config.channels ?? {})[0] ?? {};
+  return {
+    name: config.name, tagline: config.tagline, whatsapp: config.contact?.whatsappOrders ?? "",
+    instagram: handleOf("instagram"), tiktok: handleOf("tiktok"), facebook: handleOf("facebook"),
+    heroText: firstChannel.hero?.text ?? "",
+  };
+}
+
 function renderStoreSettings() {
-  const s = state.settings;
+  // Nunca guardó: se muestra lo que la tienda ya tiene.
+  const s = state.settings?.name ? state.settings : { ...settingsFromConfig(), ...state.settings };
   const input = (id, value, attrs = {}) => h("input", { id, class: "panel-input", value: value ?? "", ...attrs });
   const name = input("s-name", s.name || config.name, { maxlength: 50, required: true });
   const tagline = input("s-tagline", s.tagline, { maxlength: 70, placeholder: "Ej: Ropa y calzado para toda la familia" });
@@ -1731,8 +1753,12 @@ function renderStoreSettings() {
   } });
   function renderLogo() {
     const logo = state.settings.logo;
+    // Sin logo propio: el que ya tiene la tienda (configuracion.js) sigue igual.
+    const current = !logo && config.logo?.small ? new URL(`../${config.logo.small}`, location.href).href : null;
     logoBox.replaceChildren(
-      logo ? h("img", { src: storeUrl(logo.small), alt: "Tu logo", width: 80, height: 80 }) : h("span", { class: "panel-logo__empty" }, "Sin logo"),
+      logo ? h("img", { src: storeUrl(logo.small), alt: "Tu logo", width: 80, height: 80 })
+        : current ? h("img", { src: current, alt: "Logo actual de la tienda", width: 80, height: 80 })
+        : h("span", { class: "panel-logo__empty" }, "Sin logo"),
       h("div", { class: "panel-logo__actions" },
         h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => logoInput.click() }, logo ? "Cambiar logo" : "Subir logo"),
         logo ? h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: (e) => busy(e.currentTarget, async () => {

@@ -619,7 +619,9 @@ export function cleanSettings(input, current = {}) {
   if (phone && (phone.length < 10 || phone.length > 15)) throw new Error("El WhatsApp tiene que tener código de país y área. Ej: 5491123456789");
   const handle = (value, field) => {
     const text = String(value ?? "").trim().replace(/^@/, "").replace(/^https?:\/\/[^/]+\//, "").replace(/\/$/, "");
-    if (text && !/^[A-Za-z0-9._]{1,30}$/.test(text)) throw new Error(`El usuario de ${field} no es válido.`);
+    // Facebook acepta también links de compartir o de perfil ("share/1Dkg…", "profile.php?id=…").
+    const valid = field === "Facebook" ? /^[A-Za-z0-9._\-/?=&]{1,80}$/ : /^[A-Za-z0-9._]{1,30}$/;
+    if (text && (!valid.test(text) || text.includes(".."))) throw new Error(`El usuario de ${field} no es válido.`);
     return text;
   };
   const min = Number(input?.wholesaleMin);
