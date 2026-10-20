@@ -13,7 +13,7 @@
 import { icon } from "../js/interfaz/icons.js";
 import { createPricing } from "../js/pricing.js";
 import { compareSizes, sortSizes } from "../js/talles.js";
-import { CATEGORY_ORDERS, PRODUCT_ORDERS, sortProducts } from "../vidriera/orden.js";
+import { CATEGORY_ORDERS, PRODUCT_ORDERS, orderedCategories, sortProducts } from "../vidriera/orden.js";
 
 const config = window.STORE_CONFIG ?? {};
 const root = document.getElementById("panel");
@@ -751,7 +751,7 @@ function sectioned(items, { quality: withQuality = false } = {}) {
       current = category;
       const count = items.filter((i) => i.product.category === category).length;
       const quality = withQuality ? (BR_QUALITY[category] ?? "Calidad Brasil") : null;
-      const title = categoryName(category);
+      const title = withQuality ? categoryName(category) : ownListLabel(category);
       nodes.push(h("li", { class: "panel-section", role: "presentation" },
         h("h2", {}, title),
         quality && quality !== title ? h("span", { class: "panel-section__tag" }, quality) : null,
@@ -766,6 +766,9 @@ const BR_CATEGORIES_ORDER = { zapatillas: 0, ojotas: 1, g5: 9 };
 const brCategoryRank = (id) => BR_CATEGORIES_ORDER[id] ?? 5;
 /** Modelos del stock automático donde el cliente cargó pares suyos (también van en "Mis productos"). */
 const brWithPairs = () => (state.br?.products ?? []).filter((p) => brTotal(p, "casa") > 0);
+/** Nombre en "Mis productos" de las categorías del stock automático (Zapatillas BR, Ojotas BR, Zapatillas G5). */
+const OWN_LIST_LABELS = { zapatillas: "Zapatillas BR", ojotas: "Ojotas BR", g5: "Zapatillas G5" };
+const ownListLabel = (id) => (state.br && OWN_LIST_LABELS[id]) || categoryName(id);
 
 function renderOwnProducts() {
   const full = state.products.length >= state.limits.products;
@@ -773,11 +776,14 @@ function renderOwnProducts() {
   const chips = h("div", { class: "panel-chips", role: "group", "aria-label": "Filtrar productos" });
 
   function renderChips() {
+    // Orden: Todos · tus categorías · Zapatillas BR · Ojotas BR · Zapatillas G5 · Sin stock · Pausados.
+    const fixed = state.br ? ["zapatillas", "ojotas", "g5"] : [];
     const options = [
       { id: "todos", label: `Todos (${state.products.length + brWithPairs().length})` },
+      ...Object.entries(state.categories).filter(([id]) => !fixed.includes(id)).map(([id, label]) => ({ id: `cat:${id}`, label })),
+      ...fixed.filter((id) => Object.hasOwn(state.categories, id)).map((id) => ({ id: `cat:${id}`, label: ownListLabel(id) })),
       { id: "sin-stock", label: `Sin stock (${state.products.filter((p) => totalStock(p) === 0).length})` },
       { id: "pausados", label: `Pausados (${state.products.filter((p) => p.hidden).length + brWithPairs().filter((p) => p.hidden).length})` },
-      ...Object.entries(state.categories).map(([id, label]) => ({ id: `cat:${id}`, label })),
     ];
     chips.replaceChildren(...options.map((o) => h("button", { type: "button", class: "panel-chip", "aria-pressed": String(state.filter === o.id),
       onclick: () => { state.filter = o.id; renderChips(); renderItems(); } }, o.label)));
@@ -792,7 +798,10 @@ function renderOwnProducts() {
     // Modelos del stock automático con pares tuyos: en su categoría, después de tus productos.
     const paired = brWithPairs().filter((p) => (state.filter === "todos" || (state.filter === "pausados" ? p.hidden : state.filter.startsWith("cat:") && p.category === state.filter.slice(4)))
       && (!term || `${p.name} ${p.brand ?? ""} ${categoryName(p.category)}`.toLowerCase().includes(term)));
-    const categoryOrder = [...new Set([...shown.map((p) => p.category), ...Object.keys(state.categories)])];
+    // Mismo orden que los filtros: primero tus categorías, después Zapatillas BR, Ojotas BR y Zapatillas G5.
+    const fixedLast = state.br ? ["zapatillas", "ojotas", "g5"] : [];
+    const categoryOrder = [...new Set([...shown.map((p) => p.category), ...Object.keys(state.categories)])]
+      .sort((a, b) => (fixedLast.indexOf(a) + 1 || 0) - (fixedLast.indexOf(b) + 1 || 0));
     const rank = (id) => { const i = categoryOrder.indexOf(id); return i === -1 ? 999 : i; };
     const items = [
       ...shown.map((p, i) => ({ product: p, view: itemView(p, canOrder, renderAll), key: [rank(p.category), 0, i] })),
@@ -944,7 +953,7 @@ function addSizeCell(onAdd) {
   const cell = h("div", { class: "panel-quick__new" });
   const closed = () => cell.replaceChildren(h("button", { type: "button", class: "panel-quick__new-btn", onclick: open }, ico("plus"), "Talle"));
   function open() {
-    const input = h("input", { class: "panel-input", maxlength: 12, placeholder: "Ej: 45", "aria-label": "Talle nuevo", enterkeyhint: "done" });
+    const input = h("input", { class: "panel-input", maxlength: 12, placeholder: "Ej: 45", "aria-label": "Talle nuevo", enterkeyhint: "done", autocomplete: "off" });
     const ok = h("button", { type: "button", class: "panel-quick__ok", "aria-label": "Agregar este talle" }, ico("check"));
     const add = () => {
       const size = input.value.trim();
@@ -1287,7 +1296,8 @@ function renderQuickPairs(product, box, onChange, { onlyMine = false } = {}) {
   paintAll();
   box.replaceChildren(
     h("div", { class: "panel-quick__head" }, h("span", { class: "panel-muted" }, "En tu casa"), totalEl,
-      onlyMine ? null : h("small", { class: "panel-muted panel-quick__legend" }, product.category === "g5" ? "PR = del proveedor" : "BR = los de Brasil")),
+      // Se manejan talles reales: solo en las G5 se aclara que son europeos.
+      product.category === "g5" ? h("small", { class: "panel-muted panel-quick__legend" }, "Talles europeos (EU)") : null),
     h("div", { class: "panel-quick__grid" }, ...product.sizes.filter((s) => !shown || shown.has(s.size)).map((s) => {
       const value = h("output", { class: "panel-quick__value" }, s.casa);
       let cell;
@@ -1309,8 +1319,7 @@ function renderQuickPairs(product, box, onChange, { onlyMine = false } = {}) {
           onChange();
         });
       };
-      const from = product.category === "g5" ? "PR" : "BR";
-      cell = sizeCell(s.size, value, change(-1), change(1), onlyMine ? null : `${from} ${s.br || "—"}`);
+      cell = sizeCell(s.size, value, change(-1), change(1), product.category === "g5" ? "EU" : null);
       return cell;
     }),
     // Un talle que Brasil no tiene (por ejemplo, un 45 que tenés en tu casa): se agrega acá mismo.
@@ -1550,14 +1559,15 @@ function renderEditor(product) {
   }
 
   // Datos
-  const name = h("input", { id: "f-name", class: "panel-input", maxlength: 80, value: draft.name });
+  // Sin sugerencias del navegador (mostraba nombres escritos antes en ese campo).
+  const name = h("input", { id: "f-name", class: "panel-input", maxlength: 80, value: draft.name, autocomplete: "off" });
   const NEW = "__nueva__";
   const categorySelect = h("select", { id: "f-category", class: "panel-input" },
     // Producto nuevo: hay que elegir la categoría (antes venía la primera y era fácil equivocarse).
     draft.category ? null : h("option", { value: "", selected: true, disabled: true }, "Elegí una categoría"),
     Object.entries(state.categories).map(([id, label]) => h("option", { value: id, selected: id === draft.category }, label)),
     h("option", { value: NEW }, "+ Nueva categoría…"));
-  const newCategory = h("input", { id: "f-new-category", class: "panel-input", maxlength: 30, placeholder: "Ej: Remeras, Zapatillas, Buzos" });
+  const newCategory = h("input", { id: "f-new-category", class: "panel-input", maxlength: 30, autocomplete: "off", placeholder: "Ej: Remeras, Zapatillas, Buzos" });
   const newCategoryField = field("f-new-category", "Nombre de la categoría nueva", newCategory);
   const syncCategory = () => { newCategoryField.hidden = categorySelect.value !== NEW; };
   categorySelect.addEventListener("change", syncCategory);
@@ -1595,7 +1605,7 @@ function renderEditor(product) {
         const set = (n) => { s.stock = Math.max(0, n); value.textContent = s.stock; };
         return h("div", { class: "panel-size-row" },
           h("label", { class: "panel-size-row__label" }, h("small", { class: "panel-muted" }, "Talle"),
-            h("input", { class: "panel-input panel-size-row__name", value: s.size, maxlength: 12, placeholder: "Ej: 38", "aria-label": "Talle", oninput: (e) => { s.size = e.target.value; } })),
+            h("input", { class: "panel-input panel-size-row__name", value: s.size, maxlength: 12, placeholder: "Ej: 38", "aria-label": "Talle", autocomplete: "off", oninput: (e) => { s.size = e.target.value; } })),
           h("div", { class: "panel-size-row__qty" }, h("small", { class: "panel-muted" }, "Unidades"),
             h("div", { class: "panel-stepper" },
               h("button", { type: "button", "aria-label": `Restar una unidad del talle ${s.size}`, onclick: () => set(s.stock - 1) }, ico("minus")),
@@ -1758,11 +1768,19 @@ function renderCategories() {
     const named = rows.filter((r) => r.label.trim());
     const { categories } = await api("/categorias", { method: "POST", body: { categories: named.map((r) => ({ id: r.id, label: r.label.trim() })) } });
     state.categories = categories;
-    // Las nuevas reciben su código: la lista se arma de nuevo con lo guardado.
-    const pending = rows.filter((r) => !r.label.trim());
-    rows = [...Object.entries(categories).map(([id, label]) => ({ id, label })), ...pending];
+    // Las nuevas reciben su código (por su nombre). El orden NO se toca: si mientras se guardaba
+    // se movió algo más, se respeta lo último (antes volvían a la posición vieja).
+    const known = new Set(rows.map((r) => r.id).filter(Boolean));
+    for (const row of rows) {
+      if (row.id || !row.label.trim()) continue;
+      const found = Object.entries(categories).find(([id, label]) => !known.has(id) && label === row.label.trim());
+      if (found) { row.id = found[0]; known.add(found[0]); }
+    }
     renderRows();
   }, message);
+  // Mover con las flechas: se guarda una sola vez, cuando deja de tocar (tocar rápido no se traba).
+  let moveTimer = null;
+  const saveMovesSoon = () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => saveCategories(), 600); };
   const saveOrder = () => persist(async () => {
     const { settings } = await api("/ajustes", { method: "POST", body: {
       ...state.settings, name: state.settings.name || config.name, categoryOrder: categoryOrder.value, productOrder: productOrder.value,
@@ -1773,8 +1791,11 @@ function renderCategories() {
   productOrder.addEventListener("change", saveOrder);
 
   function renderRows() {
-    // En "De la A a la Z" se muestran ordenadas así y las flechas no se usan.
-    if (!manual()) rows.sort((a, b) => (a.label && b.label ? a.label.localeCompare(b.label, "es", { sensitivity: "base" }) : a.label ? -1 : 1));
+    // En automático se muestran como salen en la tienda (Zapatillas, Ojotas, las demás A-Z, G5 al final).
+    if (!manual()) {
+      const order = orderedCategories(Object.fromEntries(rows.filter((r) => r.id).map((r) => [r.id, r.label])), { categoryOrder: "alfabetico" });
+      rows.sort((a, b) => (a.id ? order.indexOf(a.id) : Infinity) - (b.id ? order.indexOf(b.id) : Infinity));
+    }
     // Tocar una flecha ya elige "En el orden que yo elijo" (antes las flechas estaban grises sin explicar por qué).
     const move = (i, delta) => {
       if (!manual()) {
@@ -1784,12 +1805,12 @@ function renderCategories() {
       }
       rows.splice(i + delta, 0, ...rows.splice(i, 1));
       renderRows();
-      saveCategories();
+      saveMovesSoon();
     };
     list.replaceChildren(...rows.map((row, i) => {
       const count = row.id ? used(row.id) : 0;
       return h("div", { class: "panel-cat" },
-        h("input", { class: "panel-input", value: row.label, maxlength: 30, "aria-label": `Nombre de la categoría ${i + 1}`, placeholder: "Nombre de la categoría",
+        h("input", { class: "panel-input", value: row.label, maxlength: 30, autocomplete: "off", "aria-label": `Nombre de la categoría ${i + 1}`, placeholder: "Nombre de la categoría",
           oninput: (e) => { row.label = e.target.value; },
           // Se guarda al terminar de escribir (al salir del casillero o con Enter).
           onchange: () => { if (row.label.trim()) saveCategories(row.id ? "Categoría renombrada." : "Categoría creada: ya la podés usar en tus productos."); },
@@ -2344,3 +2365,23 @@ document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   for (const menu of document.querySelectorAll(".panel-more[open]")) { menu.open = false; menu.querySelector("summary")?.focus(); }
 });
+
+// El stock también se puede cambiar desde la app de pedidos (L.A IMP) o desde otro celular: la lista
+// se vuelve a leer sola al volver a la pestaña y cada 30 segundos, si no se está editando nada.
+let lastRefresh = Date.now();
+async function refreshIfIdle() {
+  if (!state.store || document.hidden) return;
+  if (!["productos", "inicio"].includes(root.dataset.section)) return;
+  if (state.guard?.() || pendingSaves.size || document.activeElement?.matches?.("input, textarea, select")) return;
+  if (document.querySelector(".panel-more[open], .panel-quick__new input")) return;
+  if (Date.now() - lastRefresh < 15000) return;
+  lastRefresh = Date.now();
+  try { await loadData(); } catch { return; }
+  if (pendingSaves.size || document.activeElement?.matches?.("input, textarea, select")) return;
+  const y = scrollY;
+  if (root.dataset.section === "productos") renderProducts(); else renderHome();
+  window.scrollTo({ top: y, behavior: "instant" });
+}
+document.addEventListener("visibilitychange", refreshIfIdle);
+window.addEventListener("focus", refreshIfIdle);
+setInterval(refreshIfIdle, 30000);

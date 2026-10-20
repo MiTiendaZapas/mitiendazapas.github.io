@@ -1,7 +1,8 @@
 /*
  * Orden de los productos en las tiendas con stock propio (la tienda y el panel usan lo mismo).
  *
- * Por defecto: categorías de la A a la Z y, dentro de cada una, productos de la A a la Z.
+ * Por defecto: Zapatillas, Ojotas, las demás categorías de la A a la Z y Calidad G5 al final;
+ * dentro de cada una, productos de la A a la Z.
  * El cliente lo cambia en su panel (Categorías → Orden de tu tienda):
  *   categoryOrder  "alfabetico" | "manual"  (el orden que armó en la lista de categorías)
  *   productOrder   "alfabetico" (A-Z) | "alfabetico-desc" (Z-A) | "marca" (marca y modelo) |
@@ -11,10 +12,15 @@
  */
 const collator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
 
+// "alfabetico" (el de siempre, por defecto): Zapatillas, Ojotas, después las demás de la A a la Z
+// y Calidad G5 al final (tiene su propio botón en la tienda).
 export const CATEGORY_ORDERS = [
-  { value: "alfabetico", label: "De la A a la Z" },
+  { value: "alfabetico", label: "Automático: Zapatillas, Ojotas, las demás (A-Z) y G5 al final" },
   { value: "manual", label: "En el orden que yo elijo" },
 ];
+const FIXED_FIRST = ["zapatillas", "ojotas"];
+const FIXED_LAST = ["g5"];
+const fixedRank = (id) => (FIXED_FIRST.includes(id) ? FIXED_FIRST.indexOf(id) - 10 : FIXED_LAST.includes(id) ? 10 : 0);
 export const PRODUCT_ORDERS = [
   { value: "alfabetico", label: "De la A a la Z" },
   { value: "alfabetico-desc", label: "De la Z a la A" },
@@ -28,7 +34,7 @@ export const PRODUCT_ORDERS = [
 /** Códigos de las categorías en el orden en que salen en la tienda. */
 export function orderedCategories(categories = {}, settings = {}) {
   const entries = Object.entries(categories);
-  if (settings.categoryOrder !== "manual") entries.sort((a, b) => collator.compare(a[1], b[1]));
+  if (settings.categoryOrder !== "manual") entries.sort((a, b) => fixedRank(a[0]) - fixedRank(b[0]) || collator.compare(a[1], b[1]));
   return entries.map(([id]) => id);
 }
 

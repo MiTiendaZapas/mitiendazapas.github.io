@@ -844,6 +844,20 @@ function houseSize(data, id, size) {
  * Con legado: true devuelve sin anotación (pedidos descontados en la app antes del cambio).
  */
 export function moveHouseStock(data, input) {
+  // "ajustar": sumar o restar a mano desde la app de pedidos (sin pedido), también un talle nuevo.
+  if (input?.accion === "ajustar") {
+    const id = String(input?.id ?? "");
+    const size = cleanText(input?.talle, 12, "el talle", { required: true });
+    const delta = Number(input?.delta);
+    if (!HOUSE_ID.test(id)) throw new Error("Modelo inválido.");
+    if (!Number.isInteger(delta) || Math.abs(delta) > 999) throw new Error("Cantidad inválida.");
+    const target = houseSize(data, id, size);
+    if (!target) return { ok: false, motivo: "no-existe" };
+    const antes = target.get();
+    const despues = Math.min(Math.max(antes + delta, 0), 99999);
+    target.set(despues);
+    return { ok: true, antes, despues, nombre: target.name, id, talle: size };
+  }
   const order = String(input?.pedido ?? "");
   if (!ORDER_ID.test(order)) throw new Error("Pedido inválido.");
   data.casaPedidos ??= {};
