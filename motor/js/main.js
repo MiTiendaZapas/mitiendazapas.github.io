@@ -23,6 +23,7 @@ import { applyChannelPrices, applyStoreSettings, applyWholesaleSettings, loadSto
 import { createProductView } from "./interfaz/product-view.js";
 import { createToaster } from "./interfaz/toast.js";
 import { renderLastPairs } from "./interfaz/ultimos-pares.js";
+import { isSingleSize, setCatalogWords, storeWords } from "./vocabulario.js";
 
 const OPEN_CART_HASH = "#pedido";
 
@@ -95,8 +96,8 @@ async function startStore() {
     headStyle: config.catalogHeader,
     onAdded({ product, size, qty }) {
       toaster.show({
-        title: qty > 1 ? `${qty} ${config.manualStore ? "productos" : "pares"} agregados a tu pedido` : "Agregado a tu pedido",
-        text: `${product.name} · Talle ${size}`,
+        title: qty > 1 ? `${qty} ${storeWords().footwear ? "pares" : "productos"} agregados a tu pedido` : "Agregado a tu pedido",
+        text: isSingleSize(product) ? product.name : `${product.name} · Talle ${size}`,
         thumb: product.images[0]?.sm,
         action: { label: "Ver pedido", onClick: () => cartView.open() },
       });
@@ -113,6 +114,8 @@ async function startStore() {
     // Tiendas con dos versiones (público y revendedores): cada una con sus precios.
     const twoVersions = Object.keys(config.channels ?? {}).length > 1;
     if (config.manualStore) applyChannelPrices(catalog.products, channelKey);
+    // "pares" o "unidades", según lo que vende la tienda (ver vocabulario.js).
+    setCatalogWords(catalog.products);
     const pricing = createPricing(applyWholesaleSettings(priceTable, storeSettings, { twoVersions }));
     // Tienda con panel: las categorías (sus nombres y su orden) y el orden de los productos
     // dentro de cada una los elige el cliente (Categorías → Orden de tu tienda).

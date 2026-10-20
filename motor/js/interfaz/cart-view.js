@@ -6,6 +6,7 @@
  */
 import { escapeHtml, money, plural, readStorage, whatsappLink, writeStorage } from "../utils.js";
 import { buildOrderMessage, isFootwear, orderLink } from "../whatsapp.js";
+import { storeWords } from "../vocabulario.js";
 import { icon } from "./icons.js";
 import { sizeLabel } from "./g5.js";
 import { socialLinksHtml } from "./social.js";
@@ -163,7 +164,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
         <div class="state-message state-message--flat">
           ${icon("bag")}
           <h3 class="state-message__title">Tu pedido está vacío</h3>
-          <p class="state-message__text">Elegí un talle en cualquier modelo y tocá “Agregar”. Lo vas a ver acá.</p>
+          <p class="state-message__text">${storeWords().footwear ? "Elegí un talle en cualquier modelo" : "Elegí lo que te guste"} y tocá “Agregar”. Lo vas a ver acá.</p>
         </div>`;
       footer.innerHTML = `<button class="btn btn--primary btn--block btn--lg" type="button" data-close-drawer>Ver catálogo</button>`;
       footer.querySelector("[data-close-drawer]").addEventListener("click", close);

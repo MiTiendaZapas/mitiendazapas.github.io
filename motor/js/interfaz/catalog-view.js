@@ -2,6 +2,7 @@
  * Grilla del catálogo y tarjetas con compra rápida:
  * talle -> cantidad -> "Agregar", sin salir de la grilla.
  */
+import { isSingleSize } from "../vocabulario.js";
 import { escapeHtml, plural } from "../utils.js";
 import { icon } from "./icons.js";
 import { countText } from "./filters-view.js";
@@ -184,6 +185,9 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
   }
 
   function cardHtml(product, index) {
+    // Sin talles ("Talle único"): ya viene elegido, se agrega directo (no pide "Elegí un talle").
+    const single = isSingleSize(product) && product.available.length === 1;
+    if (single && !selection.get(product.id)) selection.set(product.id, { size: product.available[0].size, qty: 1, manual: true });
     const state = selection.get(product.id);
     const nameId = escapeHtml(`name-${product.id}`);
     return `
@@ -196,10 +200,10 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
               <a href="#p/${encodeURIComponent(product.slug)}">${escapeHtml(product.name)}</a>
             </h3>
             ${priceHtml(product, pricing)}
-            <fieldset class="size-picker">
+            ${single ? "" : `<fieldset class="size-picker">
               <legend class="size-picker__legend">Talles disponibles</legend>
               <div class="size-picker__list">${sizeButtonsHtml(product.available, state?.size, { european: product.category === "g5" })}</div>
-            </fieldset>
+            </fieldset>`}
             <div class="product-card__buy" data-buy></div>
           </div>
         </article>
@@ -228,7 +232,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
       </div>
       <p class="stock-hint${low ? " is-low" : ""}">${hint}</p>
       <button class="btn btn--primary add-btn" type="button" data-add ${remaining <= 0 ? "disabled" : ""}>
-        ${icon("bag")} Agregar<span class="add-btn__size"> talle ${escapeHtml(state.size)}</span>
+        ${icon("bag")} Agregar${isSingleSize(product) ? "" : `<span class="add-btn__size"> talle ${escapeHtml(state.size)}</span>`}
       </button>`;
   }
 

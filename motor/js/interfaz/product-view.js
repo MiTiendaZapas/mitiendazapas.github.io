@@ -12,6 +12,7 @@ import { sizeTableHtml } from "./pages.js";
 import { G5_SIZE_CHART } from "./g5.js";
 import { createSharer, shareButtonHtml } from "./share.js";
 import { attachSwipe } from "./swipe.js";
+import { isSingleSize, itemWord } from "../vocabulario.js";
 import { createZoomViewer } from "./zoom-viewer.js";
 
 const HASH_PREFIX = "#p/";
@@ -82,7 +83,8 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
   function show(next) {
     if (!dialog.open) returnFocus = document.activeElement;
     product = next;
-    state = { size: null, qty: 1 };
+    // Sin talles ("Talle único"): ya viene elegido si tiene stock.
+    state = { size: isSingleSize(product) && product.sizes[0].stock > 0 ? product.sizes[0].size : null, qty: 1 };
     render();
     if (!dialog.open) dialog.showModal();
     document.body.classList.add("is-locked");
@@ -190,7 +192,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
           <button class="stepper__btn" type="button" data-step="1" aria-label="Sumar uno" ${state.qty >= remaining ? "disabled" : ""}>${icon("plus")}</button>
         </div>
         <button class="btn btn--primary btn--lg add-btn" type="button" data-add ${remaining <= 0 ? "disabled" : ""}>
-          ${icon("bag")} Agregar talle ${escapeHtml(state.size)}
+          ${icon("bag")} ${isSingleSize(product) ? "Agregar al pedido" : `Agregar talle ${escapeHtml(state.size)}`}
         </button>
       </div>
       <p class="stock-hint${low ? " is-low" : ""}">${hint}</p>
@@ -205,7 +207,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
     const message = buildOrderMessage({ config, channel, quote });
     return `
       <a class="btn btn--whatsapp btn--block quick-order" href="${orderLink(config, message)}" target="_blank" rel="noopener" data-quick-order>
-        ${icon("whatsapp")} Pedir este par por WhatsApp
+        ${icon("whatsapp")} Pedir este ${itemWord(product)} por WhatsApp
       </a>`;
   }
 
@@ -218,7 +220,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
         <h2 class="product-view__title" id="pv-title">${escapeHtml(product.name)}</h2>
         ${priceHtml(product, pricing)}
         ${product.description ? `<p class="product-view__description">${escapeHtml(product.description)}</p>` : ""}
-        <fieldset class="size-picker product-view__sizes">
+        <fieldset class="size-picker product-view__sizes"${isSingleSize(product) ? " hidden" : ""}>
           <legend class="size-picker__legend">Elegí tu talle${soldOutCount ? ` <span class="size-picker__soldout">(tachados: agotados)</span>` : ""}</legend>
           <div class="size-picker__list" data-sizes>${sizeButtonsHtml(product.sizes, state.size, { european: product.category === "g5" })}</div>
         </fieldset>
