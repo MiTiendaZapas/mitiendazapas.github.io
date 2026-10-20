@@ -128,16 +128,18 @@ def panel_icons(folder):
     code = hashlib.sha1(logo.read_bytes()).hexdigest()[:8]
     source = Image.open(logo).convert("RGBA")
     out = {}
-    for key, size, pad in (("32", 32, 0), ("180", 180, 0), ("192", 192, 0), ("512", 512, 0), ("512m", 512, 0.12)):
-        # Fondo blanco (los íconos transparentes se ven mal en algunos celulares). "m": con margen,
-        # para los celulares que recortan el ícono en círculo.
-        canvas = Image.new("RGB", (size, size), "#ffffff")
+    # Pestaña del navegador (32) y app de Android (192, 512): transparentes, solo el logo.
+    # iPhone (180) y el recortado en círculo (512m): con fondo blanco (ahí lo transparente se ve negro o mal).
+    for key, size, pad, white in (("32", 32, 0, False), ("180", 180, 0, True), ("192", 192, 0, False),
+                                  ("512", 512, 0, False), ("512m", 512, 0.12, True)):
+        canvas = Image.new("RGBA", (size, size), (255, 255, 255, 255 if white else 0))
         inner = round(size * (1 - 2 * pad))
         logo_img = source.copy()
         logo_img.thumbnail((inner, inner), Image.LANCZOS)
-        canvas.paste(logo_img, ((size - logo_img.width) // 2, (size - logo_img.height) // 2), logo_img)
-        name = f"icono-{key}-{code}.png"
-        canvas.save(folder / "panel" / name, "PNG", optimize=True)
+        canvas.alpha_composite(logo_img, ((size - logo_img.width) // 2, (size - logo_img.height) // 2))
+        # "t": nombre nuevo para que los celulares y navegadores no sigan mostrando el de fondo blanco.
+        name = f"icono-{key}-{code}{'' if white else 't'}.png"
+        (canvas.convert("RGB") if white else canvas).save(folder / "panel" / name, "PNG", optimize=True)
         out[key] = name
     return out
 
