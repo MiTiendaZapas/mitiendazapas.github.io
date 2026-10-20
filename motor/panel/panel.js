@@ -371,7 +371,7 @@ function matchesFilter(p) {
 function renderProducts() {
   if (!state.br) return renderOwnProducts();
   const switcher = h("div", { class: "panel-switcher", role: "group", "aria-label": "Qué productos ver" },
-    [["propios", `Mis productos (${state.products.length})`], ["br", `Stock automático (${state.br.products.length})`]].map(([id, label]) =>
+    [["propios", `Mis productos (${state.products.length + brWithPairs().length})`], ["br", `Stock automático (${state.br.products.length})`]].map(([id, label]) =>
       h("button", { type: "button", class: "panel-switcher__btn", "aria-pressed": String(state.view === id),
         onclick: () => { state.view = id; renderProducts(); } }, label)));
   if (state.view === "br") renderBrProducts();
@@ -690,6 +690,36 @@ const offersButton = () => h("a", { class: "btn btn--outline btn--sm", href: "#o
 /** Botón "Por mayor" (arriba de las listas de productos). */
 const wholesaleButton = () => h("a", { class: "btn btn--outline btn--sm", href: "#por-mayor" }, "Venta por mayor");
 
+/**
+ * Lista con un título por categoría (como en la tienda). items: [{ product, view }] ya ordenados
+ * por categoría. Los modelos del stock automático dicen su calidad (Brasil o G5).
+ */
+const BR_QUALITY = { g5: "Calidad G5" };
+function sectioned(items, { quality: withQuality = false } = {}) {
+  const nodes = [];
+  let current = null;
+  for (const item of items) {
+    const category = item.product.category;
+    if (category !== current) {
+      current = category;
+      const count = items.filter((i) => i.product.category === category).length;
+      const quality = withQuality ? (BR_QUALITY[category] ?? "Calidad Brasil") : null;
+      const title = categoryName(category);
+      nodes.push(h("li", { class: "panel-section", role: "presentation" },
+        h("h2", {}, title),
+        quality && quality !== title ? h("span", { class: "panel-section__tag" }, quality) : null,
+        h("small", { class: "panel-muted" }, count === 1 ? "1 producto" : `${count} productos`)));
+    }
+    nodes.push(item.view);
+  }
+  return nodes;
+}
+// Orden de las categorías del stock automático: primero Brasil, al final G5.
+const BR_CATEGORIES_ORDER = { zapatillas: 0, ojotas: 1, g5: 9 };
+const brCategoryRank = (id) => BR_CATEGORIES_ORDER[id] ?? 5;
+/** Modelos del stock automático donde el cliente cargó pares suyos (también van en "Mis productos"). */
+const brWithPairs = () => (state.br?.products ?? []).filter((p) => brTotal(p, "casa") > 0);
+
 function renderOwnProducts() {
   const full = state.products.length >= state.limits.products;
   const list = h("ul", { class: "panel-list" });
@@ -697,9 +727,9 @@ function renderOwnProducts() {
 
   function renderChips() {
     const options = [
-      { id: "todos", label: `Todos (${state.products.length})` },
+      { id: "todos", label: `Todos (${state.products.length + brWithPairs().length})` },
       { id: "sin-stock", label: `Sin stock (${state.products.filter((p) => totalStock(p) === 0).length})` },
-      { id: "pausados", label: `Pausados (${state.products.filter((p) => p.hidden).length})` },
+      { id: "pausados", label: `Pausados (${state.products.filter((p) => p.hidden).length + brWithPairs().filter((p) => p.hidden).length})` },
       ...Object.entries(state.categories).map(([id, label]) => ({ id: `cat:${id}`, label })),
     ];
     chips.replaceChildren(...options.map((o) => h("button", { type: "button", class: "panel-chip", "aria-pressed": String(state.filter === o.id),
@@ -712,8 +742,17 @@ function renderOwnProducts() {
       && (!term || `${p.name} ${p.brand ?? ""} ${categoryName(p.category)}`.toLowerCase().includes(term)));
     // Subir / bajar solo si eligió ordenar a mano, y viendo todos (si no, sería confuso).
     const canOrder = state.settings.productOrder === "manual" && state.filter === "todos" && !term;
-    list.replaceChildren(...(shown.length
-      ? shown.map((p) => itemView(p, canOrder, renderAll))
+    // Modelos del stock automático con pares tuyos: en su categoría, después de tus productos.
+    const paired = brWithPairs().filter((p) => (state.filter === "todos" || (state.filter === "pausados" ? p.hidden : state.filter.startsWith("cat:") && p.category === state.filter.slice(4)))
+      && (!term || `${p.name} ${p.brand ?? ""} ${categoryName(p.category)}`.toLowerCase().includes(term)));
+    const categoryOrder = [...new Set([...shown.map((p) => p.category), ...Object.keys(state.categories)])];
+    const rank = (id) => { const i = categoryOrder.indexOf(id); return i === -1 ? 999 : i; };
+    const items = [
+      ...shown.map((p, i) => ({ product: p, view: itemView(p, canOrder, renderAll), key: [rank(p.category), 0, i] })),
+      ...paired.map((p, i) => ({ product: p, view: brItemView(p, renderAll, { inOwnList: true }), key: [rank(p.category), 1, i] })),
+    ].sort((a, b) => a.key[0] - b.key[0] || a.key[1] - b.key[1] || a.key[2] - b.key[2]);
+    list.replaceChildren(...(items.length
+      ? sectioned(items)
       : [state.products.length
         ? emptyState("search", "No hay productos con ese filtro.", "Ver todos", () => { state.filter = "todos"; state.search = ""; renderProducts(); })
         : emptyState("bag", "Todavía no cargaste productos propios.", "+ Cargar el primero", () => openEditor(null))]));
@@ -790,7 +829,7 @@ function itemView(product, canOrder, refresh) {
         h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => openEditor(product) }, "Editar"),
         h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: togglePause }, product.hidden ? "Mostrar" : "Pausar"),
         h("details", { class: "panel-more" },
-          h("summary", { class: "btn btn--ghost btn--sm", "aria-label": `Más opciones de ${product.name}` }, ...withCaret("Más")),
+          h("summary", { class: "btn btn--ghost btn--sm panel-more__dots", "aria-label": `Más opciones de ${product.name}`, title: "Más opciones" }, h("span", { "aria-hidden": "true" }, "⋯")),
           h("div", { class: "panel-more__menu" },
             h("button", { type: "button", onclick: copy }, "Copiar (otro color)"),
             h("a", { href: productLink(product), target: "_blank", rel: "noopener" }, "Ver en la tienda", ico("external")),
@@ -1029,7 +1068,8 @@ function seenIntro() { try { return localStorage.getItem(INTRO_KEY) === "1"; } c
 function rememberIntro() { try { localStorage.setItem(INTRO_KEY, "1"); } catch { /* sin memoria: se vuelve a mostrar */ } }
 
 function renderBrProducts() {
-  const products = [...state.br.products].sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+  const products = [...state.br.products].sort((a, b) => brCategoryRank(a.category) - brCategoryRank(b.category)
+    || categoryName(a.category).localeCompare(categoryName(b.category), "es") || a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
   const list = h("ul", { class: "panel-list" });
   const chips = h("div", { class: "panel-chips", role: "group", "aria-label": "Filtrar modelos de Brasil" });
   const brCategories = [...new Set(products.map((p) => p.category))];
@@ -1052,7 +1092,7 @@ function renderBrProducts() {
     const term = state.brSearch.trim().toLowerCase();
     const shown = products.filter((p) => matchesBrFilter(p) && (!term || `${p.name} ${p.brand ?? ""}`.toLowerCase().includes(term)));
     list.replaceChildren(...(shown.length
-      ? shown.map((p) => brItemView(p, () => { renderChips(); renderItems(); }))
+      ? sectioned(shown.map((p) => ({ product: p, view: brItemView(p, () => { renderChips(); renderItems(); }) })), { quality: true })
       : [emptyState("search", "No hay modelos con ese filtro.", "Ver todos", () => { state.brFilter = "todos"; state.brSearch = ""; renderProducts(); })]));
   }
 
@@ -1069,7 +1109,7 @@ function renderBrProducts() {
   renderItems();
 }
 
-function brItemView(product, refresh) {
+function brItemView(product, refresh, { inOwnList = false } = {}) {
   const fromBrazil = brTotal(product, "br");
   const own = brTotal(product, "casa");
   const unit = product.price || autoPrice(product);
@@ -1113,6 +1153,7 @@ function brItemView(product, refresh) {
         TWO_VERSIONS ? h("small", { class: "panel-muted" }, `Revendedores: ${money(product.mayorista?.price || autoPrice(product, "mayorista"))}`) : null,
         STATUS_TEXT[product.status] ? h("span", { class: "panel-paused-tag" }, STATUS_TEXT[product.status]) : null,
         stockLine,
+        inOwnList ? h("span", { class: "panel-auto-tag" }, product.category === "g5" ? "Stock automático · calidad G5" : "Stock automático · calidad Brasil") : null,
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Oculto: no se ve en tu tienda") : null,
         tagsFor(product)),
       h("div", { class: "panel-item__actions" },
