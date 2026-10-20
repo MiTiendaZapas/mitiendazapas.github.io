@@ -797,3 +797,83 @@ export async function chooseFirstKey(env, usuario, next) {
   checkNewKey(next, user);
   return savePassword(env, user, next);
 }
+
+// --- stock de casa descontado por pedidos (app de pedidos de L.A IMP) ----------------
+// La app de pedidos descuenta 1 par al anotar un pedido de casa y lo devuelve si el pedido se
+// borra o se corrige. "id" es "p:<producto propio>" o "b:<modelo del proveedor>" (sus pares extra).
+// Cada pedido queda anotado en data.casaPedidos: un mismo pedido nunca descuenta dos veces.
+const MAX_HOUSE_ORDERS = 1000;
+const HOUSE_ID = /^(p|b):[A-Za-z0-9_-]{1,80}$/;
+const ORDER_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Cuántos pares hay de ese talle (y cómo cambiarlo), o null si no existe. */
+function houseSize(data, id, size) {
+  const [kind, code] = [id.slice(0, 1), id.slice(2)];
+  if (kind === "p") {
+    const product = data.products.find((p) => p.id === code);
+    if (!product) return null;
+    return {
+      name: product.name,
+      get: () => product.sizes.find((s) => s.size === size)?.stock ?? 0,
+      set: (n) => {
+        const entry = product.sizes.find((s) => s.size === size);
+        if (entry) entry.stock = n;
+        else if (n > 0) { product.sizes.push({ size, stock: n }); product.sizes.sort((a, b) => compareSizes(a.size, b.size)); }
+      },
+    };
+  }
+  const change = data.br?.[code];
+  return {
+    name: change?.model?.name ?? null,
+    get: () => change?.extra?.[size] ?? 0,
+    set: (n) => {
+      data.br ??= {};
+      const target = (data.br[code] ??= {});
+      target.extra = { ...(target.extra ?? {}) };
+      if (n > 0) target.extra[size] = n; else delete target.extra[size];
+      if (!Object.keys(target.extra).length) delete target.extra;
+      if (!Object.keys(target).length) delete data.br[code];
+    },
+  };
+}
+
+/**
+ * accion "descontar": baja 1 par por el pedido; "devolver": devuelve el que descontó ese pedido.
+ * Con legado: true devuelve sin anotación (pedidos descontados en la app antes del cambio).
+ */
+export function moveHouseStock(data, input) {
+  const order = String(input?.pedido ?? "");
+  if (!ORDER_ID.test(order)) throw new Error("Pedido inválido.");
+  data.casaPedidos ??= {};
+  if (input?.accion === "descontar") {
+    const id = String(input?.id ?? "");
+    const size = cleanText(input?.talle, 12, "el talle", { required: true });
+    if (!HOUSE_ID.test(id)) throw new Error("Modelo inválido.");
+    if (data.casaPedidos[order]) return { ok: false, motivo: "ya-descontado", ...data.casaPedidos[order] };
+    const target = houseSize(data, id, size);
+    if (!target) return { ok: false, motivo: "no-existe" };
+    const antes = target.get();
+    if (antes <= 0) return { ok: false, motivo: "sin-stock", antes };
+    target.set(antes - 1);
+    data.casaPedidos[order] = { id, talle: size, at: new Date().toISOString() };
+    const orders = Object.entries(data.casaPedidos);
+    if (orders.length > MAX_HOUSE_ORDERS) data.casaPedidos = Object.fromEntries(orders.slice(-MAX_HOUSE_ORDERS));
+    return { ok: true, antes, despues: antes - 1, nombre: target.name, id, talle: size };
+  }
+  if (input?.accion === "devolver") {
+    let record = data.casaPedidos[order];
+    if (!record && input?.legado === true) {
+      const id = String(input?.id ?? "");
+      if (!HOUSE_ID.test(id)) throw new Error("Modelo inválido.");
+      record = { id, talle: cleanText(input?.talle, 12, "el talle", { required: true }) };
+    }
+    if (!record) return { ok: false, motivo: "sin-descuento" };
+    const target = houseSize(data, record.id, record.talle);
+    delete data.casaPedidos[order];
+    if (!target) return { ok: true, despues: null, talle: record.talle };
+    const despues = Math.min(target.get() + 1, 99999);
+    target.set(despues);
+    return { ok: true, despues, nombre: target.name, talle: record.talle };
+  }
+  throw new Error("Acción inválida.");
+}

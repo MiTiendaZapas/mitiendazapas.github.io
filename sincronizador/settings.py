@@ -104,4 +104,4 @@ MIN_RATIO_VS_PREVIOUS = 0.5
 # De dónde sale el stock de casa (ver stock_casa_sync.py):
 #   "app"   = AppPedidos -> Stock de casa (Firebase), como hasta el 20/10.
 #   "panel" = el panel de la tienda de L.A IMP (mitiendastock.com/laimp/panel/).
-STOCK_CASA_FUENTE = "app"
+STOCK_CASA_FUENTE = "panel"

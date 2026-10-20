@@ -49,7 +49,7 @@ TEST_BRANCH = "prueba"
 # en /laimp-panel/, con el catálogo que arma el panel de "laimp". Solo en el link de prueba.
 MAIN_PANEL_TEST = "laimp-panel"
 # True: la tienda real de L.A IMP (/laimp/) ya es tienda con panel (el stock de casa se maneja ahí).
-MAIN_STORE_PANEL = False
+MAIN_STORE_PANEL = True
 PANEL_PAGE = """<!DOCTYPE html>
 <html lang="es-AR">
 <head>
@@ -81,6 +81,12 @@ PANEL_MANIFEST = {"name": "", "short_name": "Mi panel", "start_url": "./", "scop
                       {"src": "/motor/panel/icono-192.png", "sizes": "192x192", "type": "image/png"},
                       {"src": "/motor/panel/icono-512.png", "sizes": "512x512", "type": "image/png"},
                       {"src": "/motor/panel/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
+
+
+# App de pedidos de L.A IMP (../AppPedidos) en /pedidos/: así puede descontar el stock de casa
+# en el panel de la tienda con la misma sesión (ver AppPedidos/stock-panel.js).
+ORDERS_APP = PROJECTS / "AppPedidos"
+SKIP_ORDERS_APP = {".git", ".claude", ".gitignore", "README.md"}
 
 
 def add_panel(folder, store_id, name):
@@ -184,6 +190,9 @@ def build(dist, test=False):
     elif test:
         shutil.copytree(main_store, dist / MAIN_PANEL_TEST)
         add_panel(dist / MAIN_PANEL_TEST, MAIN_STORE, "L.A IMP")
+    if ORDERS_APP.exists():
+        (dist / "pedidos").mkdir()
+        copy_tree(ORDERS_APP, dist / "pedidos", SKIP_ORDERS_APP)
     clients = client_repos(test)
     for name, folder in clients.items():
         if (dist / name).exists():

@@ -8,6 +8,8 @@
 import { fail, isStoreId, json, publicCatalog, publicMixedCatalog, readBrStock, readCatalog } from "../../../../servidor/panel.js";
 
 const SECONDS = 20;
+// Es público: otras páginas también lo pueden leer (PedidosProveedor, en la compu, lee el stock de casa de L.A IMP).
+const OPEN = { "Access-Control-Allow-Origin": "*" };
 
 export async function onRequestGet({ request, env, params, waitUntil }) {
   if (!isStoreId(params.tienda)) return fail("Tienda inexistente.", 404);
@@ -19,13 +21,14 @@ export async function onRequestGet({ request, env, params, waitUntil }) {
   if (cached) {
     const headers = new Headers(cached.headers);
     headers.set("Cache-Control", "no-cache");
+    headers.set("Access-Control-Allow-Origin", "*");
     return new Response(cached.body, { status: cached.status, headers });
   }
 
   const { data } = await readCatalog(env, params.tienda);
   const body = data.stockBR ? publicMixedCatalog(data, await readBrStock(env, data.stockBR)) : publicCatalog(data);
   // El navegador siempre pregunta ("no-cache"); la memoria de Cloudflare guarda la respuesta unos segundos.
-  const response = json(body, 200, { "Cache-Control": "no-cache" });
+  const response = json(body, 200, { "Cache-Control": "no-cache", ...OPEN });
   if (cache) {
     const stored = new Response(response.clone().body, response);
     stored.headers.set("Cache-Control", `public, max-age=${SECONDS}`);
