@@ -1151,6 +1151,8 @@ function matchesBrFilter(p) {
   if (state.brFilter === "ocultos") return p.hidden;
   if (state.brFilter === "sin-precio") return p.status === "nuevo" || p.status === "sin-precio-g5";
   if (state.brFilter === "casa") return brTotal(p, "casa") > 0;
+  if (state.brFilter === "calidad:br") return p.category !== "g5";
+  if (state.brFilter === "calidad:g5") return p.category === "g5";
   if (state.brFilter.startsWith("cat:")) return p.category === state.brFilter.slice(4);
   return true;
 }
@@ -1169,14 +1171,21 @@ function renderBrProducts() {
 
   function renderChips() {
     const count = (fn) => products.filter(fn).length;
+    const g5 = count((p) => p.category === "g5");
+    // Primero por calidad (lo que más se busca): Todos · Calidad Brasil · Calidad G5. Después, el resto.
     const options = [
       { id: "todos", label: `Todos (${products.length})` },
-      { id: "cambios", label: `Con cambios tuyos (${count(brChanged)})` },
+      ...(g5 && g5 < products.length ? [
+        { id: "calidad:br", label: `Calidad Brasil (${products.length - g5})` },
+        { id: "calidad:g5", label: `Calidad G5 (${g5})` },
+      ] : []),
       { id: "casa", label: `Con pares tuyos (${count((p) => brTotal(p, "casa") > 0)})` },
+      { id: "cambios", label: `Con cambios tuyos (${count(brChanged)})` },
       { id: "ocultos", label: `Ocultos (${count((p) => p.hidden)})` },
       ...(count((p) => p.status === "nuevo" || p.status === "sin-precio-g5")
         ? [{ id: "sin-precio", label: `Sin precio, no se ven (${count((p) => p.status === "nuevo" || p.status === "sin-precio-g5")})` }] : []),
-      ...(brCategories.length > 1 ? brCategories.map((id) => ({ id: `cat:${id}`, label: categoryName(id) })) : []),
+      // Las categorías de calidad Brasil (Zapatillas, Ojotas…); la G5 ya tiene su botón arriba.
+      ...(brCategories.filter((id) => id !== "g5").length > 1 ? brCategories.filter((id) => id !== "g5").map((id) => ({ id: `cat:${id}`, label: categoryName(id) })) : []),
     ];
     chips.replaceChildren(...options.map((o) => h("button", { type: "button", class: "panel-chip", "aria-pressed": String(state.brFilter === o.id),
       onclick: () => { state.brFilter = o.id; renderChips(); renderItems(); } }, o.label)));
