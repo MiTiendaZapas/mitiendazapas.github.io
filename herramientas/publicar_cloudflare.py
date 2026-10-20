@@ -203,6 +203,11 @@ def build(dist, test=False):
     # solo con un 308, que la vista previa de WhatsApp a veces no sigue (link sin imagen).
     pages = sorted({html.parent.relative_to(dist).as_posix() for html in dist.rglob("index.html")} - {"."})
     redirects += [f"/{page} /{page}/ 301" for page in pages]
+    # El panel de prueba de L.A IMP (/laimp-panel/) ya no existe: L.A IMP usa el panel real.
+    # Quien lo tenga guardado en el celular va directo al de mitiendastock.com (siempre al día).
+    if MAIN_STORE_PANEL and test:
+        redirects.insert(0, f"/{MAIN_PANEL_TEST}/* {NEW_URL}{MAIN_STORE}/:splat 302")
+        redirects.insert(0, f"/{MAIN_PANEL_TEST} {NEW_URL}{MAIN_STORE}/panel/ 302")
     (dist / "_redirects").write_text("\n".join(redirects) + "\n", encoding="utf-8")
     # El programa de fondo del panel (para instalarlo en el celular) vive en /motor/panel/ pero
     # atiende el panel de cada tienda (/<tienda>/panel/): Cloudflare tiene que permitirlo.
