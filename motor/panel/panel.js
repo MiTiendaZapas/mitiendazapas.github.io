@@ -811,27 +811,23 @@ function renderOwnProducts() {
         : `Tenés ${state.products.length} de ${state.limits.products} productos.`) : null,
     h("input", { class: "panel-input", type: "search", placeholder: "Buscar producto", value: state.search, "aria-label": "Buscar producto",
       oninput: (e) => { state.search = e.target.value; renderItems(); } }),
-    chips, list);
+    chips,
+    h("p", { class: "panel-muted panel-stock-hint" }, "Tocá − cuando vendas y + cuando te llegue: se guarda solo. Con “+ Talle” agregás uno que no está."),
+    list);
   renderAll();
 }
 
 function itemView(product, canOrder, refresh) {
-  const total = totalStock(product);
   // Vecinos de la MISMA categoría en el orden de la tienda (subir/bajar no cruza categorías).
   const ordered = sortProducts(state.products, state.categories, state.settings);
   const position = ordered.indexOf(product);
   const neighbor = (delta) => (ordered[position + delta]?.category === product.category ? ordered[position + delta] : null);
-  const stockBox = h("div", { class: "panel-quick", hidden: true });
+  // El stock siempre a la vista: el panel es sobre todo para esto (antes había que tocar "Stock: N").
+  const stockTotal = h("span", { class: "panel-quick__total" });
+  const stockBox = h("div", { class: "panel-quick" });
   const thumb = product.images[0]
     ? h("img", { src: storeUrl(product.images[0].sm), alt: "", width: 64, height: 80, loading: "lazy" })
     : h("span", { class: "panel-thumb--empty" }, "Sin foto");
-  const badge = h("button", { class: `panel-stock${total === 0 ? " is-empty" : ""}`, type: "button", "aria-expanded": "false",
-    onclick: () => {
-      const open = stockBox.hidden;
-      stockBox.hidden = !open;
-      badge.setAttribute("aria-expanded", String(open));
-      if (open) renderQuickStock(product, stockBox, badge);
-    } }, ...withCaret(total === 0 ? "Sin stock" : `Stock: ${total}`));
 
   const move = (delta) => async (event) => busy(event.currentTarget, async () => {
     const list = [...state.products];
@@ -866,7 +862,6 @@ function itemView(product, canOrder, refresh) {
         product.hidden ? h("span", { class: "panel-paused-tag" }, "Pausado: no se ve en la tienda") : null,
         tagsFor(product)),
       h("div", { class: "panel-item__actions" },
-        badge,
         h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => openEditor(product) }, "Editar"),
         h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: togglePause }, product.hidden ? "Mostrar" : "Pausar"),
         h("details", { class: "panel-more" },
@@ -876,21 +871,36 @@ function itemView(product, canOrder, refresh) {
             h("a", { href: productLink(product), target: "_blank", rel: "noopener" }, "Ver en la tienda", ico("external")),
             canOrder && neighbor(-1) ? h("button", { type: "button", onclick: move(-1) }, "Subir un lugar") : null,
             canOrder && neighbor(1) ? h("button", { type: "button", onclick: move(1) }, "Bajar un lugar") : null)))),
-    stockBox);
+    (renderQuickStock(product, stockBox, stockTotal), stockBox));
 }
 
-/** Stock rápido: "vendí uno" sin entrar a editar. Se guarda al toque. */
-function renderQuickStock(product, box, badge) {
-  box.replaceChildren(h("p", { class: "panel-muted" }, "Unidades de cada talle. Tocá − cuando vendas una y + cuando te llegue. Se guarda solo."),
-    h("div", { class: "panel-quick__grid" }, product.sizes.map((s) => {
+/** Total del stock arriba de los talles ("4 unidades" / "Sin stock", en rojo). */
+function paintTotal(el, total, word = "unidades") {
+  el.textContent = total === 0 ? "Sin stock" : `${total} ${total === 1 ? word.replace(/es$/, "").replace(/s$/, "") : word}`;
+  el.classList.toggle("is-empty", total === 0);
+}
+
+/** Un talle con − y + en una sola línea (compacto: dos por fila en el celular). */
+function sizeCell(label, value, onMinus, onPlus, sub) {
+  return h("div", { class: `panel-quick__size${Number(value.textContent) === 0 ? " is-zero" : ""}` },
+    h("span", { class: "panel-quick__label" }, h("strong", {}, label), sub ? h("small", { class: "panel-muted" }, sub) : null),
+    h("div", { class: "panel-stepper" },
+      h("button", { type: "button", "aria-label": `Restar uno al talle ${label}`, onclick: onMinus }, ico("minus")),
+      value,
+      h("button", { type: "button", "aria-label": `Sumar uno al talle ${label}`, onclick: onPlus }, ico("plus"))));
+}
+
+/** Stock rápido: "vendí uno" sin entrar a editar. Siempre a la vista y se guarda solo. */
+function renderQuickStock(product, box, totalEl) {
+  const paintAll = () => paintTotal(totalEl, totalStock(product));
+  paintAll();
+  box.replaceChildren(
+    h("div", { class: "panel-quick__head" }, h("span", { class: "panel-muted" }, "Stock"), totalEl),
+    h("div", { class: "panel-quick__grid" }, ...product.sizes.map((s) => {
       const value = h("output", { class: "panel-quick__value" }, s.stock);
       let pending = 0;   // toques que todavía no se guardaron
-      const paint = () => {
-        value.textContent = s.stock;
-        const total = totalStock(product);
-        badge.replaceChildren(...withCaret(total === 0 ? "Sin stock" : `Stock: ${total}`));
-        badge.classList.toggle("is-empty", total === 0);
-      };
+      let cell;
+      const paint = () => { value.textContent = s.stock; cell.classList.toggle("is-zero", s.stock === 0); paintAll(); };
       const change = (delta) => () => {
         if (s.stock + delta < 0) return;
         s.stock += delta;
@@ -905,40 +915,44 @@ function renderQuickStock(product, box, badge) {
           if (!pending) { s.stock = stock; paint(); }
         }, () => { s.stock -= pending; pending = 0; paint(); });
       };
-      return h("div", { class: "panel-quick__size" },
-        h("span", { class: "panel-quick__label" }, h("strong", {}, `Talle ${s.size}`)),
-        h("div", { class: "panel-stepper" },
-          h("button", { type: "button", "aria-label": `Restar uno al talle ${s.size}`, onclick: change(-1) }, ico("minus")),
-          value,
-          h("button", { type: "button", "aria-label": `Sumar uno al talle ${s.size}`, onclick: change(1) }, ico("plus"))));
-    })),
+      cell = sizeCell(s.size, value, change(-1), change(1));
+      return cell;
+    }),
     // Un talle nuevo (por ejemplo, te llegó un 45): se agrega acá mismo, con 1 unidad.
-    addSizeRow(async (size) => {
+    addSizeCell(async (size) => {
       const { sizes } = await api("/stock", { method: "POST", body: { id: product.id, size, delta: 1, nuevo: true } });
       product.sizes = sizes;
-      renderQuickStock(product, box, badge);
-      const total = totalStock(product);
-      badge.replaceChildren(...withCaret(total === 0 ? "Sin stock" : `Stock: ${total}`));
-      badge.classList.toggle("is-empty", total === 0);
+      renderQuickStock(product, box, totalEl);
       toast(`Talle ${size} agregado con 1 unidad.`);
-    }));
+    })));
 }
 
 /**
- * "¿Tenés un talle que no está?": un campo y "+ Agregar talle" (también con Enter).
- * La usan el stock de los productos propios y "Mis pares" de los modelos automáticos.
+ * "+ Talle": la última casilla de la grilla. Al tocarla se convierte en un campo para escribir
+ * el talle (Enter o ✓ lo agrega, Esc o × cancela). La usan los productos propios y "Mis pares".
  */
-function addSizeRow(onAdd) {
-  const input = h("input", { class: "panel-input", maxlength: 12, placeholder: "Ej: 45", "aria-label": "Talle nuevo", enterkeyhint: "done" });
-  const button = h("button", { type: "button", class: "btn btn--outline btn--sm" }, ico("plus"), "Agregar talle");
-  const add = () => {
-    const size = input.value.trim();
-    if (!size) { input.focus(); return; }
-    busy(button, async () => { await onAdd(size); });
-  };
-  button.addEventListener("click", add);
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
-  return h("div", { class: "panel-quick__add" }, h("span", { class: "panel-muted" }, "¿Tenés un talle que no está?"), input, button);
+function addSizeCell(onAdd) {
+  const cell = h("div", { class: "panel-quick__new" });
+  const closed = () => cell.replaceChildren(h("button", { type: "button", class: "panel-quick__new-btn", onclick: open }, ico("plus"), "Talle"));
+  function open() {
+    const input = h("input", { class: "panel-input", maxlength: 12, placeholder: "Ej: 45", "aria-label": "Talle nuevo", enterkeyhint: "done" });
+    const ok = h("button", { type: "button", class: "panel-quick__ok", "aria-label": "Agregar este talle" }, ico("check"));
+    const add = () => {
+      const size = input.value.trim();
+      if (!size) { input.focus(); return; }
+      busy(ok, async () => { await onAdd(size); });
+    };
+    ok.addEventListener("click", add);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); add(); }
+      if (e.key === "Escape") closed();
+    });
+    cell.replaceChildren(input, ok,
+      h("button", { type: "button", class: "panel-quick__cancel", "aria-label": "Cancelar", onclick: closed }, ico("close")));
+    input.focus();
+  }
+  closed();
+  return cell;
 }
 
 const roundPrice = (n) => Math.max(100, Math.round(n / 100) * 100);
@@ -1205,7 +1219,8 @@ function brItemView(product, refresh, { inOwnList = false } = {}) {
     pairsButton.classList.toggle("is-none", !mine);
   };
   // "Mis pares": sumar o restar al toque los pares que el cliente tiene en su casa.
-  const quick = h("div", { class: "panel-quick", hidden: true });
+  // En "Mis productos" los pares van siempre a la vista; en la lista de 175 modelos, con "Mis pares".
+  const quick = h("div", { class: "panel-quick", hidden: !inOwnList });
   const pairsButton = h("button", { class: `panel-stock${own ? "" : " is-none"}`, type: "button", "aria-expanded": "false",
     onclick: () => {
       const open = quick.hidden;
@@ -1235,18 +1250,23 @@ function brItemView(product, refresh, { inOwnList = false } = {}) {
             toast(`Listo: ya se ve en tu tienda a ${money(autoPrice(product))}.`);
             renderProducts();
           }) }, `Mostrar a ${money(autoPrice(product))}`) : null,
-        pairsButton,
+        inOwnList ? null : pairsButton,
         h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => { location.hash = `#br/${encodeURIComponent(product.id)}`; } }, "Editar"),
         h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: toggle }, product.hidden ? "Mostrar" : "Ocultar"))),
-    quick);
+    (inOwnList ? renderQuickPairs(product, quick, paintPairs) : null, quick));
 }
 
-/** Pares de casa al toque: + y − por talle, se guarda solo (como "vendí uno" en los productos propios). */
+/** Pares de casa al toque: + y − por talle, se guarda solo (como el stock de los productos propios). */
 function renderQuickPairs(product, box, onChange) {
+  const totalEl = h("span", { class: "panel-quick__total" });
+  const paintAll = () => paintTotal(totalEl, product.sizes.reduce((sum, s) => sum + s.casa, 0), "pares tuyos");
+  paintAll();
   box.replaceChildren(
-    h("p", { class: "panel-muted" }, "Tus pares de cada talle. Tocá − cuando vendas uno y + cuando te llegue. Se guarda solo."),
-    h("div", { class: "panel-quick__grid" }, product.sizes.map((s) => {
+    h("div", { class: "panel-quick__head" }, h("span", { class: "panel-muted" }, "En tu casa"), totalEl,
+      h("small", { class: "panel-muted panel-quick__legend" }, product.category === "g5" ? "PR = del proveedor" : "BR = los de Brasil")),
+    h("div", { class: "panel-quick__grid" }, ...product.sizes.map((s) => {
       const value = h("output", { class: "panel-quick__value" }, s.casa);
+      let cell;
       const change = (delta) => () => {
         const before = product.sizes.map((x) => x.casa);
         const next = Math.max(0, s.casa + delta);
@@ -1254,7 +1274,9 @@ function renderQuickPairs(product, box, onChange) {
         s.casa = next;
         s.stock = s.br + s.casa;
         value.textContent = next;
+        cell.classList.toggle("is-zero", next === 0);
         buzz();
+        paintAll();
         onChange();
         // Se guarda una sola vez cuando deja de tocar (con todos los talles como quedaron).
         saveSoon(`pares:${product.id}`, () => api("/br", { method: "POST", body: brBody(product) }), () => {
@@ -1263,16 +1285,12 @@ function renderQuickPairs(product, box, onChange) {
           onChange();
         });
       };
-      return h("div", { class: "panel-quick__size" },
-        h("span", { class: "panel-quick__label" }, h("strong", {}, `Talle ${s.size}`),
-          h("small", { class: "panel-muted" }, s.br ? `En Brasil: ${s.br}` : "Brasil no tiene")),
-        h("div", { class: "panel-stepper" },
-          h("button", { type: "button", "aria-label": `Restar un par tuyo del talle ${s.size}`, onclick: change(-1) }, ico("minus")),
-          value,
-          h("button", { type: "button", "aria-label": `Sumar un par tuyo al talle ${s.size}`, onclick: change(1) }, ico("plus"))));
-    })),
+      const from = product.category === "g5" ? "PR" : "BR";
+      cell = sizeCell(s.size, value, change(-1), change(1), `${from} ${s.br || "—"}`);
+      return cell;
+    }),
     // Un talle que Brasil no tiene (por ejemplo, un 45 que tenés en tu casa): se agrega acá mismo.
-    addSizeRow(async (size) => {
+    addSizeCell(async (size) => {
       if (product.sizes.some((s) => s.size.toLowerCase() === size.toLowerCase())) throw new Error(`El talle ${size} ya está: sumale con el +.`);
       product.sizes.push({ size, br: 0, casa: 1, stock: 1, soloCasa: true });
       product.sizes.sort((a, b) => compareSizes(a.size, b.size));
@@ -1285,7 +1303,7 @@ function renderQuickPairs(product, box, onChange) {
       renderQuickPairs(product, box, onChange);
       onChange();
       toast(`Talle ${size} agregado con 1 par.`);
-    }));
+    })));
 }
 
 /** Lo que se manda al guardar un modelo de Brasil (lo que no se cambia, queda como estaba). */
@@ -2065,8 +2083,8 @@ function renderHelp() {
   // Preguntas que se abren al tocarlas (antes era una pared de texto, todo abierto).
   const steps = [
     ["¿Cómo cargo un producto?", "En “Productos” tocá “Nuevo producto”: subí las fotos, poné el nombre y la categoría, elegí los talles con su cantidad y el precio. Tocá “Guardar” y ya aparece en tu tienda."],
-    ["Vendí algo: ¿cómo resto el stock?", "En “Productos” tocá el botón “Stock” del producto y restá con “−” en el talle que vendiste. Se guarda solo. Lo que llega a 0 deja de verse en la tienda."],
-    ["Me llegó un talle que no tenía", "Tocá “Stock” en el producto y, abajo, en “¿Tenés un talle que no está?”, escribí el talle y tocá “Agregar talle”. Queda con 1 unidad: sumale más con “+”."],
+    ["Vendí algo: ¿cómo resto el stock?", "En “Productos”, cada producto muestra sus talles: tocá “−” en el que vendiste. Se guarda solo. Lo que llega a 0 deja de verse en la tienda."],
+    ["Me llegó un talle que no tenía", "En el producto tocá “+ Talle” (al final de sus talles), escribí el talle y dale a ✓. Queda con 1 unidad: sumale más con “+”."],
     ["El mismo modelo en otro color", "Tocá “⋯” → “Copiar (otro color)”. Se crea una copia pausada con las mismas fotos y talles: cambiale el nombre, las fotos y las cantidades, y tildá “Se ve en la tienda”."],
     ["Pausar sin borrar", "El botón “Pausar” lo esconde de la tienda (por ejemplo, mientras esperás mercadería). Con “Mostrar” vuelve a aparecer. Para borrarlo del todo: “Editar” → “Borrar este producto”, abajo de todo."],
     ["Ordenar las categorías", "En “Categorías”, con las flechas ↑ ↓ elegís en qué orden salen en la tienda. Ahí también creás, renombrás o borrás categorías."],
@@ -2082,7 +2100,7 @@ function renderHelp() {
   ];
   if (state.br) steps.unshift(
     ["¿Qué es el stock automático?", "En “Productos” → “Stock automático” están los modelos de Brasil y de calidad G5 que llegan solos. No hace falta cargarlos: el stock se actualiza solo."],
-    ["Sumar los pares que tengo en mi casa", "En el modelo tocá “Mis pares” y sumá con “+” en cada talle. Si tenés un talle que Brasil no tiene, agregalo ahí mismo, abajo. En la tienda se ven todos juntos y el modelo también aparece en “Mis productos”."],
+    ["Sumar los pares que tengo en mi casa", "En el modelo tocá “Mis pares” y sumá con “+” en cada talle (con “+ Talle” agregás uno que Brasil no tiene). Desde ahí el modelo aparece también en “Mis productos”, con sus pares siempre a la vista."],
     ["Mi precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el precio general (o el precio base que ya trae)."],
     ["Un precio para todos", "En “Stock automático” → “Precios generales” ponés un precio para todos los modelos de Brasil y otro para las G5."],
     ["Ocultar un modelo", "Con “Ocultar” deja de verse en tu tienda. Con “Mostrar” vuelve."],

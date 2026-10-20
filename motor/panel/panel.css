@@ -694,3 +694,44 @@
   .panel-br-row:not(.panel-br-row--head) { border-bottom: 1px solid var(--color-border); padding-block: 4px; }
 }
 .panel-editor__head > a[target="_blank"] { min-height: 44px; }
+
+/* --- Stock siempre a la vista (22/10): talles compactos en una línea --- */
+.panel-quick { gap: 8px; margin-top: 10px; padding-top: 10px; }
+.panel-quick__head { display: flex; align-items: baseline; gap: 8px; }
+.panel-quick__head > .panel-muted { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.panel-quick__total { font-weight: 700; }
+.panel-quick__total.is-empty { color: var(--color-danger); }
+.panel-quick__grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 6px; }
+@media (min-width: 700px) { .panel-quick__grid { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)) !important; } }
+.panel-quick__size { min-height: 52px; padding: 4px 4px 4px 10px; gap: 4px; }
+.panel-quick__size .panel-quick__label { min-width: 0; }
+.panel-quick__size .panel-quick__label strong { font-size: 16px; }
+.panel-quick__size .panel-quick__label small { font-size: 12px; white-space: nowrap; }
+.panel-quick__size .panel-stepper { gap: 2px; }
+.panel-quick__size .panel-stepper button { width: 44px; height: 44px; }
+.panel-quick__size.is-zero .panel-quick__value { color: var(--color-text-muted); }
+.panel-quick__size.is-zero { background: color-mix(in srgb, var(--color-surface-2) 55%, transparent); }
+/* "+ Talle": la última casilla de la grilla */
+.panel-quick__new { display: flex; align-items: center; gap: 4px; min-height: 52px; }
+.panel-quick__new-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 52px;
+  border: 1.5px dashed var(--color-border); border-radius: var(--radius-control); background: transparent;
+  color: var(--color-text); font: inherit; font-weight: 600; cursor: pointer;
+}
+.panel-quick__new-btn:hover { border-color: var(--color-text-muted); background: var(--color-surface-2); }
+.panel-quick__new .panel-input { flex: 1 1 auto; min-width: 0; min-height: 44px; padding-inline: 10px; }
+.panel-quick__ok, .panel-quick__cancel { display: grid; flex: none; place-items: center; width: 44px; height: 44px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); color: var(--color-text); cursor: pointer; }
+.panel-quick__ok { border-color: var(--color-text); background: var(--color-text); color: var(--color-surface); }
+.panel-quick__ok .panel-ico, .panel-quick__cancel .panel-ico { width: 20px; height: 20px; }
+.panel-stock-hint { margin: 0; font-size: 14px; }
+/* Celular: en cada producto, primero el stock y después Editar / Pausar / ⋯ (lo que más se usa, más cerca) */
+@media (max-width: 699px) {
+  .panel-main[data-section="productos"] .panel-item { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: var(--space-3); }
+  .panel-main[data-section="productos"] .panel-item__row { display: contents; }
+  .panel-main[data-section="productos"] .panel-item > .panel-quick { grid-column: 1 / -1; order: 3; }
+  .panel-main[data-section="productos"] .panel-item__actions { grid-column: 1 / -1; order: 4; margin-top: 10px; }
+  .panel-main[data-section="productos"] .panel-item__info { align-self: center; }
+}
+.panel-quick__head { flex-wrap: wrap; }
+.panel-quick__legend { margin-left: auto; font-size: 12px; }
+.panel-quick__head > small.panel-quick__legend { text-transform: none; letter-spacing: 0; font-weight: 400; }
