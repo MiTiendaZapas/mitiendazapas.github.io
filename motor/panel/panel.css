@@ -613,3 +613,84 @@
   .panel-size-row__qty .panel-stepper { justify-content: space-between; width: 100%; }
 }
 .panel-thumb--empty { font-size: 12px; line-height: 1.2; }
+
+/* --- Revisión 21/10: botones ordenados en Productos (celular y PC) --- */
+/* Pestañas Mis productos / Stock automático: el número en una pastilla (el texto no se corta) */
+.panel-switcher__btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.panel-switcher__count { min-width: 26px; padding: 1px 7px; border-radius: var(--radius-pill); background: var(--color-surface-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.panel-switcher__btn[aria-pressed="true"] .panel-switcher__count { background: var(--color-text); color: var(--color-surface); }
+/* Aviso de límite de productos (solo cuando falta poco) */
+.panel-limit { margin: 0; font-size: 14px; }
+.panel-limit.is-full { color: var(--color-danger); font-weight: 600; }
+/* Sin botón flotante: "Nuevo producto" ya está arriba (el flotante tapaba los botones de los productos) */
+.panel-fab { display: none !important; }
+/* "¿Tenés un talle que no está?": el texto arriba y el campo con su botón al lado */
+.panel-quick__add { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; max-width: 420px; margin-top: 6px; }
+.panel-quick__add > span { grid-column: 1 / -1; font-size: 14px; }
+.panel-quick__add .panel-input { width: 100%; text-align: left; }
+.panel-add-size { justify-self: start; }
+
+@media (max-width: 699px) {
+  /* Barra: "Nuevo producto" a lo ancho y las otras tres acciones en una fila pareja */
+  .panel-main[data-section="productos"] .panel-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+  .panel-main[data-section="productos"] .panel-toolbar > .btn { flex: 1 1 0; min-width: 0; }
+  .panel-main[data-section="productos"] .panel-toolbar__main { flex-basis: 100% !important; min-height: 48px; font-size: 15px; }
+  .panel-main[data-section="productos"] .panel-toolbar .btn:not(.panel-toolbar__main) {
+    min-height: 48px; padding: 4px 6px; font-size: 13.5px; line-height: 1.15; text-align: center; white-space: normal;
+  }
+  /* Botones de cada producto: ocupan todo el ancho, parejos (antes quedaban corridos a la derecha) */
+  .panel-item__actions { display: flex; flex-wrap: nowrap; gap: 6px; }
+  .panel-item__actions > :is(button, a, .panel-stock) { flex: 1 1 0; min-width: 0; }
+  .panel-item__actions > .panel-stock { flex-grow: 1.4; }
+  .panel-item__actions > .panel-more { flex: 0 0 44px; }
+  .panel-item__actions > .panel-more > summary { width: 44px; }
+  .panel-item__actions .btn--ghost { border: 1px solid var(--color-border); }
+}
+.panel-only-narrow { display: none; }
+@media (max-width: 420px) {
+  .panel-only-wide { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .panel-only-narrow { display: inline; }
+}
+/* La tabla de "Tus pares" (modelos automáticos) va siempre en una columna: las tarjetitas de dos columnas son solo del editor propio */
+.panel-sizes:has(> .panel-br-row) { grid-template-columns: minmax(0, 1fr) !important; }
+.panel-cat__actions button.is-locked { opacity: 0.45; }
+/* Mi tienda: índice para saltar a cada parte */
+.panel-jump { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.panel-jump .panel-chip { min-height: 40px; text-decoration: none; }
+.panel-main :is(.panel-card > h2, .panel-account__title) { scroll-margin-top: 80px; }
+@media (max-width: 699px) {
+  /* El botón Guardar acompaña al formulario (no queda fijo encima de "Tu cuenta") */
+  .panel-main[data-section="tienda"] .panel-savebar { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); right: auto; left: auto; margin: 0 calc(-1 * var(--gutter)); }
+  .panel-top:not(.is-editing) ~ .panel-main[data-section="tienda"] { padding-bottom: 96px; }
+  .panel-jump .panel-chip { min-height: 44px; }
+}
+.panel-jump .panel-chip { display: inline-flex; align-items: center; flex: none; white-space: nowrap; }
+@media (max-width: 699px) {
+  .panel-jump { flex-wrap: nowrap; overflow-x: auto; margin-inline: calc(-1 * var(--gutter)); padding: 2px var(--gutter); scrollbar-width: none; }
+  .panel-jump::-webkit-scrollbar { display: none; }
+}
+/* Ayuda: preguntas que se abren al tocarlas */
+.panel-faq { display: grid; gap: 6px; }
+.panel-faq__item { border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); }
+.panel-faq__item > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 10px 14px; font-weight: 600; cursor: pointer; list-style: none; }
+.panel-faq__item > summary::-webkit-details-marker { display: none; }
+.panel-faq__icon { flex: none; width: 20px; height: 20px; transition: transform 0.2s ease; }
+.panel-faq__item[open] .panel-faq__icon { transform: rotate(180deg); }
+.panel-faq__item > p { margin: 0; padding: 0 14px 14px; line-height: 1.5; }
+.panel-faq__item[open] { border-color: var(--color-text-muted); }
+.panel-reveal-wrap { position: relative; }
+.panel-reveal-wrap .panel-input { padding-right: 88px; }
+.panel-reveal { position: absolute; top: 50%; right: 4px; min-width: 76px; min-height: 40px; transform: translateY(-50%); border: 0; border-radius: 8px; background: transparent; color: var(--color-text); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.panel-reveal:hover { background: var(--color-surface-2); }
+/* PC: los talles del stock rápido y de "Mis pares", de a 3 o 4 por fila (antes media pantalla cada uno) */
+@media (min-width: 1024px) {
+  .panel-quick__grid { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)) !important; }
+}
+/* "Tus pares" en PC/tablet: columnas juntas (talle, de Brasil, en tu casa) para seguir cada fila con la vista */
+@media (min-width: 700px) {
+  .panel-br-row { grid-template-columns: 90px 110px auto 36px; justify-content: start; column-gap: 16px; }
+  .panel-br-row > :nth-child(2) { text-align: center; }
+  .panel-br-row--head span:nth-child(2) { text-align: center; }
+  .panel-br-row:not(.panel-br-row--head) { border-bottom: 1px solid var(--color-border); padding-block: 4px; }
+}
+.panel-editor__head > a[target="_blank"] { min-height: 44px; }

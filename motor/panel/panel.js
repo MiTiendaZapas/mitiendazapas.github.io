@@ -313,6 +313,19 @@ function renderTop({ loggedIn }) {
 const pageTitle = (text) => h("h1", { class: "panel-page-title" }, text);
 
 // --- ingreso ---------------------------------------------------------------------
+/** Campo de clave con "Mostrar / Ocultar" (en el celular es fácil equivocarse sin verla). */
+function withReveal(input) {
+  const button = h("button", { type: "button", class: "panel-reveal", "aria-pressed": "false", "aria-label": "Mostrar la clave" }, "Mostrar");
+  button.addEventListener("click", () => {
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.textContent = show ? "Ocultar" : "Mostrar";
+    button.setAttribute("aria-pressed", String(show));
+    button.setAttribute("aria-label", show ? "Ocultar la clave" : "Mostrar la clave");
+    input.focus();
+  });
+  return h("div", { class: "panel-reveal-wrap" }, input, button);
+}
 function showLogin(message = "") {
   state.store = null;
   renderTop({ loggedIn: false });
@@ -334,7 +347,7 @@ function showLogin(message = "") {
   } },
     h("h1", {}, "Ingresá a tu panel"),
     h("p", { class: "panel-muted" }, "Con el usuario y la clave que te pasamos."),
-    field("usuario", "Usuario", user), field("clave", "Clave", pass),
+    field("usuario", "Usuario", user), field("clave", "Clave", withReveal(pass)),
     error, button,
     h("a", { class: "panel-forgot", target: "_blank", rel: "noopener",
       href: `https://wa.me/${HELP_WHATSAPP}?text=${encodeURIComponent(`¡Hola! Me olvidé la clave del panel de mi tienda${config.name ? ` (${config.name})` : ""}.`)}` },
@@ -366,7 +379,7 @@ function chooseKey() {
     } },
       h("h1", {}, "Elegí tu clave"),
       h("p", { class: "panel-muted" }, "Es tu primera vez en el panel. Elegí una clave que solo sepas vos: la vas a usar para entrar desde ahora."),
-      field("ck-new", "Tu clave nueva", next, "8 letras o números como mínimo."),
+      field("ck-new", "Tu clave nueva", withReveal(next), "8 letras o números como mínimo. Que no sea fácil de adivinar."),
       field("ck-repeat", "Repetí la clave", repeat),
       error, button,
       h("button", { class: "btn btn--ghost", type: "button", onclick: () => { logout(); resolve(false); } }, "Salir")));
@@ -391,9 +404,12 @@ function matchesFilter(p) {
 function renderProducts() {
   if (!state.br) { renderOwnProducts(); root.prepend(pageTitle("Productos")); return; }
   const switcher = h("div", { class: "panel-switcher", role: "group", "aria-label": "Qué productos ver" },
-    [["propios", `Mis productos (${state.products.length + brWithPairs().length})`], ["br", `Stock automático (${state.br.products.length})`]].map(([id, label]) =>
+    [["propios", "Mis productos", state.products.length + brWithPairs().length], ["br", "Stock automático", state.br.products.length]].map(([id, label, count]) =>
       h("button", { type: "button", class: "panel-switcher__btn", "aria-pressed": String(state.view === id),
-        onclick: () => { state.view = id; renderProducts(); } }, label)));
+        onclick: () => { state.view = id; renderProducts(); } },
+        // En pantallas chicas "Stock automático" no entra: dice "Automático".
+        id === "br" ? [h("span", { class: "panel-only-wide" }, label), h("span", { class: "panel-only-narrow", "aria-hidden": "true" }, "Automático")] : label,
+        h("span", { class: "panel-switcher__count" }, count))));
   if (state.view === "br") renderBrProducts();
   else renderOwnProducts();
   root.prepend(pageTitle("Productos"), switcher);
@@ -429,7 +445,7 @@ function renderPriceChange() {
         choice([[5, "5%"], [10, "10%"], [15, "15%"], [20, "20%"], ["otro", "Otro"]], amount, (v) => { amount = v; paint(); if (v === "otro") custom.focus(); }),
         amount === "otro" ? customField : null),
       state.br ? h("section", { class: "panel-card" }, h("h2", {}, "3. ¿A cuáles?"),
-        choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["brasil", "Solo a los de Brasil"]], scope, (v) => { scope = v; paint(); })) : null].filter(Boolean));
+        choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["brasil", "Solo al stock automático"]], scope, (v) => { scope = v; paint(); })) : null].filter(Boolean));
     const n = percent();
     const valid = n > 0 && n <= (direction > 0 ? 100 : 50);
     apply.textContent = valid ? `${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios` : "Elegí cuánto";
@@ -440,7 +456,7 @@ function renderPriceChange() {
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
     const n = percent();
-    const what = { todos: "todos tus productos", propios: "tus productos", brasil: "los modelos de Brasil" }[state.br ? scope : "propios"];
+    const what = { todos: "todos tus productos", propios: "tus productos", brasil: "el stock automático" }[state.br ? scope : "propios"];
     if (!await ask(`¿${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios de ${what}?`, { ok: direction > 0 ? "Sí, subir" : "Sí, bajar" })) return;
     const done = await busy(apply, async () => {
       await api("/precios", { method: "POST", body: {
@@ -502,7 +518,9 @@ function renderGeneralPricing() {
   const br = block("br", "Modelos de Brasil",
     listUnit ? `Un precio para todos los modelos de Brasil que no tengan el suyo. Vacío = el precio base (por ejemplo ${money(listUnit)}).` : "Un precio para todos los modelos de Brasil que no tengan el suyo.",
     listUnit ? String(listUnit) : "Ej: 60000");
-  const g5 = block("g5", "Calidad G5", "Un precio para todas las G5 que no tengan el suyo. Mientras no tengan precio, las G5 no se ven en tu tienda.", "Ej: 30000");
+  const g5 = block("g5", "Calidad G5", state.br?.options?.g5 === true
+    ? "Un precio para todas las G5 que no tengan el suyo. Vacío = el precio de tu lista."
+    : "Un precio para todas las G5 que no tengan el suyo. Mientras no tengan precio, las G5 no se ven en tu tienda.", "Ej: 30000");
   const modes = h("div", { class: "panel-pc__choices", role: "radiogroup", "aria-label": "Modelos nuevos" });
   const paintModes = () => modes.replaceChildren(...[["auto", "Que aparezcan solos con el precio general"], ["manual", "Que esperen a que les ponga precio"]]
     .map(([value, label]) => h("button", { type: "button", class: "panel-chip", role: "radio", "aria-checked": String(mode === value), "aria-pressed": String(mode === value),
@@ -708,7 +726,8 @@ function renderGroupOffers() {
 const offersButton = () => h("a", { class: "btn btn--outline btn--sm", href: "#ofertas" }, "Ofertas");
 
 /** Botón "Por mayor" (arriba de las listas de productos). */
-const wholesaleButton = () => h("a", { class: "btn btn--outline btn--sm", href: "#por-mayor" }, "Venta por mayor");
+// Con dos versiones (público y revendedores) el por mayor sale de cada producto: no hay nada que configurar.
+const wholesaleButton = () => (TWO_VERSIONS ? null : h("a", { class: "btn btn--outline btn--sm", href: "#por-mayor" }, "Venta por mayor"));
 
 /**
  * Lista con un título por categoría (como en la tienda). items: [{ product, view }] ya ordenados
@@ -781,13 +800,15 @@ function renderOwnProducts() {
 
   show(
     h("div", { class: "panel-toolbar" },
-      h("button", { class: "btn btn--primary", type: "button", disabled: full, onclick: () => openEditor(null) }, "+ Nuevo producto"),
+      h("button", { class: "btn btn--primary panel-toolbar__main", type: "button", disabled: full, onclick: () => openEditor(null) }, ico("plus"), "Nuevo producto"),
       pricesButton(),
       offersButton(),
-      wholesaleButton(),
-      h("span", { class: "panel-muted" }, `${state.products.length} de ${state.limits.products} productos`)),
-    // En el celular, "Nuevo producto" también queda abajo a la derecha, cerca del dedo.
-    full ? null : h("button", { class: "panel-fab", type: "button", "aria-label": "Nuevo producto", onclick: () => openEditor(null) }, ico("plus")),
+      wholesaleButton()),
+    // El límite de productos solo se muestra cuando falta poco (antes estaba siempre, entre los botones).
+    state.products.length >= state.limits.products * 0.8
+      ? h("p", { class: `panel-muted panel-limit${full ? " is-full" : ""}` }, full
+        ? `Llegaste al máximo de ${state.limits.products} productos. Borrá alguno para cargar otro.`
+        : `Tenés ${state.products.length} de ${state.limits.products} productos.`) : null,
     h("input", { class: "panel-input", type: "search", placeholder: "Buscar producto", value: state.search, "aria-label": "Buscar producto",
       oninput: (e) => { state.search = e.target.value; renderItems(); } }),
     chips, list);
@@ -860,7 +881,7 @@ function itemView(product, canOrder, refresh) {
 
 /** Stock rápido: "vendí uno" sin entrar a editar. Se guarda al toque. */
 function renderQuickStock(product, box, badge) {
-  box.replaceChildren(h("p", { class: "panel-muted" }, "Sumá o restá unidades. Se guarda solo."),
+  box.replaceChildren(h("p", { class: "panel-muted" }, "Unidades de cada talle. Tocá − cuando vendas una y + cuando te llegue. Se guarda solo."),
     h("div", { class: "panel-quick__grid" }, product.sizes.map((s) => {
       const value = h("output", { class: "panel-quick__value" }, s.stock);
       let pending = 0;   // toques que todavía no se guardaron
@@ -890,7 +911,34 @@ function renderQuickStock(product, box, badge) {
           h("button", { type: "button", "aria-label": `Restar uno al talle ${s.size}`, onclick: change(-1) }, ico("minus")),
           value,
           h("button", { type: "button", "aria-label": `Sumar uno al talle ${s.size}`, onclick: change(1) }, ico("plus"))));
-    })));
+    })),
+    // Un talle nuevo (por ejemplo, te llegó un 45): se agrega acá mismo, con 1 unidad.
+    addSizeRow(async (size) => {
+      const { sizes } = await api("/stock", { method: "POST", body: { id: product.id, size, delta: 1, nuevo: true } });
+      product.sizes = sizes;
+      renderQuickStock(product, box, badge);
+      const total = totalStock(product);
+      badge.replaceChildren(...withCaret(total === 0 ? "Sin stock" : `Stock: ${total}`));
+      badge.classList.toggle("is-empty", total === 0);
+      toast(`Talle ${size} agregado con 1 unidad.`);
+    }));
+}
+
+/**
+ * "¿Tenés un talle que no está?": un campo y "+ Agregar talle" (también con Enter).
+ * La usan el stock de los productos propios y "Mis pares" de los modelos automáticos.
+ */
+function addSizeRow(onAdd) {
+  const input = h("input", { class: "panel-input", maxlength: 12, placeholder: "Ej: 45", "aria-label": "Talle nuevo", enterkeyhint: "done" });
+  const button = h("button", { type: "button", class: "btn btn--outline btn--sm" }, ico("plus"), "Agregar talle");
+  const add = () => {
+    const size = input.value.trim();
+    if (!size) { input.focus(); return; }
+    busy(button, async () => { await onAdd(size); });
+  };
+  button.addEventListener("click", add);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+  return h("div", { class: "panel-quick__add" }, h("span", { class: "panel-muted" }, "¿Tenés un talle que no está?"), input, button);
 }
 
 const roundPrice = (n) => Math.max(100, Math.round(n / 100) * 100);
@@ -1063,7 +1111,9 @@ function generalPrice(product, version = "publico") {
 }
 /** Qué se cobra en un modelo sin precio propio: el precio general, o si no, el de la lista (G5: nada). */
 function autoPrice(product, version = "publico") {
-  return generalPrice(product, version) || (product.category === "g5" && version !== "mayorista" ? null : listPrice(product, version).unit);
+  // G5 sin precio: no se ven, salvo en las tiendas que las venden a precio de lista (L.A IMP).
+  const g5Hidden = product.category === "g5" && version !== "mayorista" && state.br?.options?.g5 !== true;
+  return generalPrice(product, version) || (g5Hidden ? null : listPrice(product, version).unit);
 }
 const STATUS_TEXT = { nuevo: "Nuevo: no se ve hasta que le pongas precio", "sin-precio-g5": "No se ve: las G5 necesitan precio" };
 
@@ -1117,7 +1167,7 @@ function renderBrProducts() {
   }
 
   show(
-    h("div", { class: "panel-toolbar" }, h("a", { class: "btn btn--primary btn--sm", href: "#precios-generales" }, "Precios generales"), pricesButton(), offersButton(), wholesaleButton()),
+    h("div", { class: "panel-toolbar" }, h("a", { class: "btn btn--primary btn--sm panel-toolbar__main", href: "#precios-generales" }, "Precios generales"), pricesButton(), offersButton(), wholesaleButton()),
     seenIntro() ? null : h("div", { class: "panel-intro-box" },
       h("p", { class: "panel-muted panel-intro" },
         "Stock automático: estos modelos (de Brasil y calidad G5) y su stock llegan y se actualizan solos. Tocá “Editar” en uno para ponerle tu precio, ocultarlo o sumar los pares que tenés en tu casa."),
@@ -1222,32 +1272,20 @@ function renderQuickPairs(product, box, onChange) {
           h("button", { type: "button", "aria-label": `Sumar un par tuyo al talle ${s.size}`, onclick: change(1) }, ico("plus"))));
     })),
     // Un talle que Brasil no tiene (por ejemplo, un 45 que tenés en tu casa): se agrega acá mismo.
-    (() => {
-      const input = h("input", { class: "panel-input", maxlength: 12, placeholder: "Ej: 45", "aria-label": "Otro talle que tenés" });
-      const add = () => {
-        const size = input.value.trim();
-        if (!size) return input.focus();
-        if (product.sizes.some((s) => s.size.toLowerCase() === size.toLowerCase())) {
-          toast(`El talle ${size} ya está en la lista: sumale con el +.`, "error");
-          return;
-        }
-        product.sizes.push({ size, br: 0, casa: 1, stock: 1, soloCasa: true });
-        product.sizes.sort((a, b) => compareSizes(a.size, b.size));
-        saveSoon(`pares:${product.id}`, () => api("/br", { method: "POST", body: brBody(product) }), () => {
-          product.sizes = product.sizes.filter((s) => s.size !== size);
-          renderQuickPairs(product, box, onChange);
-          onChange();
-        });
-        renderQuickPairs(product, box, onChange);
-        onChange();
-        toast(`Talle ${size} agregado con 1 par.`);
-      };
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
-      return h("div", { class: "panel-quick__add" },
-        h("span", { class: "panel-muted" }, "¿Tenés un talle que no está?"),
-        input,
-        h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: add }, "+ Agregar talle"));
-    })());
+    addSizeRow(async (size) => {
+      if (product.sizes.some((s) => s.size.toLowerCase() === size.toLowerCase())) throw new Error(`El talle ${size} ya está: sumale con el +.`);
+      product.sizes.push({ size, br: 0, casa: 1, stock: 1, soloCasa: true });
+      product.sizes.sort((a, b) => compareSizes(a.size, b.size));
+      try {
+        await api("/br", { method: "POST", body: brBody(product) });
+      } catch (e) {
+        product.sizes = product.sizes.filter((s) => s.size !== size);
+        throw e;
+      }
+      renderQuickPairs(product, box, onChange);
+      onChange();
+      toast(`Talle ${size} agregado con 1 par.`);
+    }));
 }
 
 /** Lo que se manda al guardar un modelo de Brasil (lo que no se cambia, queda como estaba). */
@@ -1345,25 +1383,27 @@ function renderBrEditor(product) {
       h("div", {},
         h("p", {}, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
         h("p", { class: "panel-muted" }, "Modelo del stock automático: las fotos, el nombre y el stock del proveedor se actualizan solos."))),
-    h("section", { class: "panel-card" }, h("h2", {}, "Datos"), extras.descriptionField),
+    // Lo que más se usa primero: los pares de tu casa. Después el precio y lo opcional.
+    h("section", { class: "panel-card" }, h("h2", {}, "Tus pares"),
+      h("p", { class: "panel-muted" }, `“${product.category === "g5" ? "Del proveedor" : "De Brasil"}” se actualiza solo. En “En tu casa” sumá los pares que tenés vos: en la tienda se ven todos juntos.`),
+      sizesBox,
+      h("button", { type: "button", class: "btn btn--outline btn--sm panel-add-size", onclick: () => {
+        draft.sizes.push({ size: "", br: 0, casa: 1, fresh: true });
+        renderSizes();
+        sizesBox.querySelector(".panel-br-row:last-child input")?.focus();
+      } }, ico("plus"), "Agregar un talle que no está")),
     h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
       h("div", { class: "panel-two" },
         field("b-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, list.unit
           ? `Vacío = ${generalUnit ? "el precio general" : "el precio base"} (${money(list.unit)}).`
           : "Las G5 necesitan un precio para verse en tu tienda (o poné uno general en “Precios generales”)."),
-        sellsWholesale ? field("b-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, list.wholesale ? `Vacío = el precio base (${money(list.wholesale)}).` : "Opcional.") : null),
+        sellsWholesale ? field("b-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, list.wholesale ? `Vacío = el precio base (${money(list.wholesale)}).` : "Opcional.") : null)),
+    resale.node,
+    h("section", { class: "panel-card" }, h("h2", {}, "Descripción"), extras.descriptionField),
+    optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Destacado"), ...extras.nodes)),
+    h("section", { class: "panel-card panel-card--row" },
       h("label", { class: "panel-switch", for: "b-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
-    resale.node,
-    optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Destacado"), ...extras.nodes)),
-    h("section", { class: "panel-card" }, h("h2", {}, "Talles"),
-      h("p", { class: "panel-muted" }, "“De Brasil” se actualiza solo. En “En tu casa” sumá los pares que tenés vos: en la tienda se ven todos juntos."),
-      sizesBox,
-      h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => {
-        draft.sizes.push({ size: "", br: 0, casa: 1, fresh: true });
-        renderSizes();
-        sizesBox.querySelector(".panel-br-row:last-child input")?.focus();
-      } }, "+ Otro talle")),
     brChanged(product) ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: async () => {
       if (await ask("¿Volver este modelo a lo automático? Se borran tu precio y tus pares de este modelo.", { ok: "Sí, volver", danger: true })) save({ id: product.id }, "El modelo volvió a lo automático.");
     } }, "Volver todo a lo automático") : null,
@@ -1584,7 +1624,7 @@ function renderEditor(product) {
     h("section", { class: "panel-card" }, h("h2", {}, "Talles y cantidades"),
       h("p", { class: "panel-muted" }, "Elegí los talles (o escribí uno) y con − y + poné cuántas unidades tenés de cada uno."),
       h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
-        h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, "+ Otro talle")),
+        h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, ico("plus"), "Otro talle")),
       sizesBox),
     h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
       h("div", { class: "panel-two" },
@@ -1686,7 +1726,17 @@ function renderCategories() {
   function renderRows() {
     // En "De la A a la Z" se muestran ordenadas así y las flechas no se usan.
     if (!manual()) rows.sort((a, b) => (a.label && b.label ? a.label.localeCompare(b.label, "es", { sensitivity: "base" }) : a.label ? -1 : 1));
-    const move = (i, delta) => { rows.splice(i + delta, 0, ...rows.splice(i, 1)); renderRows(); saveCategories(); };
+    // Tocar una flecha ya elige "En el orden que yo elijo" (antes las flechas estaban grises sin explicar por qué).
+    const move = (i, delta) => {
+      if (!manual()) {
+        categoryOrder.value = "manual";
+        saveOrder();
+        toast("Listo: ahora las categorías van en el orden que elijas.");
+      }
+      rows.splice(i + delta, 0, ...rows.splice(i, 1));
+      renderRows();
+      saveCategories();
+    };
     list.replaceChildren(...rows.map((row, i) => {
       const count = row.id ? used(row.id) : 0;
       return h("div", { class: "panel-cat" },
@@ -1697,10 +1747,12 @@ function renderCategories() {
           onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } } }),
         h("span", { class: "panel-muted panel-cat__count" }, count === 1 ? "1 producto" : `${count} productos`),
         h("div", { class: "panel-cat__actions" },
-          h("button", { type: "button", "aria-label": "Subir", disabled: !manual() || i === 0 || !row.id, onclick: () => move(i, -1) }, ico("arrowUp")),
-          h("button", { type: "button", "aria-label": "Bajar", disabled: !manual() || i === rows.length - 1 || !row.id, onclick: () => move(i, 1) }, ico("arrowDown")),
-          h("button", { type: "button", "aria-label": `Borrar ${row.label}`, disabled: count > 0, title: count > 0 ? "Tiene productos: cambiales la categoría antes de borrarla" : null,
+          h("button", { type: "button", "aria-label": `Subir ${row.label}`, title: "Subir", disabled: i === 0 || !row.id, onclick: () => move(i, -1) }, ico("arrowUp")),
+          h("button", { type: "button", "aria-label": `Bajar ${row.label}`, title: "Bajar", disabled: i === rows.length - 1 || !row.id, onclick: () => move(i, 1) }, ico("arrowDown")),
+          h("button", { type: "button", "aria-label": `Borrar ${row.label}`, title: "Borrar", class: count > 0 ? "is-locked" : null,
             onclick: async () => {
+              // Con productos no se puede: se explica (antes el botón estaba gris, sin decir por qué).
+              if (count > 0) return toast(`“${row.label}” tiene ${count === 1 ? "1 producto" : `${count} productos`}: cambiales la categoría antes de borrarla.`, "error");
               if (!row.id) { rows.splice(i, 1); return renderRows(); }
               if (!await ask(`¿Borrar la categoría "${row.label}"?`, { ok: "Sí, borrar", danger: true })) return;
               rows.splice(i, 1);
@@ -1710,25 +1762,27 @@ function renderCategories() {
     }), ...(rows.length ? [] : [h("p", { class: "panel-muted" }, "Todavía no tenés categorías. Agregá la primera.")]));
   }
 
-  show(
-    h("section", { class: "panel-card" },
-      h("h1", {}, "Orden de tu tienda"),
+  const ordersCard = h("section", { class: "panel-card" },
+      h("h2", {}, "Orden de tu tienda"),
       h("p", { class: "panel-muted" }, "Los productos se ven agrupados por categoría. Elegí en qué orden van las categorías y cómo se ordenan los productos dentro de cada una."),
       h("div", { class: "panel-two" },
         field("o-categories", "Orden de las categorías", categoryOrder),
         field("o-products", "Productos dentro de cada categoría", productOrder, state.br
           ? "Para que un producto salga primero, marcalo como “Destacado” al editarlo."
-          : "“En el orden que yo elijo”: en Productos → Más → Subir o Bajar."))),
+          : "“En el orden que yo elijo”: en Productos → ⋯ → Subir o Bajar.")));
+  // Primero lo que más se usa: tus categorías. Después, el orden de la tienda.
+  show(
     h("section", { class: "panel-card" },
-      h("h2", {}, "Categorías"),
-      h("p", { class: "panel-muted" }, "Creá, renombrá o borrá categorías (solo se puede borrar una sin productos). Con “En el orden que yo elijo”, ordenalas con las flechas."),
+      h("h2", {}, "Tus categorías"),
+      h("p", { class: "panel-muted" }, "Tocá un nombre para cambiarlo. Con las flechas elegís en qué orden salen en la tienda."),
       list,
-      h("button", { class: "btn btn--outline", type: "button", onclick: () => {
+      h("button", { class: "btn btn--outline panel-add-size", type: "button", onclick: () => {
         rows.push({ id: null, label: "" });
         renderRows();
         list.querySelector(".panel-cat:last-child input")?.focus();
-      } }, "+ Nueva categoría"),
-      status));
+      } }, ico("plus"), "Nueva categoría"),
+      status),
+    ordersCard);
   renderRows();
 }
 
@@ -1871,6 +1925,15 @@ function renderStoreSettings() {
     h("div", { class: "panel-savebar" }, saveButton));
   // La clave va aparte (tiene su propio botón): no se guarda con "Guardar cambios".
   show(form, h("div", { class: "panel-account" }, h("h2", { class: "panel-account__title" }, "Tu cuenta"), passwordCard()));
+  // Índice de la página (es larga): un toque y baja a cada parte.
+  const sections = [...root.querySelectorAll(".panel-editor .panel-card > h2, .panel-account__title")];
+  sections.forEach((title, i) => { title.id = `parte-${i}`; });
+  form.querySelector("h1")?.after(h("nav", { class: "panel-jump", "aria-label": "Partes de Mi tienda" },
+    h("span", { class: "panel-muted" }, "Ir a:"),
+    sections.map((title) => h("a", { class: "panel-chip", href: `#tienda`, onclick: (e) => {
+      e.preventDefault();
+      title.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    } }, title.textContent))));
   // Si sale sin guardar, se le pregunta (ver route). La clave va aparte y no cuenta.
   const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, notice, orderGreeting, orderFooter];
   const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color]);
@@ -1972,7 +2035,7 @@ function renderHome() {
       h("div", { class: "panel-home__quick" },
         h("button", { class: "btn btn--outline", type: "button", onclick: () => { state.view = "propios"; openEditor(null); } }, "+ Nuevo producto"),
         h("a", { class: "btn btn--outline", href: "#precios" }, "Cambiar precios"),
-        h("a", { class: "btn btn--outline", href: "#por-mayor" }, "Venta por mayor"),
+        TWO_VERSIONS ? null : h("a", { class: "btn btn--outline", href: "#por-mayor" }, "Venta por mayor"),
         h("a", { class: "btn btn--outline", href: "#ofertas" }, "Poner ofertas"),
         h("a", { class: "btn btn--outline", href: "#tienda" }, state.settings.notice ? "Cambiar el aviso" : "Poner un aviso"),
         h("a", { class: "btn btn--outline", href: "#ayuda" }, "¿Cómo se usa?"))),
@@ -1999,35 +2062,38 @@ function termsCard() {
 }
 
 function renderHelp() {
+  // Preguntas que se abren al tocarlas (antes era una pared de texto, todo abierto).
   const steps = [
-    ["Cargá tus productos", "En “Productos” tocá “Nuevo producto”: subí fotos, poné nombre, categoría, precio y los talles con su cantidad. Tocá “Guardar” y ya aparece en tu tienda."],
-    ["Cuando vendés algo", "En la lista tocá el cartel verde “… en stock” y restá con “−” el talle que vendiste. Se guarda solo. Lo que llega a 0 deja de verse en la tienda."],
-    ["El mismo modelo en otro color", "Tocá “Más” → “Copiar”. Se crea una copia pausada con las mismas fotos y talles: cambiale el nombre, las fotos y las cantidades, y tildá “Se ve en la tienda”."],
-    ["Pausar sin borrar", "“Más” → “Pausar” lo esconde de la tienda (por ejemplo, mientras esperás mercadería). Con “Mostrar” vuelve a aparecer."],
-    ["Orden de la tienda", "Por defecto, las categorías y los productos van de la A a la Z. En “Categorías” → “Orden de tu tienda” podés elegir otro orden: lo último que cargás primero, del más barato al más caro, o el que vos armes (con las flechas en Categorías y con “Más” → “Subir / Bajar” en Productos)."],
-    ["Subir o bajar todos los precios", "En “Productos” tocá “Cambiar precios”: elegí subir o bajar, cuánto (5%, 10%…) y mirá cómo quedan antes de aplicar."],
-    ["Muchos productos en oferta", "En “Productos” → “Ofertas” elegís una categoría entera o los productos que quieras, y el descuento. Ahí mismo podés sacar las ofertas."],
-    ["Poner algo en oferta", "Tocá “Editar” en el producto, prendé “Poner en oferta” y elegí el descuento (10%, 20%, 30% u otro precio). En la tienda se ve el precio rebajado, el de antes tachado y el cartel “Oferta”. Para sacarla, apagá “Poner en oferta”."],
-    ["Destacados y descripción", "Al editar un producto, en “Más opciones”: con “Destacado” sale primero en su categoría, y podés escribir una descripción."],
-    ["Venta por mayor", "En “Productos” → “Por mayor” (o desde Inicio) la prendés, elegís desde cuántos productos y, si querés, otro mínimo para cada categoría."],
-    ["Precio por cantidad", "Al editar un producto, en “Precio por cantidad”: por ejemplo “llevando 3 o más, $12.000 cada uno” de ese mismo producto."],
-    ["Tu tienda", "En “Mi tienda” cambiás el nombre, el logo, tu WhatsApp, tus redes, los textos de la portada, el aviso de arriba de la tienda, el mensaje de los pedidos y el color. También tu clave."],
-    ["Tenerlo como aplicación", "Abrí el panel en Google Chrome → tres puntitos → “Agregar a la pantalla principal”. En iPhone: Safari → Compartir → “Agregar a inicio”."],
+    ["¿Cómo cargo un producto?", "En “Productos” tocá “Nuevo producto”: subí las fotos, poné el nombre y la categoría, elegí los talles con su cantidad y el precio. Tocá “Guardar” y ya aparece en tu tienda."],
+    ["Vendí algo: ¿cómo resto el stock?", "En “Productos” tocá el botón “Stock” del producto y restá con “−” en el talle que vendiste. Se guarda solo. Lo que llega a 0 deja de verse en la tienda."],
+    ["Me llegó un talle que no tenía", "Tocá “Stock” en el producto y, abajo, en “¿Tenés un talle que no está?”, escribí el talle y tocá “Agregar talle”. Queda con 1 unidad: sumale más con “+”."],
+    ["El mismo modelo en otro color", "Tocá “⋯” → “Copiar (otro color)”. Se crea una copia pausada con las mismas fotos y talles: cambiale el nombre, las fotos y las cantidades, y tildá “Se ve en la tienda”."],
+    ["Pausar sin borrar", "El botón “Pausar” lo esconde de la tienda (por ejemplo, mientras esperás mercadería). Con “Mostrar” vuelve a aparecer. Para borrarlo del todo: “Editar” → “Borrar este producto”, abajo de todo."],
+    ["Ordenar las categorías", "En “Categorías”, con las flechas ↑ ↓ elegís en qué orden salen en la tienda. Ahí también creás, renombrás o borrás categorías."],
+    ["Subir o bajar todos los precios", "En “Productos” tocá “Cambiar precios”: elegí subir o bajar, cuánto (5%, 10%…) y a cuáles."],
+    ["Poner productos en oferta", "En “Productos” → “Ofertas” elegís una categoría entera o los productos que quieras, y el descuento. Para uno solo: “Editar” → “Oferta”. En la tienda se ve el precio rebajado y el de antes tachado."],
+    ["Destacar un producto", "“Editar” → “Destacado”: sale primero en su categoría."],
+    ["Precio por cantidad", "“Editar” → “Precio por cantidad”: por ejemplo “llevando 3 o más, $12.000 cada uno” de ese mismo producto."],
+    ...(TWO_VERSIONS ? [] : [["Venta por mayor", "En “Productos” → “Venta por mayor” la prendés, elegís desde cuántos productos y, si querés, otro mínimo para cada categoría."]]),
+    ["Cambiar el nombre, logo, WhatsApp o redes", "En “Mi tienda”. Tocá “Guardar cambios” al terminar. Tu clave se cambia abajo de todo, en “Tu cuenta”."],
+    ["Tenerlo como aplicación en el celular", "Abrí el panel en Google Chrome → tres puntitos → “Agregar a la pantalla principal”. En iPhone: Safari → Compartir → “Agregar a inicio”."],
     ["Compartir tu tienda", "En “Inicio” tocá “Compartir mi tienda” y elegí WhatsApp, Instagram o donde quieras."],
-    ["Los pedidos", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
+    ["¿Cómo me llegan los pedidos?", "Tus clientes arman el pedido en la tienda y te llega armado a tu WhatsApp. Ahí confirmás stock, cobro y envío. En la web no se cobra nada."],
   ];
   if (state.br) steps.unshift(
-    ["El stock automático", "En “Productos” → “Stock automático” están los modelos de Brasil y de calidad G5 que llegan solos. No hace falta cargarlos: el stock se actualiza solo."],
-    ["Precios generales", "En “Stock automático” → “Precios generales” ponés un precio para todos los modelos de Brasil y otro para todas las G5. Las G5 no se ven en tu tienda hasta que tengan precio."],
-    ["Modelos nuevos", "Si en “Precios generales” elegís que los nuevos esperen, los que entren aparecen en Inicio como “sin precio”: tocá “Mostrar” o ponéles un precio."],
-    ["Tu precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el precio general (o el precio base que ya trae)."],
-    ["Pares que tenés en tu casa", "En el mismo modelo, en “En tu casa”, sumá con “+” los pares que tenés vos. En la tienda se ven junto con los de Brasil. Cuando vendas uno tuyo, restalo con “−”."],
+    ["¿Qué es el stock automático?", "En “Productos” → “Stock automático” están los modelos de Brasil y de calidad G5 que llegan solos. No hace falta cargarlos: el stock se actualiza solo."],
+    ["Sumar los pares que tengo en mi casa", "En el modelo tocá “Mis pares” y sumá con “+” en cada talle. Si tenés un talle que Brasil no tiene, agregalo ahí mismo, abajo. En la tienda se ven todos juntos y el modelo también aparece en “Mis productos”."],
+    ["Mi precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el precio general (o el precio base que ya trae)."],
+    ["Un precio para todos", "En “Stock automático” → “Precios generales” ponés un precio para todos los modelos de Brasil y otro para las G5."],
     ["Ocultar un modelo", "Con “Ocultar” deja de verse en tu tienda. Con “Mostrar” vuelve."],
-    ["Otras cosas que vendas", "Ropa, accesorios o lo que quieras: en “Mis productos” → “Nuevo producto”, con tus fotos y la categoría que elijas."],
+    ["Vender otras cosas (ropa, accesorios…)", "En “Mis productos” → “Nuevo producto”, con tus fotos y la categoría que elijas."],
   );
   show(h("section", { class: "panel-card" },
     h("h1", {}, "Cómo usar tu panel"),
-    h("ol", { class: "panel-help" }, steps.map(([title, text]) => h("li", {}, h("strong", {}, title), h("span", {}, text)))),
+    h("p", { class: "panel-muted" }, "Tocá una pregunta para ver la respuesta."),
+    h("div", { class: "panel-faq" }, steps.map(([title, text]) => h("details", { class: "panel-faq__item" },
+      h("summary", {}, h("span", {}, title), ico("chevronDown", "panel-faq__icon")),
+      h("p", {}, text)))),
     h("p", { class: "panel-muted" }, "Tu link para compartir es el de “Ver tienda”. ¿Dudas? Escribinos por WhatsApp.")),
     termsCard());
 }
@@ -2218,3 +2284,14 @@ async function start() {
 
 window.addEventListener("hashchange", route);
 start();
+
+// Menú "⋯" de cada producto: se cierra al tocar afuera, al elegir una opción o con Esc (como cualquier menú).
+document.addEventListener("click", (event) => {
+  for (const menu of document.querySelectorAll(".panel-more[open]")) {
+    if (!menu.contains(event.target) || event.target.closest(".panel-more__menu :is(a, button)")) menu.open = false;
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  for (const menu of document.querySelectorAll(".panel-more[open]")) { menu.open = false; menu.querySelector("summary")?.focus(); }
+});

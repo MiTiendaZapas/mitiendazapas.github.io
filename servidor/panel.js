@@ -879,3 +879,14 @@ export function moveHouseStock(data, input) {
   }
   throw new Error("Acción inválida.");
 }
+
+/** Agrega un talle a un producto propio (desde el stock rápido). Devuelve el talle agregado. */
+export function addSize(product, sizeRaw, stock) {
+  const size = cleanText(sizeRaw, 12, "el talle", { required: true });
+  if (product.sizes.some((s) => s.size.toLowerCase() === size.toLowerCase())) throw new Error(`El talle ${size} ya está: sumale con el +.`);
+  if (product.sizes.length >= LIMITS.sizesPerProduct) throw new Error(`Máximo ${LIMITS.sizesPerProduct} talles por producto.`);
+  const entry = { size, stock: Math.min(Math.max(Number(stock) || 0, 0), 99999) };
+  product.sizes.push(entry);
+  product.sizes.sort((a, b) => compareSizes(a.size, b.size));
+  return entry;
+}
