@@ -1,5 +1,11 @@
-"""Baja el STOCK DE CASA de la app (AppPedidos -> pestaña "Stock de casa", en Firebase)
-y reescribe zapatillas_manual.js / indumentaria.js (y las fotos nuevas de Fotos/).
+"""Baja el STOCK DE CASA y reescribe zapatillas_manual.js / indumentaria.js (y las fotos nuevas de Fotos/).
+
+¿De dónde sale? (settings.STOCK_CASA_FUENTE, o la variable de entorno STOCK_CASA_FUENTE)
+  "panel": del panel de la tienda de L.A IMP (desde el 20/10, lo maneja el socio ahí). Se lee el
+           catálogo PÚBLICO de esa tienda (no hace falta ninguna llave):
+             - productos propios (no pausados)             -> modelos solo de casa (con foto y precio)
+             - modelos del proveedor con "pares tuyos"      -> esos pares, como stock de casa del modelo
+  "app":   de AppPedidos -> pestaña "Stock de casa" (Firebase), como antes.
 
 Así el resto de las herramientas (sincronizador/piloto, tiendas, bot, PedidosProveedor)
 siguen leyendo los mismos archivos de siempre, con el mismo formato:
@@ -18,6 +24,7 @@ Uso:  python stock_casa_sync.py [--simular] [--destino CARPETA]
 """
 import argparse
 import base64
+import io
 import json
 import re
 import shutil
@@ -61,6 +68,35 @@ ARCHIVOS = {
                      "// Stock de indumentaria. GENERADO desde AppPedidos > Stock de casa:\n"
                      "// no se edita a mano (se pisa en cada vuelta del piloto)."),
 }
+
+
+def fuente():
+    return (os.environ.get("STOCK_CASA_FUENTE") or getattr(_settings(), "STOCK_CASA_FUENTE", "app") or "app").strip().lower()
+
+
+def _settings():
+    try:
+        sys.path.insert(0, str(AQUI))
+        import settings
+        return settings
+    except Exception:
+        return None
+
+
+# Tienda de L.A IMP con panel: su catálogo público trae el stock de casa (ver docstring).
+PANEL_TIENDA = "laimp"
+# (STOCK_CASA_PANEL_URL: para probar contra el servidor local)
+PANEL_URL = os.environ.get("STOCK_CASA_PANEL_URL") or f"https://mitiendastock.com/api/tienda/{PANEL_TIENDA}/productos.json"
+PANEL_FOTOS = os.environ.get("STOCK_CASA_PANEL_FOTOS") or f"https://catalogo.mitiendastock.com/tiendas/{PANEL_TIENDA}/"
+# Categorías del panel que van a indumentaria.js (el resto, a zapatillas_manual.js).
+CATEGORIAS_CALZADO = {"zapatillas", "ojotas", "g5", "ninos"}
+
+
+def _bajar(url):
+    # Cloudflare frena los pedidos sin nombre de programa (protección anti-bots).
+    req = urllib.request.Request(url, headers={"User-Agent": "mitiendastock-piloto/1.0"})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        return r.read()
 
 
 def log(msg):
@@ -187,21 +223,18 @@ def _cargar_estado():
         return {}
 
 
-def sincronizar(destino=None, simular=False):
-    """Devuelve (hubo_cambios, mensaje). Lanza excepción solo si algo sale mal (ver sincronizar_seguro)."""
+def _desde_app(raiz, estado):
+    """Stock de casa de AppPedidos (Firebase). Devuelve (por_tipo, precios, fotos_nuevas) o un mensaje si no hay."""
     fb = Firebase()
     meta = fb.obtener("config/stock_casa_meta")
     if not meta or not meta.get("migrado"):
-        return False, "La app todavía no migró el stock de casa: se usan los archivos como están."
+        return "La app todavía no migró el stock de casa: se usan los archivos como están."
     docs = fb.listar("stock_casa")
     if not docs:
-        return False, "No hay stock de casa en la app (vacío): no se toca nada."
-
-    raiz = Path(destino) if destino else REPO
-    estado = _cargar_estado()
+        return "No hay stock de casa en la app (vacío): no se toca nada."
     por_tipo = {"zapatillas": [], "indumentaria": []}
-    fotos_nuevas = []
-    precios = []   # precios cargados en la app para modelos con stock (ver manual_stock._precios_de_casa)
+    fotos_nuevas = []   # (clave, ruta de la foto, versión, función que trae los bytes)
+    precios = []        # precios cargados para modelos con stock (ver manual_stock._precios_de_casa)
     for id_, d in docs:
         if d.get("eliminado") or not d.get("nombre"):
             continue
@@ -212,11 +245,75 @@ def sincronizar(destino=None, simular=False):
         foto = d.get("fotoRuta") or f"Fotos/{limpiar_nombre_archivo(d['nombre'])}.jpg"
         version = d.get("fotoVersion")
         if version and (estado.get(id_) != version or not (raiz / foto).exists()):
-            fotos_nuevas.append((id_, foto, version))
+            def traer(id_=id_):
+                url = (fb.obtener(f"stock_casa_fotos/{id_}") or {}).get("dataUrl", "")
+                return base64.b64decode(url.split(",", 1)[1]) if url.startswith("data:image") else None
+            fotos_nuevas.append((id_, foto, version, traer))
         por_tipo[tipo].append({"modelo": d["nombre"], "talles": talles, "foto": foto})
         precio = int(d.get("precio") or 0)
         if precio > 0:
             precios.append({"nombre": d["nombre"], "price": precio, "wholesalePrice": int(d.get("precioMayor") or 0) or None})
+    return por_tipo, precios, fotos_nuevas
+
+
+def _a_jpg(contenido):
+    """Las fotos del panel son WEBP: se guardan como JPG, como las de siempre en Fotos/."""
+    from PIL import Image
+    salida = io.BytesIO()
+    Image.open(io.BytesIO(contenido)).convert("RGB").save(salida, "JPEG", quality=90)
+    return salida.getvalue()
+
+
+def _desde_panel(raiz, estado):
+    """Stock de casa del panel de L.A IMP (catálogo público). Devuelve (por_tipo, precios, fotos_nuevas) o un mensaje."""
+    datos = json.loads(_bajar(PANEL_URL).decode("utf-8"))
+    productos = datos.get("products")
+    if not isinstance(productos, list) or not productos:
+        return "El panel de L.A IMP no devolvió productos: no se toca nada."
+    por_tipo = {"zapatillas": [], "indumentaria": []}
+    fotos_nuevas, precios = [], []
+    for p in productos:
+        nombre = str(p.get("name") or "").strip()
+        if not nombre:
+            continue
+        if p.get("manual"):
+            # Producto propio = modelo solo de casa.
+            talles = {str(s["size"]): int(s.get("stock") or 0) for s in p.get("sizes", []) if int(s.get("stock") or 0) > 0}
+        else:
+            # Modelo del proveedor: solo los pares que cargó el socio ("extra").
+            talles = {str(s["size"]): int(s.get("extra") or 0) for s in p.get("sizes", []) if int(s.get("extra") or 0) > 0}
+        if not talles:
+            continue
+        tipo = "zapatillas" if not p.get("manual") or p.get("category") in CATEGORIAS_CALZADO else "indumentaria"
+        foto = f"Fotos/{limpiar_nombre_archivo(nombre)}.jpg"
+        imagenes = p.get("images") or []
+        if p.get("manual") and imagenes and imagenes[0].get("lg"):
+            lg = imagenes[0]["lg"]
+            clave = f"panel:{p.get('id')}"
+            if estado.get(clave) != lg or not (raiz / foto).exists():
+                url = lg if lg.startswith("http") else PANEL_FOTOS + lg
+                fotos_nuevas.append((clave, foto, lg, lambda url=url: _a_jpg(_bajar(url))))
+        por_tipo[tipo].append({"modelo": nombre, "talles": talles, "foto": foto})
+        # Precio propio del panel. Si es el que salió de la lista de L.A IMP ("fromList"), no va:
+        # así cada tienda usa su propia lista para ese modelo.
+        precio = int(p.get("price") or 0)
+        if p.get("manual") and precio > 0 and not p.get("fromList"):
+            mayor = int(p.get("wholesalePrice") or 0) or None
+            precios.append({"nombre": nombre, "price": precio, "wholesalePrice": mayor if mayor and mayor < precio else None})
+    if not any(por_tipo.values()):
+        return "El panel de L.A IMP no tiene stock de casa: no se toca nada."
+    return por_tipo, precios, fotos_nuevas
+
+
+def sincronizar(destino=None, simular=False):
+    """Devuelve (hubo_cambios, mensaje). Lanza excepción solo si algo sale mal (ver sincronizar_seguro)."""
+    raiz = Path(destino) if destino else REPO
+    estado = _cargar_estado()
+    origen = fuente()
+    leido = _desde_panel(raiz, estado) if origen == "panel" else _desde_app(raiz, estado)
+    if isinstance(leido, str):
+        return False, leido
+    por_tipo, precios, fotos_nuevas = leido
 
     cambios = []
     for tipo, (archivo, variable, encabezado) in ARCHIVOS.items():
@@ -250,23 +347,24 @@ def sincronizar(destino=None, simular=False):
             tmp.write_text(nuevo_precios, encoding="utf-8")
             tmp.replace(ruta_precios)
 
-    for id_, foto, version in fotos_nuevas:
-        d = fb.obtener(f"stock_casa_fotos/{id_}")
-        url = (d or {}).get("dataUrl", "")
-        if not url.startswith("data:image"):
+    for clave, foto, version, traer in fotos_nuevas:
+        if simular:
+            cambios.append(f"foto {foto}")
+            continue
+        contenido = traer()
+        if not contenido:
             continue
         cambios.append(f"foto {foto}")
-        if simular:
-            continue
         (raiz / foto).parent.mkdir(parents=True, exist_ok=True)
-        (raiz / foto).write_bytes(base64.b64decode(url.split(",", 1)[1]))
-        estado[id_] = version
+        (raiz / foto).write_bytes(contenido)
+        estado[clave] = version
     if not simular and not destino and fotos_nuevas:
         ESTADO.parent.mkdir(parents=True, exist_ok=True)
         ESTADO.write_text(json.dumps(estado, ensure_ascii=False, indent=1), encoding="utf-8")
 
     total = sum(len(v) for v in por_tipo.values())
-    return bool(cambios), (f"Actualizado: {', '.join(cambios)}." if cambios else f"Sin cambios ({total} modelos con stock).")
+    de = "panel de L.A IMP" if origen == "panel" else "app"
+    return bool(cambios), (f"Actualizado desde {de}: {', '.join(cambios)}." if cambios else f"Sin cambios ({total} modelos con stock, desde {de}).")
 
 
 def sincronizar_seguro(**kw):
@@ -276,7 +374,7 @@ def sincronizar_seguro(**kw):
         log(("🏠 " if hubo else "") + msg)
         return hubo
     except Exception as e:  # sin internet, Firebase caído, etc.
-        log(f"⚠️ No se pudo traer el stock de la app ({type(e).__name__}: {e}). Se usan los archivos que hay.")
+        log(f"⚠️ No se pudo traer el stock de casa ({fuente()}: {type(e).__name__}: {e}). Se usan los archivos que hay.")
         return False
 
 

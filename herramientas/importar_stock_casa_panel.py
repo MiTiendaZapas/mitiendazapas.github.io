@@ -175,6 +175,8 @@ def main():
             own.append({
                 "id": f"m-{uuid.uuid4()}", "slug": "", "name": name, "brand": (listed or {}).get("brand"), "category": category,
                 "price": price or None, "wholesalePrice": wholesale, "mayorista": mayorista,
+                # Precio de las listas (no cargado en la app): las demás tiendas siguen con su lista.
+                **({"fromList": True} if price and not d.get("precio") else {}),
                 "sizes": [{"size": s, "stock": n} for s, n in sorted(sizes.items(), key=lambda e: size_order(e[0]))], "images": images,
                 "hidden": not price,   # sin precio no se puede vender: queda pausado hasta ponérselo
                 "createdAt": d.get("creado") or None,

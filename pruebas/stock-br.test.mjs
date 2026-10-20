@@ -43,7 +43,8 @@ describe("stock de Brasil", () => {
     const catalog = publicMixedCatalog(store({ br: { "vp-1": change } }), soldOut);
     const dunk = catalog.products.find((p) => p.id === "vp-1");
     assert.equal(dunk.name, "Dunk panda");
-    assert.deepEqual(dunk.sizes, [{ size: "38", stock: 1 }]);
+    // "extra": cuántos de esos pares son del cliente (el piloto los toma como stock de casa en L.A IMP).
+    assert.deepEqual(dunk.sizes, [{ size: "38", stock: 1, extra: 1 }]);
     assert.equal(dunk.images[0].lg, "https://catalogo.mitiendastock.com/fotos/vp-1/a-lg.webp");
   });
 

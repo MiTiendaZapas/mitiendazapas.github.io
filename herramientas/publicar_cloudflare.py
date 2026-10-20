@@ -48,6 +48,8 @@ TEST_BRANCH = "prueba"
 # Prueba de la tienda de L.A IMP con panel (stock de casa en el panel, 20/10): la misma tienda,
 # en /laimp-panel/, con el catálogo que arma el panel de "laimp". Solo en el link de prueba.
 MAIN_PANEL_TEST = "laimp-panel"
+# True: la tienda real de L.A IMP (/laimp/) ya es tienda con panel (el stock de casa se maneja ahí).
+MAIN_STORE_PANEL = False
 PANEL_PAGE = """<!DOCTYPE html>
 <html lang="es-AR">
 <head>
@@ -177,7 +179,9 @@ def build(dist, test=False):
     # Links de mitiendastock.com que se usaron antes de mover la tienda a /laimp/ (09/10).
     redirects = [line for page in MAIN_PAGES for line in (
         f"/{page} /{MAIN_STORE}/{page}/ 301", f"/{page}/* /{MAIN_STORE}/{page}/:splat 301")]
-    if test:
+    if MAIN_STORE_PANEL:
+        add_panel(main_store, MAIN_STORE, "L.A IMP")
+    elif test:
         shutil.copytree(main_store, dist / MAIN_PANEL_TEST)
         add_panel(dist / MAIN_PANEL_TEST, MAIN_STORE, "L.A IMP")
     clients = client_repos(test)
@@ -199,7 +203,9 @@ def build(dist, test=False):
     # con stock propio (para poner su nombre y logo al compartir). El resto se entrega directo.
     manual = [name for name, folder in clients.items()
               if re.search(r"^\s*manualStore:", (folder / "configuracion.js").read_text(encoding="utf-8"), re.M)]
-    if test:
+    if MAIN_STORE_PANEL:
+        manual.append(MAIN_STORE)
+    elif test:
         manual.append(MAIN_PANEL_TEST)
     routes = {"version": 1, "include": ["/api/*"] + [f"/{name}/" for name in manual], "exclude": []}
     (dist / "_routes.json").write_text(json.dumps(routes, indent=2) + "\n", encoding="utf-8")

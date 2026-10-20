@@ -244,6 +244,10 @@ export function cleanProduct(input, current, data) {
     hidden: input.hidden === true,
     ...cleanExtras(input, price),
     mayorista: cleanResale(input.mayorista),
+    // Precio sacado de la lista de L.A IMP al pasar el stock de casa al panel: mientras no lo cambien,
+    // las demás tiendas usan su propia lista para ese modelo (ver stock_casa_sync.py).
+    ...(current?.fromList && current.price === price && (current.wholesalePrice ?? null) === (wholesalePrice ?? null)
+      && JSON.stringify(current.mayorista ?? null) === JSON.stringify(cleanResale(input.mayorista)) ? { fromList: true } : {}),
     // Cuándo se cargó (para el orden "lo más nuevo primero").
     createdAt: current?.createdAt ?? new Date().toISOString(),
   };
@@ -388,7 +392,8 @@ export function publicMixedCatalog(data, br) {
   const fromBrazil = brProducts(data, br)
     .filter((p) => p.status === "visible")
     .map((p) => withGeneralPrice(p, data))
-    .map(({ hidden, status, sizes, ...p }) => ({ ...p, sizes: sizes.map(({ size, stock }) => ({ size, stock })) }));
+    // "extra": pares del cliente en ese talle (el piloto los toma de la tienda de L.A IMP como stock de casa).
+    .map(({ hidden, status, sizes, ...p }) => ({ ...p, sizes: sizes.map(({ size, stock, casa }) => ({ size, stock, ...(casa > 0 ? { extra: casa } : {}) })) }));
   const own = publicCatalog(data).products;
   const categories = storeCategories(data);
   const dates = [br.generatedAt, data.generatedAt].filter(Boolean).sort();
@@ -668,6 +673,7 @@ export function changePrices(catalog, settings, { percent, own, br }) {
     if (item.mayorista) for (const key of ["price", "wholesalePrice"]) if (item.mayorista[key]) item.mayorista[key] = roundPrice(item.mayorista[key] * factor);
     if (item.wholesalePrice && item.price && item.wholesalePrice >= item.price) item.wholesalePrice = null;
     if (item.compareAt && item.price && item.compareAt <= item.price) item.compareAt = null;
+    delete item.fromList;   // precio cambiado a mano: ya no es el de la lista
   };
   let count = 0;
   if (own) for (const product of catalog.products) { scale(product); count += 1; }
@@ -708,6 +714,7 @@ export function applyGroupOffers(catalog, brIds, items) {
       if (compareAt && compareAt <= price) throw new Error(`En "${own.name}", el precio de antes tiene que ser más alto.`);
       if (own.wholesalePrice && own.wholesalePrice >= price) own.wholesalePrice = null;   // un por mayor que ya no conviene
       Object.assign(own, { price, compareAt: compareAt || null });
+      delete own.fromList;
       count += 1;
     } else if (brIds.has(item?.id)) {
       if (compareAt && price && compareAt <= price) throw new Error("El precio de antes tiene que ser más alto que el de oferta.");

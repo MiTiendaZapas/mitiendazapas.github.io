@@ -100,3 +100,8 @@ IMAGES_WARN_MB = 500           # aviso si la carpeta de imágenes supera este ta
 # Si un escaneo trae menos de esta proporción de productos que el anterior,
 # NO se pisa el catálogo (probable caída o cambio del sitio del proveedor).
 MIN_RATIO_VS_PREVIOUS = 0.5
+
+# De dónde sale el stock de casa (ver stock_casa_sync.py):
+#   "app"   = AppPedidos -> Stock de casa (Firebase), como hasta el 20/10.
+#   "panel" = el panel de la tienda de L.A IMP (mitiendastock.com/laimp/panel/).
+STOCK_CASA_FUENTE = "app"
