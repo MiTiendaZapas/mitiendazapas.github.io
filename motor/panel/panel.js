@@ -1767,12 +1767,20 @@ function passwordCard() {
     if (next.value !== repeat.value) throw new Error("Las dos claves nuevas no coinciden.");
     await api("/clave", { method: "POST", body: { actual: current.value, nueva: next.value } });
     current.value = next.value = repeat.value = "";
-    toast("Clave cambiada. La próxima vez ingresá con la nueva.");
+    toast("Clave cambiada. En los otros celulares hay que ingresar de nuevo.");
   }) }, "Cambiar clave");
+  // Por si perdió el celular o alguien más sabe la clave: saca a todos (también a este).
+  const closeAll = h("button", { class: "btn btn--ghost", type: "button", onclick: async () => {
+    if (!await ask("¿Cerrar la sesión en todos los celulares y computadoras? Vas a tener que ingresar de nuevo, también acá.", { ok: "Sí, cerrar en todos", danger: true })) return;
+    const done = await busy(closeAll, () => api("/cerrar-sesiones", { method: "POST" }));
+    if (done) showLogin("Cerraste la sesión en todos los dispositivos.");
+  } }, "Cerrar sesión en todos los dispositivos");
   return h("section", { class: "panel-card" }, h("h2", {}, "Tu clave"),
     field("p-current", "Clave actual", current),
-    h("div", { class: "panel-two" }, field("p-new", "Clave nueva", next, "8 letras o números como mínimo."), field("p-repeat", "Repetí la clave nueva", repeat)),
-    button);
+    h("div", { class: "panel-two" }, field("p-new", "Clave nueva", next, "8 letras o números como mínimo. Que no sea fácil de adivinar."), field("p-repeat", "Repetí la clave nueva", repeat)),
+    button,
+    h("p", { class: "panel-muted" }, "¿Perdiste el celular o alguien más sabe tu clave? Cambiala y, si querés, cerrá la sesión en todos lados."),
+    closeAll);
 }
 
 // --- inicio: resumen de la tienda y accesos rápidos -----------------------------------

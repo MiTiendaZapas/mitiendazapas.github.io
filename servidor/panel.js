@@ -4,11 +4,11 @@
  *
  * Dónde se guarda cada cosa:
  *   CATALOGO (depósito público, el de siempre):
- *     tiendas/<tienda>/productos.json   catálogo que ve el público
- *     tiendas/<tienda>/fotos/<código>   fotos de los productos
+ *     tiendas/<tienda>/fotos/<código>   fotos de los productos (y marca/ el logo, ajustes.json)
  *   PRIVADO (depósito sin acceso público):
+ *     tiendas/<tienda>/productos.json   catálogo completo (con pausados); el público ve una versión filtrada
  *     usuarios/<usuario>.json           usuario, tienda y clave cifrada
- *     intentos/<usuario>.json           ingresos fallidos (bloqueo de 15 minutos)
+ *     intentos/<usuario>.json           ingresos fallidos (bloqueo de 15 min, 1 hora, 1 día)
  *
  * Seguridad:
  *   - La tienda de cada pedido sale SIEMPRE de la sesión firmada, nunca de lo que
@@ -27,7 +27,8 @@ export const LIMITS = {
 };
 const SESSION_DAYS = 30;
 const MAX_FAILS = 8;
-const LOCK_MINUTES = 15;
+// Bloqueo que crece si siguen fallando: 15 minutos, 1 hora y después 1 día (auditoría 20/10).
+const LOCK_STEPS_MINUTES = [15, 60, 24 * 60];
 const PBKDF2_ITERATIONS = 100000;   // el máximo que permite Cloudflare
 const STORE_ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
 const PHOTO_PATH = /^fotos\/[a-f0-9-]{36}-(lg|sm)\.(webp|jpg)$/;
@@ -40,7 +41,7 @@ export function json(data, status = 200, headers = {}) {
     headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers },
   });
 }
-export const fail = (message, status = 400) => json({ error: message }, status);
+export const fail = (message, status = 400, headers = {}) => json({ error: message }, status, headers);
 
 // --- textos y números ---------------------------------------------------------
 export function slugify(text) {
@@ -66,13 +67,19 @@ function cleanPrice(value, field, { required = false } = {}) {
 export const isStoreId = (id) => STORE_ID.test(id ?? "");
 export const isPhotoFile = (name) => PHOTO_FILE.test(name ?? "");
 
-// --- catálogo de una tienda (en el depósito CATALOGO) ---------------------------
+// --- catálogo de una tienda (en el depósito PRIVADO) -----------------------------
+// Antes estaba en el depósito público (CATALOGO) y se podía abrir directo, con los productos
+// pausados y los cambios internos (auditoría 20/10). Ahora va en el privado; la tienda solo ve
+// la versión filtrada que arma /api/tienda/<tienda>/productos.json. Si una tienda todavía tiene
+// el archivo viejo en el público, se lee de ahí y al guardar pasa al privado (y se borra el viejo).
 const catalogKey = (store) => `tiendas/${store}/productos.json`;
 
 export async function readCatalog(env, store) {
-  const object = await env.CATALOGO.get(catalogKey(store));
-  if (!object) return { data: { version: 1, store, categories: {}, products: [] }, etag: null };
-  return { data: await object.json(), etag: object.etag };
+  const object = await env.PRIVADO.get(catalogKey(store));
+  if (object) return { data: await object.json(), etag: object.etag };
+  const legacy = await env.CATALOGO.get(catalogKey(store));
+  if (legacy) return { data: await legacy.json(), etag: null, legacy: true };
+  return { data: { version: 1, store, categories: {}, products: [] }, etag: null };
 }
 
 /**
@@ -82,7 +89,7 @@ export async function readCatalog(env, store) {
  */
 export async function updateCatalog(env, store, change) {
   for (let attempt = 0; attempt < 4; attempt++) {
-    const { data, etag } = await readCatalog(env, store);
+    const { data, etag, legacy } = await readCatalog(env, store);
     const result = await change(data);
     data.generatedAt = new Date().toISOString();
     data.count = data.products.length;
@@ -91,8 +98,11 @@ export async function updateCatalog(env, store, change) {
       httpMetadata: { contentType: "application/json; charset=utf-8", cacheControl: "no-cache" },
     };
     if (etag) options.onlyIf = { etagMatches: etag };
-    const saved = await env.CATALOGO.put(catalogKey(store), JSON.stringify(data), options);
-    if (saved) return result;
+    const saved = await env.PRIVADO.put(catalogKey(store), JSON.stringify(data), options);
+    if (saved) {
+      if (legacy) await env.CATALOGO.delete(catalogKey(store));
+      return result;
+    }
   }
   throw new Error("No se pudo guardar: probá de nuevo en un momento.");
 }
@@ -464,28 +474,61 @@ export async function checkLogin(env, usuarioRaw, password) {
   if (!/^[a-z0-9._-]{3,40}$/.test(usuario) || typeof password !== "string" || password.length > 200) {
     return { error: "Usuario o clave incorrectos." };
   }
-  const attemptsKey = `intentos/${usuario}.json`;
-  const attemptsObject = await env.PRIVADO.get(attemptsKey);
-  const attempts = attemptsObject ? await attemptsObject.json() : { fails: 0, until: 0 };
-  if (attempts.until > Date.now()) {
-    return { error: `Demasiados intentos. Probá de nuevo en ${LOCK_MINUTES} minutos.`, status: 429 };
-  }
-
   const userObject = await env.PRIVADO.get(`usuarios/${usuario}.json`);
   const user = userObject ? await userObject.json() : null;
-  // Si el usuario no existe igual se calcula una clave, para tardar lo mismo.
-  const hash = await hashPassword(password, user?.salt ?? DUMMY_SALT, user?.iterations ?? PBKDF2_ITERATIONS);
-  if (!user || !sameText(hash, user.hash) || !isStoreId(user.tienda)) {
-    attempts.fails += 1;
-    if (attempts.fails >= MAX_FAILS) Object.assign(attempts, { fails: 0, until: Date.now() + LOCK_MINUTES * 60_000 });
+  // Usuario que no existe: se calcula una clave igual (para tardar lo mismo) y no se guarda nada
+  // (si no, inventando usuarios se podía llenar el depósito).
+  if (!user) {
+    await hashPassword(password, DUMMY_SALT, PBKDF2_ITERATIONS);
+    return { error: "Usuario o clave incorrectos." };
+  }
+  const attemptsKey = `intentos/${usuario}.json`;
+  const attemptsObject = await env.PRIVADO.get(attemptsKey);
+  const attempts = attemptsObject ? await attemptsObject.json() : { fails: 0, until: 0, level: 0 };
+  const now = Date.now();
+  if (attempts.until > now) {
+    const minutes = Math.ceil((attempts.until - now) / 60_000);
+    return { error: `Demasiados intentos. Probá de nuevo en ${minutes >= 120 ? `${Math.round(minutes / 60)} horas` : `${minutes} minutos`}.`, status: 429 };
+  }
+  // Un día sin bloqueos: el bloqueo vuelve a empezar desde 15 minutos.
+  if (attempts.level && attempts.until && now - attempts.until > 86_400_000) attempts.level = 0;
+  const hash = await hashPassword(password, user.salt, user.iterations ?? PBKDF2_ITERATIONS);
+  if (!sameText(hash, user.hash) || !isStoreId(user.tienda)) {
+    attempts.fails = (attempts.fails ?? 0) + 1;
+    if (attempts.fails >= MAX_FAILS) {
+      const step = LOCK_STEPS_MINUTES[Math.min(attempts.level ?? 0, LOCK_STEPS_MINUTES.length - 1)];
+      Object.assign(attempts, { fails: 0, until: now + step * 60_000, level: (attempts.level ?? 0) + 1 });
+    }
     await env.PRIVADO.put(attemptsKey, JSON.stringify(attempts));
     return { error: "Usuario o clave incorrectos." };
   }
   if (attemptsObject) await env.PRIVADO.delete(attemptsKey);
-  return { usuario, tienda: user.tienda };
+  return { usuario, tienda: user.tienda, v: keyVersion(user) };
 }
 
 // --- sesión firmada (cookie) ---------------------------------------------------
+/**
+ * "Versión" de la clave del usuario: cambia al cambiar o resetear la clave, o al tocar
+ * "Cerrar sesión en todos los dispositivos". La sesión la lleva adentro y el control de
+ * entrada la compara: si no coincide (o el usuario ya no existe), la sesión no vale más.
+ */
+export const keyVersion = (user) => `${user.cambiada ?? user.creado ?? ""}|${user.cerradas ?? ""}`;
+
+/** Usuario guardado (o null). */
+export async function readUser(env, usuario) {
+  if (!/^[a-z0-9._-]{3,40}$/.test(usuario ?? "")) return null;
+  const object = await env.PRIVADO.get(`usuarios/${usuario}.json`);
+  return object ? object.json() : null;
+}
+
+/** Cierra todas las sesiones del usuario (en todos los celulares y computadoras). */
+export async function closeAllSessions(env, usuario) {
+  const user = await readUser(env, usuario);
+  if (!user) throw new Error("Usuario inexistente.");
+  const updated = { ...user, cerradas: new Date().toISOString() };
+  await env.PRIVADO.put(`usuarios/${usuario}.json`, JSON.stringify(updated));
+  return updated;
+}
 const toUrl64 = (text) => btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const fromUrl64 = (text) => atob(text.replace(/-/g, "+").replace(/_/g, "/"));
 
@@ -495,8 +538,8 @@ async function signingKey(env) {
   return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 }
 
-export async function createSession(env, { usuario, tienda }) {
-  const payload = toUrl64(JSON.stringify({ u: usuario, t: tienda, exp: Date.now() + SESSION_DAYS * 86_400_000 }));
+export async function createSession(env, { usuario, tienda, v }) {
+  const payload = toUrl64(JSON.stringify({ u: usuario, t: tienda, v, exp: Date.now() + SESSION_DAYS * 86_400_000 }));
   const signature = await crypto.subtle.sign("HMAC", await signingKey(env), encoder.encode(payload));
   const token = `${payload}.${toUrl64(String.fromCharCode(...new Uint8Array(signature)))}`;
   return `panel=${token}; HttpOnly; Secure; SameSite=Strict; Path=/api/panel; Max-Age=${SESSION_DAYS * 86400}`;
@@ -513,8 +556,8 @@ export async function readSession(env, request) {
     const valid = await crypto.subtle.verify("HMAC", await signingKey(env), bytes, encoder.encode(payload));
     if (!valid) return null;
     const session = JSON.parse(fromUrl64(payload));
-    if (!session.exp || session.exp < Date.now() || !isStoreId(session.t)) return null;
-    return { usuario: session.u, tienda: session.t };
+    if (!session.exp || session.exp < Date.now() || !isStoreId(session.t) || typeof session.v !== "string") return null;
+    return { usuario: session.u, tienda: session.t, v: session.v };
   } catch {
     return null;
   }
@@ -694,16 +737,31 @@ export async function cleanupPhotos(env, store, data) {
   return remove.length;
 }
 
-/** Cambia la clave del usuario que ingresó (pide la actual). */
+// Claves que se adivinan enseguida (se prueban primero): no se aceptan.
+const COMMON_KEYS = new Set(["12345678", "123456789", "1234567890", "87654321", "11111111", "00000000", "12341234", "11223344",
+  "password", "password1", "contraseña", "contrasena", "qwerty123", "qwertyui", "asdfghjk", "abc12345", "abcd1234", "iloveyou",
+  "argentina", "argentina1", "bocajuniors", "riverplate", "zapatillas", "tienda123", "tiendaonline", "mitienda", "mitienda1",
+  "mitiendastock", "panel123", "admin123", "administrador", "demo1234", "clave123", "miclave1", "contraseña1", "12345678a", "a1234567"]);
+
+/** Revisa que la clave nueva no sea fácil de adivinar. */
+function checkNewKey(next, user) {
+  if (typeof next !== "string" || next.length < 8 || next.length > 100) throw new Error("La clave tiene que tener entre 8 y 100 letras o números.");
+  const plain = next.toLowerCase();
+  if (COMMON_KEYS.has(plain) || /^(.)\1+$/.test(plain) || "01234567890123456789".includes(plain) || "98765432109876543210".includes(plain)
+    || plain.includes(user.usuario) || plain.includes(user.tienda)) {
+    throw new Error("Esa clave es muy fácil de adivinar. Probá con otra (por ejemplo, dos palabras y un número).");
+  }
+}
+
+/** Cambia la clave del usuario que ingresó (pide la actual). Devuelve el usuario actualizado. */
 export async function changePassword(env, usuario, current, next) {
-  if (typeof next !== "string" || next.length < 8 || next.length > 100) throw new Error("La clave nueva tiene que tener entre 8 y 100 letras o números.");
   const object = await env.PRIVADO.get(`usuarios/${usuario}.json`);
   const user = object ? await object.json() : null;
   if (!user) throw new Error("Usuario inexistente.");
   const hash = await hashPassword(String(current ?? ""), user.salt, user.iterations ?? PBKDF2_ITERATIONS);
   if (!sameText(hash, user.hash)) throw new Error("La clave actual no es correcta.");
-  const salt = toBase64(crypto.getRandomValues(new Uint8Array(16)));
-  await savePassword(env, user, next);
+  checkNewKey(next, user);
+  return savePassword(env, user, next);
 }
 
 /** Guarda la clave nueva (cifrada) y saca el aviso de "elegí tu clave". */
@@ -712,20 +770,18 @@ async function savePassword(env, user, next) {
   const { elegirClave, ...rest } = user;
   const updated = { ...rest, salt, iterations: PBKDF2_ITERATIONS, hash: await hashPassword(next, salt), cambiada: new Date().toISOString() };
   await env.PRIVADO.put(`usuarios/${user.usuario}.json`, JSON.stringify(updated));
+  return updated;
 }
 
 /** ¿Tiene que elegir su propia clave? (la primera vez que entra con la clave que le pasaron). */
-export async function mustChooseKey(env, usuario) {
-  const object = await env.PRIVADO.get(`usuarios/${usuario}.json`);
-  return object ? (await object.json()).elegirClave === true : false;
-}
+export const mustChooseKey = (user) => user?.elegirClave === true;
 
 /** Primera clave propia: no pide la anterior (ya ingresó con ella), solo si le toca elegirla. */
 export async function chooseFirstKey(env, usuario, next) {
-  if (typeof next !== "string" || next.length < 8 || next.length > 100) throw new Error("La clave tiene que tener entre 8 y 100 letras o números.");
   const object = await env.PRIVADO.get(`usuarios/${usuario}.json`);
   const user = object ? await object.json() : null;
   if (!user) throw new Error("Usuario inexistente.");
   if (user.elegirClave !== true) throw new Error("Tu clave ya está elegida. Para cambiarla, entrá a “Mi tienda”.");
-  await savePassword(env, user, next);
+  checkNewKey(next, user);
+  return savePassword(env, user, next);
 }

@@ -24,7 +24,9 @@ if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(store ?? "")) {
   process.exit(1);
 }
 const where = flag("local") ? "--local" : "--remote";
-const key = `mitiendastock-catalogo/tiendas/${store}/productos.json`;
+// El catálogo de cada tienda vive en el depósito privado (el público solo tiene fotos y logos).
+const key = `mitiendastock-privado/tiendas/${store}/productos.json`;
+const legacyKey = `mitiendastock-catalogo/tiendas/${store}/productos.json`;
 const wrangler = (args) => execFileSync("npx", ["wrangler", "r2", "object", ...args, where],
   { stdio: ["ignore", "ignore", "pipe"], shell: process.platform === "win32" });
 
@@ -32,21 +34,28 @@ const folder = mkdtempSync(join(tmpdir(), "stock-br-"));
 const file = join(folder, "productos.json");
 try {
   let data = { version: 1, store, categories: {}, products: [] };
-  try {
-    wrangler(["get", key, "--file", file]);
-    data = JSON.parse(readFileSync(file, "utf8"));
-  } catch (error) {
-    // Solo si de verdad no tiene catálogo se arranca vacío. Cualquier otro problema (sin
-    // internet, sin sesión) corta acá: nunca se pisa lo que el cliente ya cargó.
-    if (!/specified key does not exist/i.test(String(error.stderr ?? ""))) {
-      console.error("No se pudo leer el catálogo de la tienda. No se cambió nada.");
-      process.exit(1);
+  // Primero el privado; si no está, el viejo del depósito público (tiendas de antes del 20/10).
+  let legacy = false;
+  for (const [where, isLegacy] of [[key, false], [legacyKey, true]]) {
+    try {
+      wrangler(["get", where, "--file", file]);
+      data = JSON.parse(readFileSync(file, "utf8"));
+      legacy = isLegacy;
+      break;
+    } catch (error) {
+      // Solo si de verdad no tiene catálogo se arranca vacío. Cualquier otro problema (sin
+      // internet, sin sesión) corta acá: nunca se pisa lo que el cliente ya cargó.
+      if (!/specified key does not exist/i.test(String(error.stderr ?? ""))) {
+        console.error("No se pudo leer el catálogo de la tienda. No se cambió nada.");
+        process.exit(1);
+      }
     }
   }
   data.stockBR = { casa: flag("casa"), g5: flag("g5") };
   data.br ??= {};
   writeFileSync(file, JSON.stringify(data));
   wrangler(["put", key, "--file", file, "--content-type", "application/json", "--cache-control", "no-cache"]);
+  if (legacy) wrangler(["delete", legacyKey]);
   console.log(`Listo. Tienda ${store}: stock de Brasil activado (stock de casa: ${data.stockBR.casa ? "sí" : "no"}, G5: ${data.stockBR.g5 ? "sí" : "no"}). Productos propios: ${data.products.length}.`);
 } finally {
   rmSync(folder, { recursive: true, force: true });

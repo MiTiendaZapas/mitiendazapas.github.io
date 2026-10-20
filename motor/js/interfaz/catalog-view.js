@@ -185,7 +185,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
 
   function cardHtml(product, index) {
     const state = selection.get(product.id);
-    const nameId = `name-${product.id}`;
+    const nameId = escapeHtml(`name-${product.id}`);
     return `
       <li>
         <article class="product-card" data-product-id="${escapeHtml(product.id)}" aria-labelledby="${nameId}">

@@ -2,7 +2,9 @@
 //   1) Los pedidos que cambian algo tienen que venir desde esta misma página (otra
 //      página no puede mandarlos haciéndose pasar por el cliente).
 //   2) Salvo "ingresar" y "salir", hace falta una sesión válida. La tienda sale de la sesión.
-import { fail, readSession } from "../../../servidor/panel.js";
+//   3) El usuario tiene que seguir existiendo y la sesión tiene que ser de su clave actual:
+//      cambiar la clave, borrar el usuario o "cerrar sesión en todos" corta las sesiones viejas.
+import { clearSession, fail, keyVersion, readSession, readUser } from "../../../servidor/panel.js";
 
 const PUBLIC = new Set(["/api/panel/ingresar", "/api/panel/salir"]);
 
@@ -15,8 +17,12 @@ export async function onRequest(context) {
   try {
     if (!PUBLIC.has(url.pathname)) {
       const session = await readSession(env, request);
-      if (!session) return fail("Tenés que ingresar de nuevo.", 401);
-      context.data.session = session;
+      const user = session && await readUser(env, session.usuario);
+      if (!user || user.tienda !== session.tienda || keyVersion(user) !== session.v) {
+        return fail("Tenés que ingresar de nuevo.", 401, { "Set-Cookie": clearSession() });
+      }
+      context.data.session = { usuario: session.usuario, tienda: session.tienda };
+      context.data.user = user;
     }
     const response = await context.next();
     const headers = new Headers(response.headers);

@@ -8,6 +8,7 @@ Se toman solo los de linea "G5" y categoria "Calzado". Entran al catálogo con l
 categoría "g5": las tiendas que no la activan (showG5) no los muestran.
 """
 import json
+import re
 
 import net
 import settings
@@ -25,7 +26,15 @@ def _catalog():
     return _cache["data"]
 
 
+# Los códigos del proveedor van a las páginas de todas las tiendas: solo letras, números y
+# guiones (auditoría 20/10). Si mandara otra cosa (por error o porque lo hackean), se limpia.
+_UNSAFE_ID = re.compile(r"[^A-Za-z0-9-]")
+
+
 def _to_item(item, prefix):
+    safe_id = _UNSAFE_ID.sub("", str(item["id"]))[:40]
+    if not safe_id:
+        raise ValueError(f"Código de modelo inválido del proveedor: {item.get('nombre')!r}")
     sizes = {}
     for entry in item.get("talles", []):
         size = str(entry.get("talle") or "").strip()
@@ -33,7 +42,7 @@ def _to_item(item, prefix):
             sizes[size] = sizes.get(size, 0) + max(int(entry.get("cantidad") or 0), 0)
     photo = item.get("fotoGrande") or item.get("foto")
     return {
-        "ref": f"{prefix}-{item['id']}",
+        "ref": f"{prefix}-{safe_id}",
         "name": item["nombre"].strip(),
         "sizes": [{"size": s, "stock": n} for s, n in sizes.items()],
         "provider_brand": None,

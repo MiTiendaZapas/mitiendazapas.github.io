@@ -118,12 +118,24 @@ class Firebase:
     def __init__(self):
         self.api, self.pid = _leer_config()
         self.base = f"https://firestore.googleapis.com/v1/projects/{self.pid}/databases/(default)/documents"
-        res = _http(f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={self.api}", {"returnSecureToken": True})
-        self.token = res["idToken"]
+        # El stock de casa se lee SIN cuenta: las reglas nuevas dejan leer solo eso (stock, fotos y
+        # su versión) a cualquiera, y nada más (auditoría 20/10). Mientras sigan las reglas viejas
+        # ("hace falta una cuenta"), se entra como anónimo como antes.
+        self.token = None
+
+    def _pedir(self, url):
+        try:
+            return _http(url, token=self.token)
+        except urllib.error.HTTPError as e:
+            if e.code != 403 or self.token:
+                raise
+            res = _http(f"https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={self.api}", {"returnSecureToken": True})
+            self.token = res["idToken"]
+            return _http(url, token=self.token)
 
     def obtener(self, ruta):
         try:
-            return _doc(_http(f"{self.base}/{ruta}", token=self.token))
+            return _doc(self._pedir(f"{self.base}/{ruta}"))
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return None
@@ -132,7 +144,7 @@ class Firebase:
     def listar(self, coleccion):
         out, pagina = [], ""
         while True:
-            res = _http(f"{self.base}/{coleccion}?pageSize=300{pagina}", token=self.token)
+            res = self._pedir(f"{self.base}/{coleccion}?pageSize=300{pagina}")
             for d in res.get("documents", []):
                 out.append((d["name"].rsplit("/", 1)[-1], _doc(d)))
             if not res.get("nextPageToken"):
