@@ -507,8 +507,6 @@
 }
 /* PC: la barra de arriba y las pestañas con el mismo ancho que el contenido */
 @media (min-width: 900px) {
-  .panel-page:has(.panel-main[data-section="productos"]) :is(.panel-top__inner, .panel-tabs),
-  .panel-page:has(.panel-main[data-section="inicio"]) :is(.panel-top__inner, .panel-tabs) { max-width: 1040px; }
   .panel-main[data-section="inicio"] { max-width: 1040px; }
   /* Resumen: todos los números en una sola fila */
   .panel-main[data-section="inicio"] .panel-tiles { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); }
@@ -520,3 +518,98 @@
   .panel-page * { transition: none !important; animation: none !important; }
   .panel-page :is(.btn, .panel-chip, .panel-stock):active { transform: none !important; }
 }
+
+/* ===== Armazón (revisión 20/10): en la computadora, menú fijo a la izquierda ===== */
+.panel-top__title { display: flex; align-items: center; gap: 10px; }
+.panel-top__avatar { display: none; }
+.panel-top__names { display: grid; min-width: 0; line-height: 1.2; }
+.panel-top__names strong { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.panel-top__names span { color: var(--color-text-muted); font-size: 12px; }
+.panel-top__store .panel-ico { display: none; }
+.panel-page-title { display: none; }
+/* Celular y tablet: al editar se esconde el menú (deja lugar al botón Guardar) */
+@media (max-width: 1023px) { .panel-top.is-editing .panel-tabs { display: none; } }
+@media (max-width: 380px) { .panel-top__names span { display: none; } }
+
+@media (min-width: 1024px) {
+  .panel-page { --panel-side: 248px; padding-left: var(--panel-side); padding-bottom: 0; }
+  .panel-top:not(.is-guest) {
+    position: fixed; inset: 0 auto 0 0; z-index: 20; display: flex; flex-direction: column; width: var(--panel-side);
+    padding: 18px 12px; overflow-y: auto; border-right: 1px solid var(--color-border); border-bottom: 0;
+  }
+  .panel-top:not(.is-guest) .panel-top__inner { display: contents; }
+  .panel-top:not(.is-guest) .panel-top__title { order: 1; padding: 2px 8px 16px; border-bottom: 1px solid var(--color-border); }
+  .panel-top__avatar {
+    display: grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+    background: var(--color-text); color: var(--color-surface); font-size: 18px; font-weight: 800;
+  }
+  .panel-top:not(.is-guest) .panel-tabs { order: 2; display: grid; gap: 2px; max-width: none; margin: 12px 0 0; padding: 0; overflow: visible; }
+  .panel-top:not(.is-guest) .panel-tab {
+    display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px;
+    color: var(--color-text-muted); font-size: 15px; font-weight: 600;
+  }
+  .panel-top:not(.is-guest) .panel-tab:hover { background: var(--color-surface-2); color: var(--color-text); }
+  .panel-top:not(.is-guest) .panel-tab[aria-current="page"] { background: var(--color-surface-2); color: var(--color-text); }
+  .panel-top:not(.is-guest) .panel-tab .panel-ico { width: 20px; height: 20px; }
+  .panel-top:not(.is-guest) .panel-top__actions {
+    order: 3; display: grid; grid-template-columns: 1fr auto; gap: 6px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--color-border);
+  }
+  .panel-top:not(.is-guest) .panel-top__store { grid-column: 1 / -1; order: -1; justify-content: center; min-height: 44px; }
+  .panel-top__store .panel-ico { display: inline-block; }
+  .panel-top:not(.is-guest) .panel-top__logout { justify-content: flex-start; padding-inline: 12px; }
+  .panel-top:not(.is-guest) .panel-theme { order: 2; }
+
+  /* Contenido: siempre el mismo ancho y en el mismo lugar, en todas las pantallas */
+  .panel-main, .panel-main[data-section] { max-width: 1080px; margin: 0 auto; padding: 28px 32px 40px; }
+  .panel-page-title { display: block; margin: 0; font-family: var(--font-body); font-size: 26px; letter-spacing: 0; text-transform: none; }
+  .panel-main > h1.panel-title { font-size: 26px; }
+  /* Formularios: angostos y alineados a la izquierda (no saltan al centro) */
+  .panel-editor { width: 100%; max-width: 820px; }
+  .panel-main[data-section="tienda"], .panel-main[data-section="ayuda"], .panel-main[data-section="categorias"] { justify-items: start; }
+  .panel-main[data-section="tienda"] > *, .panel-main[data-section="ayuda"] > *, .panel-main[data-section="categorias"] > * { width: 100%; max-width: 820px; }
+  /* Botón Guardar: pegado abajo del formulario (no ocupa toda la pantalla) */
+  .panel-savebar { position: sticky; right: auto; bottom: 0; left: auto; margin: 0; padding: 14px 0 18px; border-top: 1px solid var(--color-border); background: var(--color-bg); }
+  .panel-savebar .btn { max-width: none; }
+  .panel-toast { left: calc(50% + var(--panel-side) / 2); bottom: 28px; }
+  .panel-fab { display: none; }
+}
+
+@media (min-width: 1024px) {
+  .panel-top__avatar.has-logo { overflow: hidden; background: var(--color-surface-2); }
+  .panel-top__avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .panel-main[data-section="inicio"] .panel-tiles { grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); }
+}
+
+/* Talles del editor: tarjetitas con "Talle" y "Unidades" (en la computadora, varias por fila) */
+.panel-size-row { grid-template-columns: minmax(0, 1fr) auto 36px; align-items: end; padding: 8px 10px; border-radius: var(--radius-control); background: var(--color-surface-2); }
+.panel-size-row__label, .panel-size-row__qty { display: grid; gap: 2px; min-width: 0; }
+.panel-size-row__name { min-height: 44px; font-weight: 700; background: var(--color-surface); }
+.panel-size-row__remove { align-self: center; }
+@media (min-width: 700px) {
+  .panel-sizes { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .panel-size-row__name { max-width: 90px; text-align: center; }
+}
+.panel-card--row { padding-block: 10px; }
+/* Títulos de sección de las listas: misma letra que el resto del panel */
+.panel-section h2 { font-family: var(--font-body); letter-spacing: 0; text-transform: none; }
+
+.panel-quick__add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.panel-quick__add .panel-input { width: 100px; min-height: 44px; text-align: center; }
+
+.panel-account { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
+.panel-account__title { margin: 0; font-family: var(--font-body); font-size: 20px; letter-spacing: 0; text-transform: none; }
+/* El nombre de la tienda siempre se ve (una regla vieja escondía todo el título en pantallas chicas) */
+.panel-top .panel-top__title > .panel-top__names { display: grid; }
+@media (max-width: 380px) { .panel-top .panel-top__names > span { display: none; } }
+/* Celular: talles en dos columnas (talle arriba, cantidad abajo): la mitad de alto */
+@media (max-width: 699px) {
+  .panel-sizes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panel-size-row { grid-template-columns: minmax(0, 1fr) 36px; grid-template-areas: "name remove" "qty qty"; align-items: center; row-gap: 6px; padding: 8px; }
+  .panel-size-row__label { grid-area: name; }
+  .panel-size-row__label small, .panel-size-row__qty small { display: none; }
+  .panel-size-row__name { min-height: 40px; text-align: center; }
+  .panel-size-row__remove { grid-area: remove; }
+  .panel-size-row__qty { grid-area: qty; }
+  .panel-size-row__qty .panel-stepper { justify-content: space-between; width: 100%; }
+}
+.panel-thumb--empty { font-size: 12px; line-height: 1.2; }

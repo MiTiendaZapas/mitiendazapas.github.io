@@ -12,7 +12,7 @@
  */
 import { icon } from "../js/interfaz/icons.js";
 import { createPricing } from "../js/pricing.js";
-import { sortSizes } from "../js/talles.js";
+import { compareSizes, sortSizes } from "../js/talles.js";
 import { CATEGORY_ORDERS, PRODUCT_ORDERS, sortProducts } from "../vidriera/orden.js";
 
 const config = window.STORE_CONFIG ?? {};
@@ -273,24 +273,44 @@ function themeButton() {
 
 const EDIT_SCREENS = ["editar", "nuevo", "br", "precios", "precios-generales", "por-mayor", "ofertas"];
 
+/**
+ * Barra del panel. En la computadora es un menú fijo a la izquierda (siempre igual, también
+ * al editar); en el celular, la barra de arriba y el menú de abajo (que se esconde al editar,
+ * para dejar lugar al botón Guardar).
+ */
 function renderTop({ loggedIn }) {
   const current = (location.hash.slice(1).split("/")[0]) || "inicio";
   const editing = EDIT_SCREENS.includes(current);
+  // Las pantallas de edición son parte de "Productos" (cambiar precios, ofertas, por mayor...).
+  const section = editing ? "productos" : current;
   top.classList.toggle("is-editing", loggedIn && editing);
+  top.classList.toggle("is-guest", !loggedIn);
   root.dataset.section = current;
+  const storeName = state.settings.name || config.name || "Mi tienda";
   top.replaceChildren(
     h("div", { class: "panel-top__inner" },
       h("div", { class: "panel-top__title" },
-        h("strong", {}, state.settings.name || config.name || "Mi tienda"),
-        h("span", {}, "Panel de tu tienda")),
+        // El logo de la tienda (el del panel o, si no subió uno, el de siempre); si no hay, la inicial.
+        (() => {
+          const logo = state.settings.logo ? storeUrl(state.settings.logo.small)
+            : config.logo?.small ? new URL(`../${config.logo.small}`, location.href).href : null;
+          return h("span", { class: `panel-top__avatar${logo ? " has-logo" : ""}`, "aria-hidden": "true" },
+            logo ? h("img", { src: logo, alt: "", width: 40, height: 40 }) : storeName.trim().charAt(0).toUpperCase() || "T");
+        })(),
+        h("span", { class: "panel-top__names" },
+          h("strong", {}, storeName),
+          h("span", {}, "Panel de tu tienda"))),
       h("div", { class: "panel-top__actions" },
         themeButton(),
-        loggedIn ? h("a", { class: "btn btn--outline btn--sm", href: "../", target: "_blank", rel: "noopener" }, "Ver tienda") : null,
-        loggedIn ? h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: logout }, "Salir") : null)),
-    ...(loggedIn && !editing ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
-      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": current === t.id ? "page" : null },
+        loggedIn ? h("a", { class: "btn btn--outline btn--sm panel-top__store", href: "../", target: "_blank", rel: "noopener" }, ico("external"), h("span", {}, "Ver tienda")) : null,
+        loggedIn ? h("button", { class: "btn btn--ghost btn--sm panel-top__logout", type: "button", onclick: logout }, "Salir") : null)),
+    ...(loggedIn ? [h("nav", { class: "panel-tabs", "aria-label": "Secciones del panel" },
+      TABS.map((t) => h("a", { href: `#${t.id}`, class: "panel-tab", "aria-current": section === t.id ? "page" : null },
         ico(t.icon), h("span", {}, t.label))))] : []));
 }
+
+/** Título de la página (en la computadora; en el celular ya lo dice el menú de abajo). */
+const pageTitle = (text) => h("h1", { class: "panel-page-title" }, text);
 
 // --- ingreso ---------------------------------------------------------------------
 function showLogin(message = "") {
@@ -369,14 +389,14 @@ function matchesFilter(p) {
 
 /** Pestaña Productos. Con stock de Brasil, arriba se elige qué mirar: Brasil o los productos propios. */
 function renderProducts() {
-  if (!state.br) return renderOwnProducts();
+  if (!state.br) { renderOwnProducts(); root.prepend(pageTitle("Productos")); return; }
   const switcher = h("div", { class: "panel-switcher", role: "group", "aria-label": "Qué productos ver" },
     [["propios", `Mis productos (${state.products.length + brWithPairs().length})`], ["br", `Stock automático (${state.br.products.length})`]].map(([id, label]) =>
       h("button", { type: "button", class: "panel-switcher__btn", "aria-pressed": String(state.view === id),
         onclick: () => { state.view = id; renderProducts(); } }, label)));
   if (state.view === "br") renderBrProducts();
   else renderOwnProducts();
-  root.prepend(switcher);
+  root.prepend(pageTitle("Productos"), switcher);
 }
 
 /** Botón "Cambiar precios" (arriba de las listas de productos). */
@@ -1200,7 +1220,34 @@ function renderQuickPairs(product, box, onChange) {
           h("button", { type: "button", "aria-label": `Restar un par tuyo del talle ${s.size}`, onclick: change(-1) }, ico("minus")),
           value,
           h("button", { type: "button", "aria-label": `Sumar un par tuyo al talle ${s.size}`, onclick: change(1) }, ico("plus"))));
-    })));
+    })),
+    // Un talle que Brasil no tiene (por ejemplo, un 45 que tenés en tu casa): se agrega acá mismo.
+    (() => {
+      const input = h("input", { class: "panel-input", maxlength: 12, placeholder: "Ej: 45", "aria-label": "Otro talle que tenés" });
+      const add = () => {
+        const size = input.value.trim();
+        if (!size) return input.focus();
+        if (product.sizes.some((s) => s.size.toLowerCase() === size.toLowerCase())) {
+          toast(`El talle ${size} ya está en la lista: sumale con el +.`, "error");
+          return;
+        }
+        product.sizes.push({ size, br: 0, casa: 1, stock: 1, soloCasa: true });
+        product.sizes.sort((a, b) => compareSizes(a.size, b.size));
+        saveSoon(`pares:${product.id}`, () => api("/br", { method: "POST", body: brBody(product) }), () => {
+          product.sizes = product.sizes.filter((s) => s.size !== size);
+          renderQuickPairs(product, box, onChange);
+          onChange();
+        });
+        renderQuickPairs(product, box, onChange);
+        onChange();
+        toast(`Talle ${size} agregado con 1 par.`);
+      };
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+      return h("div", { class: "panel-quick__add" },
+        h("span", { class: "panel-muted" }, "¿Tenés un talle que no está?"),
+        input,
+        h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: add }, "+ Agregar talle"));
+    })());
 }
 
 /** Lo que se manda al guardar un modelo de Brasil (lo que no se cambia, queda como estaba). */
@@ -1458,11 +1505,13 @@ function renderEditor(product) {
         const value = h("output", { class: "panel-quick__value" }, s.stock);
         const set = (n) => { s.stock = Math.max(0, n); value.textContent = s.stock; };
         return h("div", { class: "panel-size-row" },
-          h("input", { class: "panel-input panel-size-row__name", value: s.size, maxlength: 12, "aria-label": "Talle", placeholder: "Talle", oninput: (e) => { s.size = e.target.value; } }),
-          h("div", { class: "panel-stepper" },
-            h("button", { type: "button", "aria-label": "Restar uno", onclick: () => set(s.stock - 1) }, ico("minus")),
-            value,
-            h("button", { type: "button", "aria-label": "Sumar uno", onclick: () => set(s.stock + 1) }, ico("plus"))),
+          h("label", { class: "panel-size-row__label" }, h("small", { class: "panel-muted" }, "Talle"),
+            h("input", { class: "panel-input panel-size-row__name", value: s.size, maxlength: 12, placeholder: "Ej: 38", "aria-label": "Talle", oninput: (e) => { s.size = e.target.value; } })),
+          h("div", { class: "panel-size-row__qty" }, h("small", { class: "panel-muted" }, "Unidades"),
+            h("div", { class: "panel-stepper" },
+              h("button", { type: "button", "aria-label": `Restar una unidad del talle ${s.size}`, onclick: () => set(s.stock - 1) }, ico("minus")),
+              value,
+              h("button", { type: "button", "aria-label": `Sumar una unidad al talle ${s.size}`, onclick: () => set(s.stock + 1) }, ico("plus")))),
           h("button", { type: "button", class: "panel-size-row__remove", "aria-label": `Quitar talle ${s.size}`, onclick: () => { draft.sizes.splice(i, 1); renderSizes(); } }, ico("close")));
       }),
       ...(draft.sizes.length ? [] : [h("p", { class: "panel-muted" }, "Agregá los talles que tenés y cuántas unidades de cada uno.")]));
@@ -1527,22 +1576,26 @@ function renderEditor(product) {
       h("h1", {}, product ? "Editar producto" : "Nuevo producto"),
       product && !product.hidden ? viewLink(product) : null),
     h("section", { class: "panel-card" }, h("h2", {}, "Fotos"), photosHelp, photos),
+    // En el orden en que se piensa: fotos, qué es, qué talles hay, cuánto sale, y lo opcional.
     h("section", { class: "panel-card" }, h("h2", {}, "Datos"),
       field("f-name", "Nombre", name),
       field("f-category", "Categoría", categorySelect), newCategoryField,
-      extras.descriptionField,
-      h("div", { class: "panel-two" },
-        field("f-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, "El precio normal. Para rebajarlo, usá “Oferta”, más abajo."),
-        // Si la tienda no vende por mayor, no se pide (se activa en "Mi tienda").
-        !TWO_VERSIONS && state.settings.wholesale === false ? null : field("f-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, wholesaleHelp)),
-      h("label", { class: "panel-switch", for: "f-visible" }, visible, h("span", {}, "Se ve en la tienda"),
-        h("small", { class: "panel-muted" }, "Destildalo para pausarlo sin borrarlo."))),
-    resale.node,
+      extras.descriptionField),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles y cantidades"),
+      h("p", { class: "panel-muted" }, "Elegí los talles (o escribí uno) y con − y + poné cuántas unidades tenés de cada uno."),
       h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
         h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, "+ Otro talle")),
       sizesBox),
+    h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
+      h("div", { class: "panel-two" },
+        field("f-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, "El precio normal. Para rebajarlo, usá “Oferta”, más abajo."),
+        // Si la tienda no vende por mayor, no se pide (se activa en "Mi tienda").
+        !TWO_VERSIONS && state.settings.wholesale === false ? null : field("f-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, wholesaleHelp))),
+    resale.node,
     optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Destacado"), ...extras.nodes)),
+    h("section", { class: "panel-card panel-card--row" },
+      h("label", { class: "panel-switch", for: "f-visible" }, visible, h("span", {}, "Se ve en la tienda"),
+        h("small", { class: "panel-muted" }, "Destildalo para pausarlo sin borrarlo (por ejemplo, mientras llega mercadería)."))),
     product ? h("button", { class: "btn btn--ghost panel-delete", type: "button", onclick: () => removeProduct(product) }, "Borrar este producto") : null,
     h("div", { class: "panel-savebar" }, saveButton));
 
@@ -1815,9 +1868,9 @@ function renderStoreSettings() {
     TWO_VERSIONS ? null : h("section", { class: "panel-card" }, h("h2", {}, "Venta por mayor"),
       h("p", { class: "panel-muted" }, "Ahora tiene su propia pantalla, con mínimos por categoría."),
       h("a", { class: "btn btn--outline", href: "#por-mayor" }, "Configurar la venta por mayor")),
-    passwordCard(),
     h("div", { class: "panel-savebar" }, saveButton));
-  show(form);
+  // La clave va aparte (tiene su propio botón): no se guarda con "Guardar cambios".
+  show(form, h("div", { class: "panel-account" }, h("h2", { class: "panel-account__title" }, "Tu cuenta"), passwordCard()));
   // Si sale sin guardar, se le pregunta (ver route). La clave va aparte y no cuenta.
   const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, notice, orderGreeting, orderFooter];
   const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color]);
@@ -2115,7 +2168,7 @@ function route() {
     const product = state.br.products.find((p) => p.id === decodeURIComponent(id ?? ""));
     if (product) return renderBrEditor(product);
   }
-  if (section === "categorias") return renderCategories();
+  if (section === "categorias") { renderCategories(); root.prepend(pageTitle("Categorías")); return; }
   if (section === "precios") return renderPriceChange();
   if (section === "por-mayor") return renderWholesale();
   if (section === "ofertas") return renderGroupOffers();
