@@ -16,7 +16,11 @@ export async function onRequestGet({ request, env, params, waitUntil }) {
   const cacheKey = new Request(`${url.origin}${url.pathname}`);
   const cache = globalThis.caches?.default;
   const cached = cache && await cache.match(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    const headers = new Headers(cached.headers);
+    headers.set("Cache-Control", "no-cache");
+    return new Response(cached.body, { status: cached.status, headers });
+  }
 
   const { data } = await readCatalog(env, params.tienda);
   const body = data.stockBR ? publicMixedCatalog(data, await readBrStock(env, data.stockBR)) : publicCatalog(data);
