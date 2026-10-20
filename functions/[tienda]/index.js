@@ -26,14 +26,19 @@ export async function onRequestGet({ request, env, params, next }) {
   const origin = new URL(request.url).origin;
   const title = `${settings.name} · Catálogo`;
   const description = settings.tagline || settings.heroText || "Elegí producto y talle, armá tu pedido y envialo por WhatsApp.";
-  const image = settings.logo ? `${origin}/api/tienda/${params.tienda}/${settings.logo.large}` : "";
-  return new HTMLRewriter()
+  const rewriter = new HTMLRewriter()
     .on("title", { element(el) { el.setInnerContent(title); } })
     .on('meta[name="description"]', new SetContent(description))
     .on('meta[property="og:title"]', new SetContent(title))
-    .on('meta[property="og:description"]', new SetContent(description))
-    .on('meta[property="og:image"]', new SetContent(image))
-    .on('meta[property="og:image:alt"]', new SetContent(image ? `Logo de ${settings.name}` : ""))
-    .on('link[rel="icon"]', { element(el) { if (image) el.setAttribute("href", `${origin}/api/tienda/${params.tienda}/${settings.logo.small}`); else el.remove(); } })
-    .transform(response);
+    .on('meta[property="og:description"]', new SetContent(description));
+  // Logo subido en el panel: es el ícono de la pestaña y la imagen al compartir. Sin logo subido
+  // quedan los de la página (antes se borraban y L.A IMP se quedaba sin ícono ni imagen al compartir).
+  if (settings.logo) {
+    const image = `${origin}/api/tienda/${params.tienda}/${settings.logo.large}`;
+    rewriter
+      .on('meta[property="og:image"]', new SetContent(image))
+      .on('meta[property="og:image:alt"]', new SetContent(`Logo de ${settings.name}`))
+      .on('link[rel="icon"]', { element(el) { el.setAttribute("href", `${origin}/api/tienda/${params.tienda}/${settings.logo.small}`); } });
+  }
+  return rewriter.transform(response);
 }
