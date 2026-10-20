@@ -262,6 +262,9 @@ export function publicCatalog(data) {
 //   3) y sus productos propios (data.products), en las categorías que él crea.
 // data.stockBR = { casa: true|false, g5: true|false } lo pone herramientas/activar_stock_br.mjs
 // (el cliente no lo puede cambiar).
+//   casa: suma el stock de casa de L.A IMP (la tienda de L.A IMP no: ese stock lo carga en su panel).
+//   g5:   las G5 se ven con el precio de su lista de precios (tiendas que ya las vendían: L.A IMP).
+//         Sin esto, las G5 recién se ven cuando el cliente les pone precio.
 export const BR_CATEGORIES = { zapatillas: "Zapatillas", ojotas: "Ojotas", g5: "Calidad G5" };
 // Todas las tiendas con stock de Brasil reciben también la calidad G5 (19/10). Las G5 se ven
 // recién cuando el cliente les pone precio (ver precios generales).
@@ -327,7 +330,7 @@ function visibility(product, data) {
   if (product.hidden) return "oculto";
   const ownPrice = Boolean(product.price);
   if (!ownPrice && pricing.mode === "manual" && !(data.known ?? []).includes(product.id)) return "nuevo";
-  if (!ownPrice && isG5(product) && !pricing.g5.unit) return "sin-precio-g5";
+  if (!ownPrice && isG5(product) && !pricing.g5.unit && data.stockBR?.g5 !== true) return "sin-precio-g5";
   return "visible";
 }
 
@@ -338,7 +341,9 @@ function visibility(product, data) {
 export function brProducts(data, br) {
   const changes = data.br ?? {};
   const seen = new Set();
-  const list = br.products.map((p) => {
+  // Sin stock de casa, los modelos que son SOLO de casa no van (quedarían sin pares).
+  const withHouse = data.stockBR?.casa === true;
+  const list = br.products.filter((p) => withHouse || !(Array.isArray(p.origin) && p.origin.length && p.origin.every((o) => o === "casa"))).map((p) => {
     seen.add(p.id);
     return withChanges(brModel(p, data.stockBR), changes[p.id]);
   });

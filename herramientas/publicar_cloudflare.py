@@ -45,6 +45,54 @@ SKIP_CLIENT = {".git", "LEEME.md", ".gitignore", ".nojekyll"}
 
 TEST_STORES = ["demo-br"]   # tiendas de prueba (sin GitHub): solo van al link de prueba
 TEST_BRANCH = "prueba"
+# Prueba de la tienda de L.A IMP con panel (stock de casa en el panel, 20/10): la misma tienda,
+# en /laimp-panel/, con el catálogo que arma el panel de "laimp". Solo en el link de prueba.
+MAIN_PANEL_TEST = "laimp-panel"
+PANEL_PAGE = """<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Panel · {name}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/motor/panel/icono-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Mi panel">
+  <meta name="theme-color" content="#f5f5f3">
+  <script>document.write('<script src="../configuracion.js?t=' + Math.floor(Date.now() / 60000) + '"><\/script>');</script>
+  <script src="/motor/js/theme.js"></script>
+  <link rel="stylesheet" href="/motor/css/tienda.css">
+  <link rel="stylesheet" href="/motor/panel/panel.css">
+  <script type="module" src="/motor/panel/panel.js"></script>
+</head>
+<body class="panel-page">
+  <header class="panel-top" id="panel-top"></header>
+  <main class="panel-main" id="panel"></main>
+  <div class="panel-toast" id="panel-toast" role="status" aria-live="polite"></div>
+  <noscript><p class="noscript">Para usar el panel necesitás activar JavaScript.</p></noscript>
+</body>
+</html>
+"""
+PANEL_MANIFEST = {"name": "", "short_name": "Mi panel", "start_url": "./", "scope": "./", "display": "standalone",
+                  "background_color": "#111113", "theme_color": "#111113", "lang": "es-AR", "icons": [
+                      {"src": "/motor/panel/icono-192.png", "sizes": "192x192", "type": "image/png"},
+                      {"src": "/motor/panel/icono-512.png", "sizes": "512x512", "type": "image/png"},
+                      {"src": "/motor/panel/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}]}
+
+
+def add_panel(folder, store_id, name):
+    """Convierte una tienda en tienda con panel: su catálogo lo arma el panel de store_id."""
+    config = folder / "configuracion.js"
+    text = config.read_text(encoding="utf-8")
+    new = re.sub(r'^(\s*)id:\s*"[^"]*",', lambda m: f'{m.group(0)}\n{m.group(1)}manualStore: "{store_id}",', text, count=1, flags=re.M)
+    if new == text:
+        raise RuntimeError(f"No se encontró el id en {config}")
+    config.write_text(new, encoding="utf-8")
+    (folder / "panel").mkdir(exist_ok=True)
+    (folder / "panel" / "index.html").write_text(PANEL_PAGE.replace("{name}", name), encoding="utf-8")
+    (folder / "panel" / "manifest.webmanifest").write_text(
+        json.dumps({**PANEL_MANIFEST, "name": f"Panel · {name}"}, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def client_repos(test=False):
@@ -129,6 +177,9 @@ def build(dist, test=False):
     # Links de mitiendastock.com que se usaron antes de mover la tienda a /laimp/ (09/10).
     redirects = [line for page in MAIN_PAGES for line in (
         f"/{page} /{MAIN_STORE}/{page}/ 301", f"/{page}/* /{MAIN_STORE}/{page}/:splat 301")]
+    if test:
+        shutil.copytree(main_store, dist / MAIN_PANEL_TEST)
+        add_panel(dist / MAIN_PANEL_TEST, MAIN_STORE, "L.A IMP")
     clients = client_repos(test)
     for name, folder in clients.items():
         if (dist / name).exists():
@@ -148,6 +199,8 @@ def build(dist, test=False):
     # con stock propio (para poner su nombre y logo al compartir). El resto se entrega directo.
     manual = [name for name, folder in clients.items()
               if re.search(r"^\s*manualStore:", (folder / "configuracion.js").read_text(encoding="utf-8"), re.M)]
+    if test:
+        manual.append(MAIN_PANEL_TEST)
     routes = {"version": 1, "include": ["/api/*"] + [f"/{name}/" for name in manual], "exclude": []}
     (dist / "_routes.json").write_text(json.dumps(routes, indent=2) + "\n", encoding="utf-8")
     add_version(dist)
