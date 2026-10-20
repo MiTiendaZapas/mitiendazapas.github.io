@@ -875,9 +875,10 @@ function itemView(product, canOrder, refresh) {
 }
 
 /** Total del stock arriba de los talles ("4 unidades" / "Sin stock", en rojo). */
-function paintTotal(el, total, word = "unidades") {
-  el.textContent = total === 0 ? "Sin stock" : `${total} ${total === 1 ? word.replace(/es$/, "").replace(/s$/, "") : word}`;
-  el.classList.toggle("is-empty", total === 0);
+function paintTotal(el, total, word = "unidades", empty = "Sin stock") {
+  el.textContent = total === 0 ? empty : `${total} ${total === 1 ? word.replace(/^unidades$/, "unidad").replace(/^pares tuyos$/, "par tuyo") : word}`;
+  // En rojo solo cuando de verdad no hay stock (en "Mis pares", 0 tuyos no es un problema).
+  el.classList.toggle("is-empty", total === 0 && empty === "Sin stock");
 }
 
 /** Un talle con − y + en una sola línea (compacto: dos por fila en el celular). */
@@ -1259,7 +1260,7 @@ function brItemView(product, refresh, { inOwnList = false } = {}) {
 /** Pares de casa al toque: + y − por talle, se guarda solo (como el stock de los productos propios). */
 function renderQuickPairs(product, box, onChange) {
   const totalEl = h("span", { class: "panel-quick__total" });
-  const paintAll = () => paintTotal(totalEl, product.sizes.reduce((sum, s) => sum + s.casa, 0), "pares tuyos");
+  const paintAll = () => paintTotal(totalEl, product.sizes.reduce((sum, s) => sum + s.casa, 0), "pares tuyos", "ninguno todavía");
   paintAll();
   box.replaceChildren(
     h("div", { class: "panel-quick__head" }, h("span", { class: "panel-muted" }, "En tu casa"), totalEl,
