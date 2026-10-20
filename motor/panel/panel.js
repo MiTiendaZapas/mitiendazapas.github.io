@@ -1262,18 +1262,24 @@ function brItemView(product, refresh, { inOwnList = false } = {}) {
         inOwnList ? null : pairsButton,
         h("button", { class: "btn btn--outline btn--sm", type: "button", onclick: () => { location.hash = `#br/${encodeURIComponent(product.id)}`; } }, "Editar"),
         h("button", { class: "btn btn--ghost btn--sm", type: "button", onclick: toggle }, product.hidden ? "Mostrar" : "Ocultar"))),
-    (inOwnList ? renderQuickPairs(product, quick, paintPairs) : null, quick));
+    (inOwnList ? renderQuickPairs(product, quick, paintPairs, { onlyMine: true }) : null, quick));
 }
 
-/** Pares de casa al toque: + y − por talle, se guarda solo (como el stock de los productos propios). */
-function renderQuickPairs(product, box, onChange) {
+/**
+ * Pares de casa al toque: + y − por talle, se guarda solo (como el stock de los productos propios).
+ * onlyMine: en "Mis productos" se ven solo los talles con pares tuyos (los de Brasil están en "Stock automático").
+ */
+function renderQuickPairs(product, box, onChange, { onlyMine = false } = {}) {
+  // Los que estaban a la vista siguen aunque lleguen a 0 (hasta volver a dibujar la lista).
+  const shown = onlyMine ? new Set(box.dataset.shown ? JSON.parse(box.dataset.shown) : product.sizes.filter((s) => s.casa > 0).map((s) => s.size)) : null;
+  if (shown) box.dataset.shown = JSON.stringify([...shown]);
   const totalEl = h("span", { class: "panel-quick__total" });
   const paintAll = () => paintTotal(totalEl, product.sizes.reduce((sum, s) => sum + s.casa, 0), "pares tuyos", "ninguno todavía");
   paintAll();
   box.replaceChildren(
     h("div", { class: "panel-quick__head" }, h("span", { class: "panel-muted" }, "En tu casa"), totalEl,
-      h("small", { class: "panel-muted panel-quick__legend" }, product.category === "g5" ? "PR = del proveedor" : "BR = los de Brasil")),
-    h("div", { class: "panel-quick__grid" }, ...product.sizes.map((s) => {
+      onlyMine ? null : h("small", { class: "panel-muted panel-quick__legend" }, product.category === "g5" ? "PR = del proveedor" : "BR = los de Brasil")),
+    h("div", { class: "panel-quick__grid" }, ...product.sizes.filter((s) => !shown || shown.has(s.size)).map((s) => {
       const value = h("output", { class: "panel-quick__value" }, s.casa);
       let cell;
       const change = (delta) => () => {
@@ -1290,26 +1296,33 @@ function renderQuickPairs(product, box, onChange) {
         // Se guarda una sola vez cuando deja de tocar (con todos los talles como quedaron).
         saveSoon(`pares:${product.id}`, () => api("/br", { method: "POST", body: brBody(product) }), () => {
           product.sizes.forEach((x, i) => { x.casa = before[i]; x.stock = x.br + x.casa; });
-          renderQuickPairs(product, box, onChange);
+          renderQuickPairs(product, box, onChange, { onlyMine });
           onChange();
         });
       };
       const from = product.category === "g5" ? "PR" : "BR";
-      cell = sizeCell(s.size, value, change(-1), change(1), `${from} ${s.br || "—"}`);
+      cell = sizeCell(s.size, value, change(-1), change(1), onlyMine ? null : `${from} ${s.br || "—"}`);
       return cell;
     }),
     // Un talle que Brasil no tiene (por ejemplo, un 45 que tenés en tu casa): se agrega acá mismo.
     addSizeCell(async (size) => {
-      if (product.sizes.some((s) => s.size.toLowerCase() === size.toLowerCase())) throw new Error(`El talle ${size} ya está: sumale con el +.`);
-      product.sizes.push({ size, br: 0, casa: 1, stock: 1, soloCasa: true });
-      product.sizes.sort((a, b) => compareSizes(a.size, b.size));
+      const existing = product.sizes.find((s) => s.size.toLowerCase() === size.toLowerCase());
+      // Un talle que Brasil ya tiene pero no estaba a la vista: se le suma 1 par tuyo.
+      if (existing && (!shown || shown.has(existing.size))) throw new Error(`El talle ${existing.size} ya está: sumale con el +.`);
+      const undo = existing ? { ...existing } : null;
+      if (existing) { existing.casa += 1; existing.stock = existing.br + existing.casa; }
+      else {
+        product.sizes.push({ size, br: 0, casa: 1, stock: 1, soloCasa: true });
+        product.sizes.sort((a, b) => compareSizes(a.size, b.size));
+      }
       try {
         await api("/br", { method: "POST", body: brBody(product) });
       } catch (e) {
-        product.sizes = product.sizes.filter((s) => s.size !== size);
+        if (existing) Object.assign(existing, undo); else product.sizes = product.sizes.filter((s) => s.size !== size);
         throw e;
       }
-      renderQuickPairs(product, box, onChange);
+      if (shown) { shown.add(existing ? existing.size : size); box.dataset.shown = JSON.stringify([...shown]); }
+      renderQuickPairs(product, box, onChange, { onlyMine });
       onChange();
       toast(`Talle ${size} agregado con 1 par.`);
     })));
