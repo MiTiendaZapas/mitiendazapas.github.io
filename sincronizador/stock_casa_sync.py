@@ -88,8 +88,11 @@ PANEL_TIENDA = "laimp"
 # (STOCK_CASA_PANEL_URL: para probar contra el servidor local)
 PANEL_URL = os.environ.get("STOCK_CASA_PANEL_URL") or f"https://mitiendastock.com/api/tienda/{PANEL_TIENDA}/productos.json"
 PANEL_FOTOS = os.environ.get("STOCK_CASA_PANEL_FOTOS") or f"https://catalogo.mitiendastock.com/tiendas/{PANEL_TIENDA}/"
-# Categorías del panel que van a indumentaria.js (el resto, a zapatillas_manual.js).
-CATEGORIAS_CALZADO = {"zapatillas", "ojotas", "g5", "ninos"}
+# Lo ÚNICO del panel de L.A IMP que comparten las tiendas de clientes: el stock de casa de
+# zapatillas (pares propios en modelos del proveedor y productos propios de la categoría
+# "zapatillas"). Lo demás (Liquidación, ojotas, G5, indumentaria o cualquier categoría que se
+# agregue) queda solo en la tienda de L.A IMP. Pedido del usuario, 22/10.
+CATEGORIAS_COMPARTIDAS = {"zapatillas"}
 
 
 def _bajar(url):
@@ -282,9 +285,9 @@ def _desde_panel(raiz, estado):
         else:
             # Modelo del proveedor: solo los pares que cargó el socio ("extra").
             talles = {str(s["size"]): int(s.get("extra") or 0) for s in p.get("sizes", []) if int(s.get("extra") or 0) > 0}
-        if not talles:
+        if not talles or p.get("category") not in CATEGORIAS_COMPARTIDAS:
             continue
-        tipo = "zapatillas" if not p.get("manual") or p.get("category") in CATEGORIAS_CALZADO else "indumentaria"
+        tipo = "zapatillas"   # indumentaria.js queda vacío: no se comparte nada más
         foto = f"Fotos/{limpiar_nombre_archivo(nombre)}.jpg"
         imagenes = p.get("images") or []
         if p.get("manual") and imagenes and imagenes[0].get("lg"):
