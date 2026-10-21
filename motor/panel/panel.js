@@ -1562,7 +1562,8 @@ function renderEditor(product) {
   // copian a la tienda, sin sacarle fotos de nuevo. Solo en tiendas con stock automático.
   const picker = h("div", { class: "panel-pick", hidden: true });
   function catalogPhotosButton() {
-    if (!state.br?.products?.length) return null;
+    // Solo en la tienda de L.A IMP y en la de Fabri (el servidor también lo controla).
+    if (!["laimp", "fo"].includes(config.manualStore) || !state.br?.products?.length) return null;
     return h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: openPicker }, ico("image"), "Usar fotos de un modelo");
   }
   const normalText = (text) => String(text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();

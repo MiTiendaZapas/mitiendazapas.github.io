@@ -469,6 +469,8 @@ export async function copyPhotos(env, store, images) {
  * "fotos/<modelo>/…"), con nombres nuevos de la tienda: el producto propio queda con sus fotos
  * aunque el proveedor después borre ese modelo. Si una foto no tiene versión chica, va la grande.
  */
+// Solo estas tiendas pueden usar las fotos del stock automático en sus productos (pedido del usuario, 22/10).
+export const CATALOG_PHOTOS_STORES = new Set(["laimp", "fo"]);
 const BR_PHOTO_KEY = /^fotos\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(webp|jpg)$/;
 export async function copyBrPhotos(env, store, images, room) {
   // Todas a la vez (de a una tardaba varios segundos con 4 o 5 fotos).

@@ -1,9 +1,10 @@
 // POST /api/panel/foto-catalogo  { id, room }  ->  { images: [{ lg, sm, w, h }], name }
 //   Copia a la tienda las fotos de un modelo del stock automático (Brasil o G5), para usarlas en
 //   un producto propio (por ejemplo, un par en liquidación) sin tener que sacarle fotos de nuevo.
-import { LIMITS, copyBrPhotos, fail, json, readBrStock } from "../../../servidor/panel.js";
+import { CATALOG_PHOTOS_STORES, LIMITS, copyBrPhotos, fail, json, readBrStock } from "../../../servidor/panel.js";
 
 export async function onRequestPost({ request, env, data }) {
+  if (!CATALOG_PHOTOS_STORES.has(data.session.tienda)) return fail("Tu tienda no tiene esta opción.", 403);
   let input;
   try { input = await request.json(); } catch { return fail("Datos inválidos."); }
   try {
