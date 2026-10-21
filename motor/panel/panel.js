@@ -1500,6 +1500,10 @@ function renderEditor(product) {
     : { name: "", brand: "", category: "", price: "", wholesalePrice: "", sizes: [], images: [], hidden: false };
   let uploading = 0;
   const progress = new Map();   // foto que se está subiendo -> porcentaje
+  // Fotos copiadas de un modelo del stock automático: en pantalla se ve la del modelo (ya está en
+  // el celular o carga más rápido) en vez de bajar la copia recién hecha.
+  const previews = new WeakMap();
+  const thumb = (img) => previews.get(img) || storeUrl(img.sm);
 
   // Fotos: cerradas se ve solo la portada (menos ruido); "Ver y cambiar fotos" muestra todas.
   let photosOpen = false;
@@ -1515,7 +1519,7 @@ function renderEditor(product) {
     if (!photosOpen) return renderPhotosClosed();
     const last = draft.images.length - 1;
     const tiles = draft.images.map((img, i) => h("div", { class: "panel-photo" },
-      h("img", { src: storeUrl(img.sm), alt: `Foto ${i + 1}` }),
+      h("img", { src: thumb(img), alt: `Foto ${i + 1}` }),
       i === 0 ? h("span", { class: "panel-photo__tag" }, "Portada") : null,
       h("button", { type: "button", class: "panel-photo__btn", "aria-label": `Quitar foto ${i + 1}`,
         onclick: () => { draft.images.splice(i, 1); renderPhotos(); } }, ico("close")),
@@ -1542,7 +1546,7 @@ function renderEditor(product) {
     photos.className = "panel-photos-closed";
     photosHelp.hidden = true;
     photos.replaceChildren(
-      cover ? h("img", { class: "panel-photos-closed__cover", src: storeUrl(cover.sm), alt: "Portada" })
+      cover ? h("img", { class: "panel-photos-closed__cover", src: thumb(cover), alt: "Portada" })
         : h("span", { class: "panel-photos-closed__empty" }, "Sin fotos"),
       h("div", { class: "panel-photos-closed__info" },
         sending.length ? h("p", { class: "panel-muted" }, `Subiendo… ${Math.min(...sending)}%`)
@@ -1570,7 +1574,7 @@ function renderEditor(product) {
       const found = state.br.products
         .filter((p) => p.images?.length && words.every((w) => normalText(`${p.brand ?? ""} ${p.name}`).includes(w)))
         .slice(0, 40);
-      list.replaceChildren(...(found.length ? found.map((p) => h("button", { type: "button", class: "panel-pick__item", onclick: (e) => choose(p, e.currentTarget) },
+      list.replaceChildren(...(found.length ? found.map((p) => h("button", { type: "button", class: "panel-pick__item", onclick: () => choose(p) },
         h("img", { src: p.images[0].sm || p.images[0].lg, alt: "", loading: "lazy" }),
         h("span", {}, p.name, h("small", { class: "panel-muted" },
           `${p.category === "g5" ? "Calidad G5" : "Brasil"} · ${p.images.length === 1 ? "1 foto" : `${p.images.length} fotos`}`))))
@@ -1590,21 +1594,30 @@ function renderEditor(product) {
     picker.hidden = true;
     picker.replaceChildren();
   }
-  async function choose(model, button) {
+  async function choose(model) {
     const room = state.limits.imagesPerProduct - draft.images.length - uploading;
     if (room <= 0) return toast(`Máximo ${state.limits.imagesPerProduct} fotos por producto.`, "error");
-    const done = await busy(button, async () => {
-      const result = await api("/foto-catalogo", { method: "POST", body: { id: model.id, room } });
-      draft.images.push(...result.images);
-      // Producto nuevo sin nombre: se completa con el del modelo (después se puede cambiar).
-      if (!name.value.trim()) name.value = model.name;
-      return result.images.length;
-    });
-    if (!done) return;
+    // Se cierra enseguida y se ven los cuadros "Guardando…" mientras se copian (como al subir una foto).
+    // Producto nuevo sin nombre: se completa con el del modelo (después se puede cambiar).
+    if (!name.value.trim()) name.value = model.name;
     closePicker();
+    const waiting = Array.from({ length: Math.min(room, model.images.length) }, () => ({}));
+    for (const key of waiting) progress.set(key, 100);
+    uploading += waiting.length;
     photosOpen = true;
     renderPhotos();
-    toast(done === 1 ? "Se agregó 1 foto." : `Se agregaron ${done} fotos.`);
+    try {
+      const result = await api("/foto-catalogo", { method: "POST", body: { id: model.id, room } });
+      result.images.forEach((img, i) => { const from = model.images[i]; if (from) previews.set(img, from.sm || from.lg); });
+      draft.images.push(...result.images);
+      toast(result.images.length === 1 ? "Se agregó 1 foto." : `Se agregaron ${result.images.length} fotos.`);
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      uploading -= waiting.length;
+      for (const key of waiting) progress.delete(key);
+      renderPhotos();
+    }
   }
   async function addPhotos(files) {
     fileInput.value = "";

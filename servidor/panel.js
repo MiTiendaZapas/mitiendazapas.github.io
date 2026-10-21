@@ -471,15 +471,14 @@ export async function copyPhotos(env, store, images) {
  */
 const BR_PHOTO_KEY = /^fotos\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(webp|jpg)$/;
 export async function copyBrPhotos(env, store, images, room) {
-  const copies = [];
-  for (const img of images.slice(0, room)) {
-    if (!BR_PHOTO_KEY.test(img?.lg ?? "")) continue;
-    const large = await env.CATALOGO.get(img.lg);
-    if (!large) continue;
+  // Todas a la vez (de a una tardaba varios segundos con 4 o 5 fotos).
+  const copies = await Promise.all(images.slice(0, room).map(async (img) => {
+    if (!BR_PHOTO_KEY.test(img?.lg ?? "")) return null;
+    const [large, small] = await Promise.all([env.CATALOGO.get(img.lg), BR_PHOTO_KEY.test(img.sm ?? "") ? env.CATALOGO.get(img.sm) : null]);
+    if (!large) return null;
     const largeBytes = await large.arrayBuffer();
     const type = imageType(largeBytes);
-    if (!type) continue;
-    const small = BR_PHOTO_KEY.test(img.sm ?? "") ? await env.CATALOGO.get(img.sm) : null;
+    if (!type) return null;
     const smallBytes = small ? await small.arrayBuffer() : null;
     const code = crypto.randomUUID();
     const files = { lg: `fotos/${code}-lg.${type}`, sm: `fotos/${code}-sm.${type}` };
@@ -488,9 +487,9 @@ export async function copyBrPhotos(env, store, images, room) {
       env.CATALOGO.put(`tiendas/${store}/${files.lg}`, largeBytes, { httpMetadata }),
       env.CATALOGO.put(`tiendas/${store}/${files.sm}`, smallBytes && imageType(smallBytes) === type ? smallBytes : largeBytes, { httpMetadata }),
     ]);
-    copies.push({ ...files, w: Math.round(Number(img.w)) || 900, h: Math.round(Number(img.h)) || 1200 });
-  }
-  return copies;
+    return { ...files, w: Math.round(Number(img.w)) || 900, h: Math.round(Number(img.h)) || 1200 };
+  }));
+  return copies.filter(Boolean);
 }
 
 /** Borra del depósito las fotos que ya no usa ningún producto. */
