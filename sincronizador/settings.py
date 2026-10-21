@@ -29,6 +29,12 @@ EXTRA_PROVIDERS = {
         "url": "https://app-beto-seven.vercel.app/api/catalogo",
         "category": "g5",
     },
+    # 21/10: la calidad Brasil de esa misma tienda ("Brasil 2"). Va en catalogo/productos-br2.json,
+    # que NO lee ninguna tienda: solo el catálogo para compartir de Fabri (/catalogo/fo/).
+    "beto_br": {
+        "url": "https://app-beto-seven.vercel.app/api/catalogo",
+        "category": "br2",
+    },
 }
 
 # Modelos de otro proveedor que son EL MISMO producto que uno de la tienda: su stock se

@@ -50,14 +50,15 @@ def _to_item(item, prefix):
     }
 
 
-def list_products():
+def list_products(line="G5", prefix="g5"):
+    """Calzado de una línea de su tienda (G5; la línea BR la toma proveedores/beto_br.py)."""
     products = []
     for item in _catalog()["productos"]:
-        if str(item.get("linea") or "").strip().upper() != "G5":
+        if str(item.get("linea") or "").strip().upper() != line:
             continue
         if str(item.get("categoria") or "").strip().lower() != "calzado":
             continue
-        products.append(_to_item(item, "g5"))
+        products.append(_to_item(item, prefix))
     return products
 
 
