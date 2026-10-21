@@ -1530,6 +1530,7 @@ function renderEditor(product) {
     photos.replaceChildren(...tiles, ...loading,
       ...(canAdd ? [h("button", { type: "button", class: "panel-photo panel-photo--add", onclick: () => fileInput.click() }, "+ Foto")] : []),
       h("button", { type: "button", class: "btn btn--outline btn--sm panel-photos__done", onclick: () => { photosOpen = false; renderPhotos(); } }, "Listo"),
+      canAdd ? catalogPhotosButton() : null,
       fileInput);
     photosHelp.hidden = false;
   }
@@ -1548,8 +1549,62 @@ function renderEditor(product) {
           : h("p", { class: "panel-muted" }, count ? (count === 1 ? "1 foto" : `${count} fotos`) : "Todavía no tiene fotos."),
         count
           ? h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { photosOpen = true; renderPhotos(); } }, "Ver y cambiar fotos")
-          : h("button", { type: "button", class: "btn btn--primary btn--sm", onclick: () => fileInput.click() }, "+ Agregar fotos")),
+          : h("button", { type: "button", class: "btn btn--primary btn--sm", onclick: () => fileInput.click() }, "+ Agregar fotos"),
+        count ? null : catalogPhotosButton()),
       fileInput);
+  }
+
+  // Fotos de un modelo del stock automático (ej. un par en liquidación): se buscan por nombre y se
+  // copian a la tienda, sin sacarle fotos de nuevo. Solo en tiendas con stock automático.
+  const picker = h("div", { class: "panel-pick", hidden: true });
+  function catalogPhotosButton() {
+    if (!state.br?.products?.length) return null;
+    return h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: openPicker }, ico("image"), "Usar fotos de un modelo");
+  }
+  const normalText = (text) => String(text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  function openPicker() {
+    const search = h("input", { class: "panel-input", type: "search", placeholder: "Buscá el modelo (ej: superstar)", autocomplete: "off", "aria-label": "Buscar modelo" });
+    const list = h("div", { class: "panel-pick__list" });
+    const paint = () => {
+      const words = normalText(search.value).split(/\s+/).filter(Boolean);
+      const found = state.br.products
+        .filter((p) => p.images?.length && words.every((w) => normalText(`${p.brand ?? ""} ${p.name}`).includes(w)))
+        .slice(0, 40);
+      list.replaceChildren(...(found.length ? found.map((p) => h("button", { type: "button", class: "panel-pick__item", onclick: (e) => choose(p, e.currentTarget) },
+        h("img", { src: p.images[0].sm || p.images[0].lg, alt: "", loading: "lazy" }),
+        h("span", {}, p.name, h("small", { class: "panel-muted" },
+          `${p.category === "g5" ? "Calidad G5" : "Brasil"} · ${p.images.length === 1 ? "1 foto" : `${p.images.length} fotos`}`))))
+        : [h("p", { class: "panel-muted" }, "No hay modelos con ese nombre.")]));
+    };
+    search.addEventListener("input", paint);
+    picker.replaceChildren(
+      h("div", { class: "panel-pick__head" }, h("strong", {}, "Usar fotos de un modelo"),
+        h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: closePicker }, "Cancelar")),
+      h("p", { class: "panel-muted" }, "Elegí el modelo y sus fotos se agregan a este producto."),
+      search, list);
+    picker.hidden = false;
+    paint();
+    search.focus();
+  }
+  function closePicker() {
+    picker.hidden = true;
+    picker.replaceChildren();
+  }
+  async function choose(model, button) {
+    const room = state.limits.imagesPerProduct - draft.images.length - uploading;
+    if (room <= 0) return toast(`Máximo ${state.limits.imagesPerProduct} fotos por producto.`, "error");
+    const done = await busy(button, async () => {
+      const result = await api("/foto-catalogo", { method: "POST", body: { id: model.id, room } });
+      draft.images.push(...result.images);
+      // Producto nuevo sin nombre: se completa con el del modelo (después se puede cambiar).
+      if (!name.value.trim()) name.value = model.name;
+      return result.images.length;
+    });
+    if (!done) return;
+    closePicker();
+    photosOpen = true;
+    renderPhotos();
+    toast(done === 1 ? "Se agregó 1 foto." : `Se agregaron ${done} fotos.`);
   }
   async function addPhotos(files) {
     fileInput.value = "";
@@ -1688,7 +1743,7 @@ function renderEditor(product) {
       h("a", { class: "btn btn--ghost btn--sm", href: "#productos" }, ico("chevronLeft"), "Volver"),
       h("h1", {}, product ? "Editar producto" : "Nuevo producto"),
       product && !product.hidden ? viewLink(product) : null),
-    h("section", { class: "panel-card" }, h("h2", {}, "Fotos"), photosHelp, photos),
+    h("section", { class: "panel-card" }, h("h2", {}, "Fotos"), photosHelp, photos, picker),
     // En el orden en que se piensa: fotos, qué es, qué talles hay, cuánto sale, y lo opcional.
     h("section", { class: "panel-card" }, h("h2", {}, "Datos"),
       field("f-name", "Nombre", name),

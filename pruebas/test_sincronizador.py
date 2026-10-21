@@ -14,7 +14,7 @@ import manual_stock  # noqa: E402
 import settings  # noqa: E402
 from classify import Classifier, clean_name, normalize, slugify  # noqa: E402
 from images import ImageStore  # noqa: E402
-from sync_catalog import build_products  # noqa: E402
+from sync_catalog import build_products, house_to_extras  # noqa: E402
 
 
 class TestNombres(unittest.TestCase):
@@ -202,6 +202,18 @@ class TestImagenes(unittest.TestCase):
         buffer = io.BytesIO()
         Image.new("RGBA", (40, 50), (255, 0, 0, 128)).save(buffer, "PNG")
         self.assertEqual(ImageStore._open_as_rgb(buffer.getvalue()).mode, "RGB")
+
+
+class TestStockDeCasaEnG5(unittest.TestCase):
+    def test_pares_de_casa_de_una_g5_se_suman_a_su_modelo_g5(self):
+        casa = {"name": "Nike Dunk Panda", "category": "zapatillas", "origin": ["casa"],
+                "sizes": [{"size": "40", "stock": 1, "casa": 1}, {"size": "42", "stock": 2, "casa": 2}]}
+        g5 = {"name": "Nike Dunk  panda", "category": "g5", "origin": ["beto_g5"], "sizes": [{"size": "40", "stock": 3}]}
+        otra = {"name": "Jordan 4", "category": "zapatillas", "origin": ["casa"], "sizes": [{"size": "41", "stock": 1, "casa": 1}]}
+        result = house_to_extras([casa, otra, g5], {"g5": {}})
+        self.assertEqual(result, [otra, g5])     # el modelo de casa suelto ya no está
+        self.assertEqual(g5["sizes"], [{"size": "40", "stock": 4, "casa": 1}, {"size": "42", "stock": 2, "casa": 2}])
+        self.assertEqual(g5["origin"], ["beto_g5", "casa"])
 
 
 if __name__ == "__main__":

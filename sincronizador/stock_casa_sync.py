@@ -89,10 +89,11 @@ PANEL_TIENDA = "laimp"
 PANEL_URL = os.environ.get("STOCK_CASA_PANEL_URL") or f"https://mitiendastock.com/api/tienda/{PANEL_TIENDA}/productos.json"
 PANEL_FOTOS = os.environ.get("STOCK_CASA_PANEL_FOTOS") or f"https://catalogo.mitiendastock.com/tiendas/{PANEL_TIENDA}/"
 # Lo ÚNICO del panel de L.A IMP que comparten las tiendas de clientes: el stock de casa de
-# zapatillas (pares propios en modelos del proveedor y productos propios de la categoría
-# "zapatillas"). Lo demás (Liquidación, ojotas, G5, indumentaria o cualquier categoría que se
-# agregue) queda solo en la tienda de L.A IMP. Pedido del usuario, 22/10.
-CATEGORIAS_COMPARTIDAS = {"zapatillas"}
+# zapatillas, ojotas y G5 (pares propios en modelos del proveedor y productos propios de esas
+# categorías). Lo demás (Liquidación, indumentaria o cualquier categoría que se agregue) queda
+# solo en la tienda de L.A IMP. Pedido del usuario, 22/10. Las G5 de casa se suman a su modelo
+# G5 en el sincronizador (ver sync_catalog.house_to_extras).
+CATEGORIAS_COMPARTIDAS = {"zapatillas", "ojotas", "g5"}
 
 
 def _bajar(url):

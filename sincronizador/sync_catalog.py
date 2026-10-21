@@ -165,6 +165,29 @@ def _photos_folder_index():
             if f.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")}
 
 
+def house_to_extras(products, extra_categories):
+    """Pares de casa de un modelo de un proveedor extra (G5): se suman a ESE modelo (con "casa" en
+    cada talle), no quedan como un modelo de casa suelto en el catálogo principal (se vería como
+    calidad Brasil). El stock de casa llega por nombre: si el nombre coincide con un modelo G5, es de ahí.
+    """
+    extras = {normalize(p["name"]): p for p in products if p["category"] in extra_categories}
+    kept = []
+    for product in products:
+        target = extras.get(normalize(product["name"])) if product["origin"] == ["casa"] else None
+        if target is None:
+            kept.append(product)
+            continue
+        sizes = {s["size"]: s for s in target["sizes"]}
+        for s in product["sizes"]:
+            pairs = s.get("casa", s["stock"])
+            entry = sizes.setdefault(s["size"], {"size": s["size"], "stock": 0})
+            entry["stock"] += pairs
+            entry["casa"] = entry.get("casa", 0) + pairs
+        target["sizes"] = sorted(sizes.values(), key=_size_sort_key)
+        target["origin"] = sorted(set(target["origin"]) | {"casa"})
+    return kept
+
+
 def extra_file(config):
     """Archivo propio de cada proveedor extra (ej. catalogo/productos-g5.json).
 
@@ -351,6 +374,7 @@ def run():
         previous_products += _read_products(extra_file(config))
     products += build_extra_products(classifier, {p["slug"] for p in products}, previous_products)
     extra_categories = {config["category"]: config for config in settings.EXTRA_PROVIDERS.values()}
+    products = house_to_extras(products, extra_categories)
     if args.only:
         wanted = {normalize(n) for n in args.only.split(";") if n.strip()}
         products = [p for p in products if normalize(p["name"]) in wanted]

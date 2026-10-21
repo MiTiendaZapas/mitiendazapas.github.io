@@ -464,6 +464,35 @@ export async function copyPhotos(env, store, images) {
   }));
 }
 
+/**
+ * Copia a la tienda las fotos de un modelo del stock automático (están en la raíz del depósito,
+ * "fotos/<modelo>/…"), con nombres nuevos de la tienda: el producto propio queda con sus fotos
+ * aunque el proveedor después borre ese modelo. Si una foto no tiene versión chica, va la grande.
+ */
+const BR_PHOTO_KEY = /^fotos\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(webp|jpg)$/;
+export async function copyBrPhotos(env, store, images, room) {
+  const copies = [];
+  for (const img of images.slice(0, room)) {
+    if (!BR_PHOTO_KEY.test(img?.lg ?? "")) continue;
+    const large = await env.CATALOGO.get(img.lg);
+    if (!large) continue;
+    const largeBytes = await large.arrayBuffer();
+    const type = imageType(largeBytes);
+    if (!type) continue;
+    const small = BR_PHOTO_KEY.test(img.sm ?? "") ? await env.CATALOGO.get(img.sm) : null;
+    const smallBytes = small ? await small.arrayBuffer() : null;
+    const code = crypto.randomUUID();
+    const files = { lg: `fotos/${code}-lg.${type}`, sm: `fotos/${code}-sm.${type}` };
+    const httpMetadata = { contentType: type === "jpg" ? "image/jpeg" : "image/webp", cacheControl: "public, max-age=31536000, immutable" };
+    await Promise.all([
+      env.CATALOGO.put(`tiendas/${store}/${files.lg}`, largeBytes, { httpMetadata }),
+      env.CATALOGO.put(`tiendas/${store}/${files.sm}`, smallBytes && imageType(smallBytes) === type ? smallBytes : largeBytes, { httpMetadata }),
+    ]);
+    copies.push({ ...files, w: Math.round(Number(img.w)) || 900, h: Math.round(Number(img.h)) || 1200 });
+  }
+  return copies;
+}
+
 /** Borra del depósito las fotos que ya no usa ningún producto. */
 export async function deletePhotos(env, store, images) {
   const keys = images.flatMap((img) => [img.lg, img.sm]).filter((p) => PHOTO_PATH.test(p)).map((p) => `tiendas/${store}/${p}`);
