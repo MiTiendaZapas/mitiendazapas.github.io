@@ -509,14 +509,16 @@ function renderGeneralPricing() {
     const wholesale = input(`gp-${key}-wholesale`, general.wholesale, "Opcional");
     const resaleUnit = TWO_VERSIONS ? input(`gp-${key}-r-unit`, general.mayorista?.price, "Opcional") : null;
     const resaleWholesale = TWO_VERSIONS ? input(`gp-${key}-r-wholesale`, general.mayorista?.wholesalePrice, "Opcional") : null;
-    return {
-      node: h("section", { class: "panel-card" }, h("h2", {}, title), h("p", { class: "panel-muted" }, help),
+    const fields = h("div", { class: "panel-gp__fields" }, h("p", { class: "panel-muted" }, help),
         h("div", { class: "panel-two" },
           field(`gp-${key}-unit`, TWO_VERSIONS ? "Precio al público" : "Precio", unit),
           field(`gp-${key}-wholesale`, TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale)),
         TWO_VERSIONS ? h("div", { class: "panel-two" },
           field(`gp-${key}-r-unit`, "Precio para revendedores", resaleUnit),
-          field(`gp-${key}-r-wholesale`, "Por mayor para revendedores", resaleWholesale)) : null),
+          field(`gp-${key}-r-wholesale`, "Por mayor para revendedores", resaleWholesale)) : null);
+    return {
+      node: h("section", { class: "panel-card" }, h("h2", {}, title), fields),
+      fields,
       read: () => ({
         unit: unit.value.replace(/\D/g, ""), wholesale: wholesale.value.replace(/\D/g, ""),
         ...(TWO_VERSIONS ? { mayorista: { price: resaleUnit.value.replace(/\D/g, ""), wholesalePrice: resaleWholesale.value.replace(/\D/g, "") } } : {}),
@@ -529,6 +531,13 @@ function renderGeneralPricing() {
   const g5 = block("g5", "Calidad G5", state.br?.options?.g5 === true
     ? "Un precio para todas las G5 que no tengan el suyo. Vacío = el precio de tu lista."
     : "Un precio para todas las G5 que no tengan el suyo. Mientras no tengan precio, las G5 no se ven en tu tienda.", "Ej: 30000");
+  // Vender G5 o no: apagadas, no se ven ni en la tienda ni acá (lo que cargó en ellas queda guardado).
+  const g5On = h("input", { id: "gp-g5-on", type: "checkbox", checked: current.g5Off !== true });
+  const paintG5 = () => { g5.fields.hidden = !g5On.checked; };
+  g5On.addEventListener("change", paintG5);
+  g5.node.insertBefore(h("label", { class: "panel-switch", for: "gp-g5-on" }, g5On, h("span", {}, "Vendo calidad G5"),
+    h("small", { class: "panel-muted" }, "Si lo apagás, las G5 no se ven en tu tienda ni en tu panel. Lo que les cargaste queda guardado por si las volvés a prender.")), g5.fields);
+  paintG5();
   const modes = h("div", { class: "panel-pc__choices", role: "radiogroup", "aria-label": "Modelos nuevos" });
   const paintModes = () => modes.replaceChildren(...[["auto", "Que aparezcan solos con el precio general"], ["manual", "Que esperen a que les ponga precio"]]
     .map(([value, label]) => h("button", { type: "button", class: "panel-chip", role: "radio", "aria-checked": String(mode === value), "aria-pressed": String(mode === value),
@@ -538,7 +547,7 @@ function renderGeneralPricing() {
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
     const done = await busy(saveButton, async () => {
-      await api("/precios-generales", { method: "POST", body: { mode, br: br.read(), g5: g5.read() } });
+      await api("/precios-generales", { method: "POST", body: { mode, br: br.read(), g5: g5.read(), g5Off: !g5On.checked } });
       await loadData();
       return true;
     });
@@ -557,7 +566,7 @@ function renderGeneralPricing() {
       h("p", { class: "panel-muted" }, "Si elegís esperar, los nuevos aparecen en “Sin precio, no se ven” y en Inicio, para que les pongas precio.")),
     h("div", { class: "panel-savebar" }, saveButton));
   show(form);
-  const snapshot = () => JSON.stringify([mode, br.read(), g5.read()]);
+  const snapshot = () => JSON.stringify([mode, br.read(), g5.read(), g5On.checked]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -2158,6 +2167,7 @@ function renderHelp() {
     ["Sumar los pares que tengo en mi casa", "En el modelo tocá “Mis pares” y sumá con “+” en cada talle (con “+ Talle” agregás uno que Brasil no tiene). Desde ahí el modelo aparece también en “Mis productos”, con sus pares siempre a la vista."],
     ["Mi precio en un modelo", "Tocá “Editar” en el modelo y escribí tu precio. Si lo dejás vacío, se cobra el precio general (o el precio base que ya trae)."],
     ["Un precio para todos", "En “Stock automático” → “Precios generales” ponés un precio para todos los modelos de Brasil y otro para las G5."],
+    ["No quiero vender G5", "En “Stock automático” → “Precios generales”, apagá “Vendo calidad G5”. Las G5 dejan de verse en tu tienda y en tu panel; si algún día las querés, las volvés a prender."],
     ["Ocultar un modelo", "Con “Ocultar” deja de verse en tu tienda. Con “Mostrar” vuelve."],
     ["Vender otras cosas (ropa, accesorios…)", "En “Mis productos” → “Nuevo producto”, con tus fotos y la categoría que elijas."],
   );

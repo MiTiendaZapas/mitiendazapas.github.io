@@ -17,6 +17,8 @@
 
 .panel-main { display: grid; gap: var(--space-3); max-width: 760px; margin: 0 auto; padding: var(--space-4) var(--gutter); }
 .panel-card { display: grid; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-card); background: var(--color-surface); }
+.panel-gp__fields { display: grid; gap: var(--space-3); }
+.panel-gp__fields[hidden] { display: none; }
 .panel-card h1, .panel-card h2 { font-family: var(--font-body); font-size: 18px; font-weight: 700; letter-spacing: 0; text-transform: none; }
 .panel-input {
   width: 100%;

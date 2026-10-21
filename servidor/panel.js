@@ -122,7 +122,10 @@ export const MAX_CATEGORIES = 40;
 export function storeCategories(data) {
   const categories = {};
   if (data.stockBR) for (const id of brCategoryIds(data)) if (!Object.hasOwn(data.categories ?? {}, id)) categories[id] = BR_CATEGORIES[id];
-  return Object.assign(categories, data.categories ?? {});
+  Object.assign(categories, data.categories ?? {});
+  // G5 apagadas: su categoría no se ve (queda guardada con su nombre por si las vuelve a prender).
+  if (data.stockBR && g5Off(data)) delete categories.g5;
+  return categories;
 }
 
 /** Busca la categoría por su código o por su nombre (sin importar mayúsculas); si no existe, la crea. */
@@ -158,6 +161,7 @@ export function cleanCategories(input, data) {
   if (inUse) throw new Error(`No se puede borrar "${current[inUse.category] ?? inUse.category}": la usa "${inUse.name}". Cambiale la categoría primero.`);
   const brMissing = data.stockBR ? brCategoryIds(data).find((id) => !Object.hasOwn(result, id)) : null;
   if (brMissing) throw new Error(`"${current[brMissing] ?? BR_CATEGORIES[brMissing]}" es la categoría del stock de Brasil: se puede renombrar, pero no borrar.`);
+  if (data.stockBR && g5Off(data) && Object.hasOwn(data.categories ?? {}, "g5") && !Object.hasOwn(result, "g5")) result.g5 = data.categories.g5;
   return result;
 }
 
@@ -271,8 +275,10 @@ export function publicCatalog(data) {
 //         Sin esto, las G5 recién se ven cuando el cliente les pone precio.
 export const BR_CATEGORIES = { zapatillas: "Zapatillas", ojotas: "Ojotas", g5: "Calidad G5" };
 // Todas las tiendas con stock de Brasil reciben también la calidad G5 (19/10). Las G5 se ven
-// recién cuando el cliente les pone precio (ver precios generales).
-const brCategoryIds = () => ["zapatillas", "ojotas", "g5"];
+// recién cuando el cliente les pone precio (ver precios generales). Si el cliente no las quiere,
+// las apaga en "Precios generales" (data.pricing.g5Off): no se ven ni en la tienda ni en su panel.
+const g5Off = (data) => data.pricing?.g5Off === true;
+const brCategoryIds = (data) => (g5Off(data) ? ["zapatillas", "ojotas"] : ["zapatillas", "ojotas", "g5"]);
 const BR_FILES_URL = "https://catalogo.mitiendastock.com/";
 const MAX_EXTRA_SIZES = 30;
 
@@ -347,12 +353,13 @@ export function brProducts(data, br) {
   const seen = new Set();
   // Sin stock de casa, los modelos que son SOLO de casa no van (quedarían sin pares).
   const withHouse = data.stockBR?.casa === true;
-  const list = br.products.filter((p) => withHouse || !(Array.isArray(p.origin) && p.origin.length && p.origin.every((o) => o === "casa"))).map((p) => {
+  const list = br.products.filter((p) => withHouse || !(Array.isArray(p.origin) && p.origin.length && p.origin.every((o) => o === "casa")))
+    .filter((p) => !(g5Off(data) && isG5(p))).map((p) => {
     seen.add(p.id);
     return withChanges(brModel(p, data.stockBR), changes[p.id]);
   });
   for (const [id, change] of Object.entries(changes)) {
-    if (!seen.has(id) && change.model && change.extra) list.push(withChanges({ ...change.model, id, sizes: [] }, change));
+    if (!seen.has(id) && change.model && change.extra && !(g5Off(data) && isG5(change.model))) list.push(withChanges({ ...change.model, id, sizes: [] }, change));
   }
   for (const product of list) product.status = visibility(product, data);
   return list;
@@ -383,7 +390,8 @@ export function cleanGeneralPricing(input) {
     const resale = cleanResale(value?.mayorista);
     return { unit, wholesale, ...(resale ? { mayorista: resale } : {}) };
   };
-  return { mode: input?.mode === "manual" ? "manual" : "auto", br: block(input?.br, "los modelos de Brasil"), g5: block(input?.g5, "las G5") };
+  return { mode: input?.mode === "manual" ? "manual" : "auto", br: block(input?.br, "los modelos de Brasil"), g5: block(input?.g5, "las G5"),
+    ...(input?.g5Off === true ? { g5Off: true } : {}) };
 }
 
 /** Lo que ve el público en una tienda con stock de Brasil. */
