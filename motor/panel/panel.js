@@ -778,14 +778,17 @@ function renderOwnProducts() {
   function renderChips() {
     // Orden: Todos · tus categorías · Zapatillas BR · Ojotas BR · Zapatillas G5 · Sin stock · Pausados.
     const fixed = state.br ? ["zapatillas", "ojotas", "g5"] : [];
+    // Cada categoría con cuántos tiene; las vacías no se muestran (llevaban a una lista vacía).
+    const inCategory = (id) => state.products.filter((p) => p.category === id).length + brWithPairs().filter((p) => p.category === id).length;
+    const categoryChip = (id, label) => { const n = inCategory(id); return n || state.filter === `cat:${id}` ? { id: `cat:${id}`, label: `${label} (${n})` } : null; };
     const options = [
       { id: "todos", label: `Todos (${state.products.length + brWithPairs().length})` },
-      ...Object.entries(state.categories).filter(([id]) => !fixed.includes(id)).map(([id, label]) => ({ id: `cat:${id}`, label })),
-      ...fixed.filter((id) => Object.hasOwn(state.categories, id)).map((id) => ({ id: `cat:${id}`, label: ownListLabel(id) })),
+      ...Object.entries(state.categories).filter(([id]) => !fixed.includes(id)).map(([id, label]) => categoryChip(id, label)),
+      ...fixed.filter((id) => Object.hasOwn(state.categories, id)).map((id) => categoryChip(id, ownListLabel(id))),
       { id: "sin-stock", label: `Sin stock (${state.products.filter((p) => totalStock(p) === 0).length})` },
       { id: "pausados", label: `Pausados (${state.products.filter((p) => p.hidden).length + brWithPairs().filter((p) => p.hidden).length})` },
     ];
-    chips.replaceChildren(...options.map((o) => h("button", { type: "button", class: "panel-chip", "aria-pressed": String(state.filter === o.id),
+    chips.replaceChildren(...options.filter(Boolean).map((o) => h("button", { type: "button", class: "panel-chip", "aria-pressed": String(state.filter === o.id),
       onclick: () => { state.filter = o.id; renderChips(); renderItems(); } }, o.label)));
   }
   function renderItems() {

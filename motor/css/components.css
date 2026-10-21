@@ -366,8 +366,9 @@
   height: 30px;
   padding: 0 6px;
   border-radius: var(--radius-pill);
-  background: rgb(0 0 0 / 0.85);
-  color: var(--color-accent-strong);
+  /* Sobre el color de la barra (oscuro en modo claro, claro en oscuro): antes era negro sobre negro. */
+  background: color-mix(in srgb, var(--color-accent-contrast) 20%, transparent);
+  color: var(--color-accent-contrast);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }

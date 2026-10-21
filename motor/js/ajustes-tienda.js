@@ -52,9 +52,10 @@ export function applyStoreSettings(config, channel, settings) {
       for (const name of ["accent", "accent-strong", "accent-gradient"]) document.documentElement.style.setProperty(`--color-${name}`, settings.color);
     }
   }
-  // Portada: "Nombre · Catálogo". Otras páginas: "Cómo comprar · Nombre".
+  // Portada: "Nombre · Catálogo" (en la de revendedores, "Nombre · Por mayor"). Otras páginas: "Cómo comprar · Nombre".
+  const firstChannel = Object.values(config.channels ?? {})[0];
   document.title = document.body.matches("[data-channel]")
-    ? `${settings.name} · Catálogo`
+    ? `${settings.name} · ${channel && channel !== firstChannel ? channel.label ?? "Catálogo" : "Catálogo"}`
     : `${document.title.split(" · ")[0]} · ${settings.name}`;
 }
 

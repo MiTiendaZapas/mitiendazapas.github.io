@@ -272,9 +272,10 @@
   left: 8px;
   padding: 3px 8px;
   border-radius: var(--radius-pill);
-  background: var(--color-danger);
+  /* Un poco más oscuro que el rojo del tema: en modo oscuro el blanco no se leía bien (contraste 3,5). */
+  background: color-mix(in srgb, var(--color-danger) 82%, #000);
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .last-pair__name { overflow: hidden; font-size: 13px; font-weight: 600; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }

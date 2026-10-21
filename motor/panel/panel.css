@@ -607,7 +607,7 @@
   .panel-size-row { grid-template-columns: minmax(0, 1fr) 36px; grid-template-areas: "name remove" "qty qty"; align-items: center; row-gap: 6px; padding: 8px; }
   .panel-size-row__label { grid-area: name; }
   .panel-size-row__label small, .panel-size-row__qty small { display: none; }
-  .panel-size-row__name { min-height: 40px; text-align: center; }
+  .panel-size-row__name { min-height: 44px; text-align: center; }
   .panel-size-row__remove { grid-area: remove; }
   .panel-size-row__qty { grid-area: qty; }
   .panel-size-row__qty .panel-stepper { justify-content: space-between; width: 100%; }
@@ -743,3 +743,8 @@
 }
 @media (max-width: 1023px) { .panel-top .panel-top__title > .panel-top__avatar { display: grid; } }
 .panel-jump > .panel-muted { flex: none; white-space: nowrap; }
+/* Tablet (táctil): pestañas de arriba e índice de Mi tienda con 44 de alto */
+@media (min-width: 700px) and (max-width: 1023px) {
+  .panel-tab { min-height: 44px; display: inline-flex; align-items: center; }
+  .panel-jump .panel-chip { min-height: 44px; }
+}

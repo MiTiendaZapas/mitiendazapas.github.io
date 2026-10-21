@@ -61,3 +61,26 @@
 
 /* Páginas de información */
 [data-density="compacta"] .page-hero__title { font-size: clamp(30px, 8vw, 48px); }
+
+/* Letra de 12 como mínimo (antes había textos de 10 y 11, difíciles de leer en el celular) */
+[data-density="compacta"] .price__bulk,
+.brand__channel, .brand-tile__count, .last-pair__badge, .product-card__brand { font-size: 12px; }
+
+/*
+ * Pantallas táctiles (celular y tablet): todo lo que se toca mide al menos 44 px (lo recomendado
+ * para el dedo). En la computadora sigue el tamaño compacto. Revisión 23/10.
+ */
+@media (pointer: coarse), (max-width: 1023px) {
+  :root[data-density="compacta"] { --tap: 44px; }
+  [data-density="compacta"] .topbar__inner, [data-density="compacta"] .topbar__link { min-height: 44px; }
+  [data-density="compacta"] .add-btn { min-height: 44px; }
+  [data-density="compacta"] .size-chip,
+  [data-density="compacta"] .product-view__sizes .size-chip { min-width: 44px; height: 44px; }
+  [data-density="compacta"] .stepper--sm .stepper__btn, .stepper--sm .stepper__btn { width: 44px; height: 44px; }
+  .cart-line__remove, .filter-pill, .filter-check, .quality-tab, .brand-chip, .site-header .brand { min-height: 44px; }
+  .cart-line__name-btn { min-height: 44px; text-align: left; }
+  .gallery__arrow { width: 44px; height: 44px; }
+  .footer-whatsapp { min-height: 44px; }
+  .breadcrumb a { display: inline-flex; align-items: center; min-height: 44px; }
+  .site-header__menu { flex: none; }
+}
