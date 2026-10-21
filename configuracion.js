@@ -138,13 +138,11 @@ window.STORE_CONFIG = {
       // "Compartir" de cada modelo: las fotos con nombre y talles, sin precio ni link,
       // para que el revendedor se las mande a su cliente.
       share: "fotos",
-      // Al pie: aviso para que el revendedor tenga su propia tienda (solo calidad BR).
+      // Al pie: aviso grande "¿Querés una tienda así?" (lleva a mitiendastock.com).
       platformPromo: {
-        title: "¿Querés tu propia tienda para revender?",
-        text: "Te armamos una tienda como esta con tu nombre, tu logo y tus precios. El stock de calidad BR se actualiza solo y los pedidos te llegan a tu WhatsApp.",
-        whatsapp: "5491153773771",
+        title: "¿Querés una tienda así para tu negocio?",
+        text: "Te armamos tu tienda online con tu nombre, tu logo y tus productos. Tus clientes arman el pedido y te llega listo a tu WhatsApp. La manejás desde el celular, rápido y fácil.",
         ctaLabel: "Quiero mi tienda",
-        message: "¡Hola! Vi la tienda de revendedores de {tienda} y quiero mi propia tienda con el stock BR.",
       },
       // Versión para revendedores: sin portada, directo al catálogo. Solo una
       // franja finita con lo que hay que saber para comprar.
