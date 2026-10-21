@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es-AR" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Catálogo · Stock disponible</title>
+  <meta name="description" content="Modelos y talles disponibles, actualizados todo el tiempo.">
+  <meta name="theme-color" content="#ffffff">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="es_AR">
+  <meta property="og:title" content="Catálogo · Stock disponible">
+  <meta property="og:description" content="Mirá los modelos y talles que hay ahora.">
+  <!-- Antes de dibujar: el tema que eligió la persona (claro si nunca eligió). -->
+  <script>try { if (localStorage.getItem("catalogo:tema") === "dark") document.documentElement.dataset.theme = "dark"; } catch {}</script>
+  <link rel="stylesheet" href="/motor/catalogo/catalogo.css">
+  <script type="module" src="/motor/catalogo/catalogo.js"></script>
+</head>
+<!-- data-stock: de qué tienda es el stock (lo cambia herramientas/publicar_cloudflare.py en cada copia). -->
+<body data-stock="laimp">
+  <a class="c-skip" href="#modelos">Ir a los modelos</a>
+  <header class="c-header">
+    <div class="c-wrap c-header__inner">
+      <div class="c-header__title">
+        <h1>Catálogo</h1>
+        <p class="c-muted" id="actualizado">Cargando stock…</p>
+      </div>
+      <div class="c-header__actions">
+        <button class="c-icon-btn" type="button" id="compartir" aria-label="Compartir el catálogo"></button>
+        <button class="c-icon-btn" type="button" id="tema"></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="c-wrap">
+    <div class="c-quality" id="calidad" hidden>
+      <h2 class="c-filter__title">Calidad</h2>
+      <div class="c-quality__options" role="tablist" aria-label="Calidad"></div>
+    </div>
+    <p class="c-quality-note c-muted" id="calidad-nota" hidden></p>
+
+    <div class="c-layout">
+      <section class="c-filters" aria-label="Filtros">
+        <div class="c-search">
+          <label class="c-sr" for="buscar">Buscar modelo</label>
+          <input class="c-search__input" id="buscar" type="search" placeholder="Buscar modelo…" autocomplete="off" enterkeyhint="search">
+          <button class="c-search__clear" type="button" id="buscar-borrar" aria-label="Borrar búsqueda" hidden></button>
+        </div>
+        <div class="c-filter" id="f-categoria" hidden>
+          <h2 class="c-filter__title">Tipo</h2>
+          <div class="c-chips" role="group" aria-label="Tipo"></div>
+        </div>
+        <div class="c-filter">
+          <h2 class="c-filter__title">Marca</h2>
+          <div class="c-chips c-chips--scroll" id="f-marca" role="group" aria-label="Marca"></div>
+        </div>
+        <div class="c-filter">
+          <h2 class="c-filter__title">Tu talle</h2>
+          <div class="c-chips c-chips--scroll" id="f-talle" role="group" aria-label="Talle"></div>
+        </div>
+      </section>
+
+      <div class="c-main">
+        <div class="c-results">
+          <p id="cantidad" role="status" aria-live="polite"></p>
+          <div class="c-results__actions">
+            <button class="c-link" type="button" id="limpiar" hidden>Limpiar filtros</button>
+            <label class="c-sr" for="orden">Ordenar</label>
+            <select class="c-select" id="orden">
+              <option value="marca">Marca y modelo (A-Z)</option>
+              <option value="talles">Más talles disponibles</option>
+            </select>
+          </div>
+        </div>
+        <ul class="c-grid" id="modelos" aria-busy="true"></ul>
+      </div>
+    </div>
+  </main>
+
+  <!-- Al pie: aviso grande "¿Querés un catálogo así?" (lleva a mitiendastock.com, igual que en las tiendas). -->
+  <aside class="c-promo" aria-labelledby="c-promo-titulo">
+    <div class="c-wrap c-promo__inner">
+      <div>
+        <h2 id="c-promo-titulo">¿Querés un catálogo así para tu negocio?</h2>
+        <p class="c-muted">Te armamos tu catálogo online con tu nombre y tus productos: tus clientes ven el stock con fotos y talles, siempre al día, y lo pueden reenviar.</p>
+      </div>
+      <a class="c-btn c-btn--ghost" href="https://mitiendastock.com/?desde=catalogo" target="_blank" rel="noopener">Quiero mi catálogo</a>
+    </div>
+  </aside>
+
+  <dialog class="c-sheet" id="ficha" aria-labelledby="ficha-titulo"></dialog>
+  <div class="c-toast" id="aviso" role="status" aria-live="polite"></div>
+</body>
+</html>

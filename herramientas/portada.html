@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Mi Tienda Stock · Tu tienda online que vende por WhatsApp</title>
-  <meta name="description" content="Tu tienda online con tu nombre y tu logo: catálogo con talles y stock, pedidos que te llegan armados al WhatsApp y un panel para manejar todo desde el celular.">
+  <title>Mi Tienda Stock · Tiendas y catálogos online para tu negocio</title>
+  <meta name="description" content="Tiendas y catálogos online con tu nombre: tus productos con fotos, talles y stock al día. Con la tienda, los pedidos te llegan armados al WhatsApp; con el catálogo, mandás tu stock a quien quieras.">
   <meta name="theme-color" content="#f5f5f3">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="es_AR">
-  <meta property="og:title" content="Mi Tienda Stock · Tu tienda online que vende por WhatsApp">
-  <meta property="og:description" content="Catálogo con talles y stock, pedidos armados al WhatsApp y un panel fácil desde el celular.">
+  <meta property="og:title" content="Mi Tienda Stock · Tiendas y catálogos online para tu negocio">
+  <meta property="og:description" content="Tu tienda o tu catálogo online, con tu nombre y tu stock siempre al día. Rápido y fácil desde el celular.">
   <link rel="stylesheet" href="/motor/fuentes/fuentes.css">
   <style>
     :root {
@@ -100,6 +100,17 @@
     .card h3 { margin: 0 0 6px; font-size: 18px; line-height: 1.3; }
     .card p { margin: 0; color: var(--muted); }
 
+    .choose { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+    .choose li { display: grid; gap: 14px; align-content: start; padding: 22px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    section.alt .choose li { background: var(--bg); }
+    .choose h3 { margin: 0; font-size: 28px; }
+    .choose p { margin: 0; color: var(--muted); }
+    .choose ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .choose ul li { display: flex; gap: 8px; align-items: flex-start; padding: 0; border: 0; background: none; }
+    section.alt .choose ul li { background: none; }
+    .choose ul svg { flex: none; width: 20px; height: 20px; margin-top: 2px; color: var(--wa); }
+    .choose .btn { justify-self: start; }
+    .final .actions { justify-content: center; max-width: 640px; margin-inline: auto; }
     .steps { counter-reset: paso; display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
     .steps li { counter-increment: paso; display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: start; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
     .steps li::before { content: counter(paso); display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: var(--accent-contrast); font-weight: 800; font-size: 18px; }
@@ -127,6 +138,7 @@
 
     @media (min-width: 720px) {
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .choose { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .steps li { grid-template-columns: 1fr; }
       }
@@ -139,30 +151,34 @@
   </style>
 </head>
 <body>
-  <!-- Muchos llegan desde la tienda de un cliente queriendo hablar con su dueño: se aclara arriba de todo. -->
+  <!-- Muchos llegan desde la tienda o el catálogo de un cliente queriendo hablar con su dueño: se aclara arriba de todo. -->
   <div class="notice" role="note" hidden>
     <div class="wrap notice__inner">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-      <p style="margin:0"><strong>¿Querías comprar en una tienda?</strong> Cada tienda la atiende su dueño: volvé a esa tienda y mandale tu pedido por WhatsApp desde ahí. Acá te contamos cómo tener <strong>tu propia tienda</strong>.</p>
+      <p style="margin:0"><strong>¿Querías comprar?</strong> Cada tienda y cada catálogo lo atiende su dueño: volvé ahí y escribile por WhatsApp. Acá te contamos cómo tener <strong>tu propia tienda o tu propio catálogo</strong>.</p>
     </div>
   </div>
 
   <header class="wrap top">
     <a class="brand display" href="/">Mi Tienda Stock</a>
-    <a class="small" href="#como-funciona">Cómo funciona</a>
+    <a class="small" href="#tienda-o-catalogo">Tienda o catálogo</a>
   </header>
 
   <main>
     <div class="hero">
       <div class="wrap hero__grid">
         <div>
-          <span class="eyebrow">Tiendas online para vender por WhatsApp</span>
-          <h1 class="display">Tu tienda online <span>lista para vender</span></h1>
-          <p class="lead">Tus clientes arman el pedido y te llega listo a tu WhatsApp. Vos manejás todo desde el celular, rápido y fácil.</p>
+          <span class="eyebrow">Tiendas y catálogos online para tu negocio</span>
+          <h1 class="display">Tu tienda o tu catálogo <span>online, listo para vender</span></h1>
+          <p class="lead">Tus productos con fotos, talles y stock al día, en un link con tu nombre. Con la tienda, tus clientes arman el pedido y te llega listo a tu WhatsApp. Con el catálogo, mandás tu stock a quien quieras.</p>
           <div class="actions">
             <a class="btn btn--wa" data-wa href="https://wa.me/5491153773771?text=%C2%A1Hola!%20Estoy%20interesado%20en%20tener%20una%20tienda%20online%20para%20mi%20negocio.%20%C2%BFMe%20cont%C3%A1s%20c%C3%B3mo%20funciona%3F" target="_blank" rel="noopener">
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.8-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3Z"/></svg>
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z"/></svg>
               Quiero mi tienda
+            </a>
+            <a class="btn btn--ghost" href="https://wa.me/5491153773771?text=%C2%A1Hola!%20Estoy%20interesado%20en%20tener%20un%20cat%C3%A1logo%20online%20para%20mi%20negocio.%20%C2%BFMe%20cont%C3%A1s%20c%C3%B3mo%20funciona%3F" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z"/></svg>
+              Quiero mi catálogo
             </a>
           </div>
           <ul class="checks">
@@ -189,9 +205,38 @@
       </div>
     </div>
 
-    <section class="alt" aria-labelledby="ventajas">
+    <section class="alt" id="tienda-o-catalogo" aria-labelledby="elegi">
       <div class="wrap">
-        <h2 class="section-title display" id="ventajas">Todo lo que necesitás para vender</h2>
+        <h2 class="section-title display" id="elegi">Tienda o catálogo: elegí el tuyo</h2>
+        <p class="section-lead">Los dos con tu nombre, tus productos y tu stock siempre al día.</p>
+        <ul class="choose">
+          <li>
+            <h3 class="display">Tienda online</h3>
+            <p>Para vender: tus clientes ven los precios, arman el pedido y te llega listo a tu WhatsApp.</p>
+            <ul>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Precios por unidad y por mayor, y ofertas</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Pedidos armados al WhatsApp, con el total</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Panel en el celular para cargar productos, stock y precios</li>
+            </ul>
+            <a class="btn btn--wa" href="https://wa.me/5491153773771?text=%C2%A1Hola!%20Estoy%20interesado%20en%20tener%20una%20tienda%20online%20para%20mi%20negocio.%20%C2%BFMe%20cont%C3%A1s%20c%C3%B3mo%20funciona%3F" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z"/></svg>Quiero mi tienda</a>
+          </li>
+          <li>
+            <h3 class="display">Catálogo online</h3>
+            <p>Para mostrar: tu stock con fotos y talles, sin precios ni pedidos. Ideal para mandarle a tus clientes y a tus revendedores, que lo pueden reenviar.</p>
+            <ul>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Filtros por marca, talle y tipo para encontrar rápido</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Cada modelo con todas sus fotos y los talles que hay</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Botón para mandar la foto de un modelo por WhatsApp</li>
+            </ul>
+            <a class="btn btn--ghost" href="https://wa.me/5491153773771?text=%C2%A1Hola!%20Estoy%20interesado%20en%20tener%20un%20cat%C3%A1logo%20online%20para%20mi%20negocio.%20%C2%BFMe%20cont%C3%A1s%20c%C3%B3mo%20funciona%3F" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z"/></svg>Quiero mi catálogo</a>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section aria-labelledby="ventajas">
+      <div class="wrap">
+        <h2 class="section-title display" id="ventajas">Todo lo que trae la tienda</h2>
         <p class="section-lead">Una tienda simple para tus clientes y fácil de manejar para vos. Sin carritos complicados ni pagos por la web: el pedido llega a tu WhatsApp y lo cerrás como siempre.</p>
         <ul class="cards">
           <li class="card">
@@ -223,19 +268,19 @@
       </div>
     </section>
 
-    <section id="como-funciona" aria-labelledby="pasos">
+    <section class="alt" id="como-funciona" aria-labelledby="pasos">
       <div class="wrap">
         <h2 class="section-title display" id="pasos">Cómo funciona</h2>
-        <p class="section-lead">En pocos pasos tenés tu tienda funcionando.</p>
+        <p class="section-lead">En pocos pasos tenés tu tienda o tu catálogo funcionando.</p>
         <ol class="steps">
-          <li><div><h3>Nos escribís</h3><p>Contanos qué vendés y cómo se llama tu negocio.</p></div></li>
-          <li><div><h3>Armamos tu tienda</h3><p>Con tu nombre, tu logo y tus productos. Te pasamos tu usuario para el panel.</p></div></li>
-          <li><div><h3>Compartís y vendés</h3><p>Pasás tu link y los pedidos te llegan armados a tu WhatsApp.</p></div></li>
+          <li><div><h3>Nos escribís</h3><p>Contanos qué vendés, cómo se llama tu negocio y si querés tienda o catálogo.</p></div></li>
+          <li><div><h3>Lo armamos</h3><p>Con tu nombre, tu logo y tus productos. Te pasamos tu link listo para usar.</p></div></li>
+          <li><div><h3>Compartís y vendés</h3><p>Pasás tu link por Instagram, estados y grupos, y tus clientes te escriben por WhatsApp.</p></div></li>
         </ol>
       </div>
     </section>
 
-    <section class="alt" aria-labelledby="para-quien">
+    <section aria-labelledby="para-quien">
       <div class="wrap">
         <h2 class="section-title display" id="para-quien">Para todo tipo de negocio</h2>
         <p class="section-lead">Sirve para lo que vendas, con talles o sin talles.</p>
@@ -246,37 +291,38 @@
     </section>
 
 
-    <section aria-labelledby="preguntas">
+    <section class="alt" aria-labelledby="preguntas">
       <div class="wrap">
         <h2 class="section-title display" id="preguntas">Preguntas frecuentes</h2>
         <div class="faq">
           <details><summary>¿Cómo me pagan mis clientes?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>Como ya lo hacés: el pedido te llega por WhatsApp y ahí acordás el pago y el envío con tu cliente. En la tienda no se cobra nada.</p></details>
-          <details><summary>¿Puedo vender ropa u otras cosas?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>Sí. Podés cargar cualquier producto, con talles (ropa, calzado) o sin talles (perfumes, accesorios…), y organizarlos en tus propias categorías.</p></details>
-          <details><summary>¿Cuánto cuesta?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>$25.000 por mes.</p></details>
+          <details><summary>¿Puedo mostrar ropa u otras cosas?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>Sí. Podés cargar cualquier producto, con talles (ropa, calzado) o sin talles (perfumes, accesorios…), y organizarlos en tus propias categorías.</p></details>
+          <details><summary>¿Cuál es la diferencia entre tienda y catálogo?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>La tienda muestra precios y tus clientes te mandan el pedido armado por WhatsApp. El catálogo muestra solo fotos, talles y stock, sin precios ni pedidos: sirve para que tus clientes vean qué hay y te escriban, o para pasárselo a tus revendedores.</p></details>
+          <details><summary>¿Cuánto cuesta?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>$25.000 por mes, la tienda o el catálogo.</p></details>
         </div>
       </div>
     </section>
 
-    <section class="final alt" aria-labelledby="empezar">
+    <section class="final" aria-labelledby="empezar">
       <div class="wrap">
-        <h2 class="section-title display" id="empezar">¿Arrancamos con tu tienda?</h2>
-        <p class="section-lead">Escribinos y te contamos cómo quedaría la tuya.</p>
-        <a class="btn btn--wa" data-wa href="https://wa.me/5491153773771?text=%C2%A1Hola!%20Estoy%20interesado%20en%20tener%20una%20tienda%20online%20para%20mi%20negocio.%20%C2%BFMe%20cont%C3%A1s%20c%C3%B3mo%20funciona%3F" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z"/></svg>
-          Quiero mi tienda
-        </a>
+        <h2 class="section-title display" id="empezar">¿Arrancamos con el tuyo?</h2>
+        <p class="section-lead">Escribinos y te contamos cómo quedaría tu tienda o tu catálogo.</p>
+        <div class="actions">
+          <a class="btn btn--wa" data-wa href="https://wa.me/5491153773771?text=%C2%A1Hola!%20Estoy%20interesado%20en%20tener%20una%20tienda%20online%20para%20mi%20negocio.%20%C2%BFMe%20cont%C3%A1s%20c%C3%B3mo%20funciona%3F" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z"/></svg>Quiero mi tienda</a>
+          <a class="btn btn--ghost" href="https://wa.me/5491153773771?text=%C2%A1Hola!%20Estoy%20interesado%20en%20tener%20un%20cat%C3%A1logo%20online%20para%20mi%20negocio.%20%C2%BFMe%20cont%C3%A1s%20c%C3%B3mo%20funciona%3F" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Z"/></svg>Quiero mi catálogo</a>
+        </div>
       </div>
     </section>
   </main>
 
   <footer>
     <div class="wrap">
-      <span>Mi Tienda Stock · Tiendas online para vender por WhatsApp</span>
+      <span>Mi Tienda Stock · Tiendas y catálogos online para tu negocio</span>
       <span>¿Ya tenés tu tienda? Entrá a tu panel desde el link que te pasamos.</span>
     </div>
   </footer>
   <script>
-    // El aviso "¿Querías comprar en una tienda?" solo para quien llega desde el link de una tienda.
+    // El aviso "¿Querías comprar?" solo para quien llega desde el link de una tienda o de un catálogo.
     if (new URLSearchParams(location.search).has("desde")) document.querySelector(".notice").hidden = false;
   </script>
 </body>

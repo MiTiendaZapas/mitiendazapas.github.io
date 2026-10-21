@@ -219,6 +219,12 @@ def build(dist, test=False):
     copy_tree(ROOT, main_store, SKIP_MAIN)
     shutil.copytree(ROOT / "motor", dist / "motor")
     shutil.copy2(ROOT / "herramientas" / "portada.html", dist / "index.html")
+    # Catálogos para compartir: el stock sin precios ni nombre de tienda.
+    # /catalogo/ es el stock de L.A IMP; /catalogo/fo/ el de la tienda de Fabri (sin stock de casa).
+    page = (ROOT / "herramientas" / "catalogo.html").read_text(encoding="utf-8")
+    for folder, stock in (("catalogo", "laimp"), ("catalogo/fo", "fo")):
+        (dist / folder).mkdir(parents=True)
+        (dist / folder / "index.html").write_text(page.replace('data-stock="laimp"', f'data-stock="{stock}"'), encoding="utf-8")
     # Sin 404.html, Cloudflare responde la portada (con "todo bien") a cualquier archivo que
     # no existe. Si un celular pedía un estilo nuevo justo mientras se publicaba, se quedaba
     # horas con esa portada en vez del estilo y la tienda se veía sin diseño.

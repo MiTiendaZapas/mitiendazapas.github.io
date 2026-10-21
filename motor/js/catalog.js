@@ -26,7 +26,7 @@ function sortProducts(products, order) {
  */
 const fileUrl = (base, path) => (/^https?:\/\//.test(path) ? path : base + path);
 
-export async function loadCatalog(base, { order = "marca-modelo", includeHouseStock = true, showG5 = false } = {}) {
+export async function loadCatalog(base, { order = "marca-modelo", includeHouseStock = true, showG5 = false, extraFiles = null } = {}) {
   // "no-cache": el navegador pregunta si hay versión nueva (stock actualizado),
   // pero si no cambió no vuelve a descargar el archivo.
   // GitHub deja guardar estos archivos 10 minutos (en el navegador y en sus servidores).
@@ -36,13 +36,13 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
   if (!response.ok) throw new Error(`No se pudo cargar el catálogo (HTTP ${response.status})`);
   const data = await response.json();
   if (!Array.isArray(data?.products)) throw new Error("El catálogo tiene un formato inesperado");
-  // Las G5 vienen en su propio archivo; solo las tiendas con showG5 lo suman.
-  // Si falta o falla, la tienda sigue con lo demás.
-  if (showG5) {
+  // Las G5 vienen en su propio archivo; solo las tiendas con showG5 lo suman. El catálogo para
+  // compartir de Fabri suma además productos-br2.json (extraFiles). Si uno falta o falla, sigue con lo demás.
+  for (const file of extraFiles ?? (showG5 ? ["productos-g5.json"] : [])) {
     try {
-      const extra = await fetch(`${base}productos-g5.json${fresh}`, { cache: "no-cache" });
+      const extra = await fetch(`${base}${file}${fresh}`, { cache: "no-cache" });
       if (extra.ok) data.products = data.products.concat((await extra.json()).products ?? []);
-    } catch { /* sin G5 por ahora */ }
+    } catch { /* sin ese archivo por ahora */ }
   }
 
   const products = data.products
