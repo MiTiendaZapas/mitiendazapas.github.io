@@ -284,8 +284,12 @@ window.STORE_CONFIG = {
     { q: "¿Cómo puedo empezar a revender?", a: "Entrá a “Quiero revender” (en el menú o al pie de la página), escribinos desde ahí y te asesoramos para armar tu primer pedido." },
   ],
 
-  // Servicio de tiendas por internet: pregunta chiquita al pie (como en las tiendas de clientes).
-  // En la versión de revendedores va en cambio el aviso "tu propia tienda" (ver channels.mayorista).
+  // Al pie: aviso grande "¿Querés una tienda así?" (lleva a mitiendastock.com), en las dos versiones.
+  platformPromo: {
+    title: "¿Querés una tienda así para tu negocio?",
+    text: "Te armamos tu tienda online con tu nombre, tu logo y tus productos. Tus clientes arman el pedido y te llega listo a tu WhatsApp. La manejás desde el celular, rápido y fácil.",
+    ctaLabel: "Quiero mi tienda",
+  },
   platformCredit: {
     enabled: true,
     text: "¿Querés una tienda así?",
