@@ -11,7 +11,7 @@
 import { createCart } from "../js/cart.js";
 import { createPricing } from "../js/pricing.js";
 import { buildOrderMessage } from "../js/whatsapp.js";
-import { escapeHtml, money, plural, whatsappLink } from "../js/utils.js";
+import { escapeHtml, money, plural, PLATFORM_URL, whatsappLink } from "../js/utils.js";
 import { icon } from "../js/interfaz/icons.js";
 import { orderedCategories, sortProducts } from "./orden.js";
 
@@ -167,7 +167,7 @@ function stepsHtml() {
 
 function footerHtml(info) {
   const credit = config.platformCredit?.enabled
-    ? `<a class="v-credit" href="${esc(whatsappLink(config.platformCredit.whatsapp, (config.platformCredit.message ?? "").replace("{tienda}", info.name)))}" target="_blank" rel="noopener">${esc(config.platformCredit.text)}</a>`
+    ? `<a class="v-credit" href="${PLATFORM_URL}" target="_blank" rel="noopener">${esc(config.platformCredit.text)}</a>`
     : "";
   return `
     <footer class="v-footer">

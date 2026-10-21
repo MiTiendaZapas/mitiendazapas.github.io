@@ -3,7 +3,7 @@
  * Nosotros, Quiero revender) y footer, armados desde configuracion.js.
  * Cada tienda (o cliente) cambia los textos sin tocar este archivo.
  */
-import { escapeHtml, fromRoot, whatsappLink } from "../utils.js";
+import { escapeHtml, fromRoot, PLATFORM_URL, whatsappLink } from "../utils.js";
 import { icon } from "./icons.js";
 import { socialLinksHtml } from "./social.js";
 
@@ -195,7 +195,6 @@ function promoOf(config, channel) {
 function platformPromo(config, channel) {
   const c = promoOf(config, channel);
   if (!c) return "";
-  const message = (c.message ?? "").replace("{tienda}", config.name);
   return `
     <aside class="platform-promo" aria-labelledby="tu-tienda-title" id="tu-tienda">
       <div class="container platform-promo__inner">
@@ -204,7 +203,7 @@ function platformPromo(config, channel) {
           <h2 class="platform-promo__title" id="tu-tienda-title">${esc(c.title)}</h2>
           <p class="platform-promo__text">${esc(c.text)}</p>
         </div>
-        <a class="btn btn--outline" href="${whatsappLink(c.whatsapp, message)}" target="_blank" rel="noopener">${esc(c.ctaLabel)} ${icon("arrowRight")}</a>
+        <a class="btn btn--outline" href="${PLATFORM_URL}" target="_blank" rel="noopener">${esc(c.ctaLabel)} ${icon("arrowRight")}</a>
       </div>
     </aside>`;
 }
@@ -213,8 +212,7 @@ function platformPromo(config, channel) {
 function platformCredit(config, channel) {
   const c = config.platformCredit;
   if (!c || c.enabled === false || promoOf(config, channel)) return "";
-  const message = (c.message ?? "").replace("{tienda}", config.name);
-  return `<p class="platform-credit"><a href="${whatsappLink(c.whatsapp, message)}" target="_blank" rel="noopener">${esc(c.text)}</a></p>`;
+  return `<p class="platform-credit"><a href="${PLATFORM_URL}" target="_blank" rel="noopener">${esc(c.text)}</a></p>`;
 }
 
 export function renderFooter(root, { config, channel, links }) {

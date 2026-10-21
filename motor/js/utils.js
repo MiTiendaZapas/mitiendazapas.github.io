@@ -49,6 +49,12 @@ export function writeStorage(key, value) {
   }
 }
 
+/**
+ * "¿Querés una tienda así?": lleva a la página principal, que explica las tiendas y tiene el
+ * contacto (antes iba directo al WhatsApp y escribían creyendo que era el dueño de la tienda).
+ */
+export const PLATFORM_URL = "https://mitiendastock.com/?desde=tienda";
+
 /** Número de WhatsApp limpio (solo dígitos) para armar links wa.me. */
 export function whatsappLink(number, message = "") {
   const digits = String(number).replace(/\D/g, "");
