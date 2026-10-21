@@ -300,9 +300,13 @@ export function brModel(product, options = {}) {
     .filter((s) => s && String(s.size ?? "").trim() !== "")
     .map((s) => ({ size: String(s.size), stock: Math.max(0, (Number(s.stock) || 0) - (options.casa ? 0 : Number(s.casa) || 0)) }));
   const full = (path) => (!path ? null : /^https?:\/\//.test(path) ? path : BR_FILES_URL + path);
+  // Algunos modelos del stock de casa traen su propio precio (lo puso L.A IMP): es su "precio de
+  // lista" y va antes que la lista de la tienda, igual que en las tiendas sin panel.
+  const listed = (value) => (Number(value) > 0 ? Number(value) : null);
   return {
     id: product.id, slug: String(product.slug || product.id), name: product.name, brand: product.brand || null,
     category: product.category || "zapatillas", sizes,
+    basePrice: listed(product.price), baseWholesale: listed(product.wholesalePrice),
     images: (Array.isArray(product.images) ? product.images : []).map((img) => ({ lg: full(img.lg), sm: full(img.sm), w: img.w, h: img.h })),
   };
 }
@@ -371,6 +375,7 @@ export function brProducts(data, br) {
  */
 function withGeneralPrice(product, data) {
   if (product.price) return product;
+  if (product.basePrice) return { ...product, price: product.basePrice, wholesalePrice: product.baseWholesale };
   const general = pricingOf(data)[isG5(product) ? "g5" : "br"];
   if (!general?.unit) return product;
   return {

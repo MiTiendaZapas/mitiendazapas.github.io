@@ -50,6 +50,10 @@ TEST_BRANCH = "prueba"
 MAIN_PANEL_TEST = "laimp-panel"
 # True: la tienda real de L.A IMP (/laimp/) ya es tienda con panel (el stock de casa se maneja ahí).
 MAIN_STORE_PANEL = True
+# True: todas las tiendas de clientes son tiendas con panel (22/10): su catálogo lo arma el panel
+# (stock de Brasil con los precios de su lista de siempre) y cada cliente maneja su tienda solo.
+# Antes hay que activarlas con herramientas/activar_stock_br.mjs y crearles usuario.
+CLIENT_PANELS = True
 PANEL_PAGE = """<!DOCTYPE html>
 <html lang="es-AR">
 <head>
@@ -119,8 +123,10 @@ def add_panel(folder, store_id, name):
 
 
 def panel_icons(folder):
-    """Íconos del panel hechos con el logo de la tienda (marca/logo-512.*). {} si no tiene logo."""
-    logo = next((folder / "marca" / f"logo-512.{ext}" for ext in ("webp", "png", "jpg") if (folder / "marca" / f"logo-512.{ext}").exists()), None)
+    """Íconos del panel hechos con el logo de la tienda (marca/logo-…512.*). {} si no tiene logo."""
+    # "logo-512.webp" (L.A IMP) o "logo-<tienda>-512.webp" (tiendas de clientes).
+    logo = next((path for pattern in ("logo-512.*", "logo-*-512.*") for path in sorted((folder / "marca").glob(pattern))
+                 if path.suffix.lower() in (".webp", ".png", ".jpg")), None)
     if not logo:
         return {}
     from PIL import Image
@@ -246,6 +252,10 @@ def build(dist, test=False):
             raise RuntimeError(f"El cliente '{name}' choca con una carpeta ya usada.")
         (dist / name).mkdir()
         copy_tree(folder, dist / name, SKIP_CLIENT)
+        text = (dist / name / "configuracion.js").read_text(encoding="utf-8")
+        if CLIENT_PANELS and not re.search(r"^\s*manualStore:", text, re.M):
+            title = re.search(r'^\s*name:\s*"([^"]+)"', text, re.M)
+            add_panel(dist / name, name, title.group(1) if title else name)
     # Cada página sin la barra final ("/emma") pasa a "/emma/" con un 301. Cloudflare lo hace
     # solo con un 308, que la vista previa de WhatsApp a veces no sigue (link sin imagen).
     pages = sorted({html.parent.relative_to(dist).as_posix() for html in dist.rglob("index.html")} - {"."})
@@ -262,8 +272,8 @@ def build(dist, test=False):
         "/motor/panel/sw.js\n  Service-Worker-Allowed: /\n  Cache-Control: no-cache\n", encoding="utf-8")
     # El programa del panel (functions/) corre SOLO en /api/ y en la portada de las tiendas
     # con stock propio (para poner su nombre y logo al compartir). El resto se entrega directo.
-    manual = [name for name, folder in clients.items()
-              if re.search(r"^\s*manualStore:", (folder / "configuracion.js").read_text(encoding="utf-8"), re.M)]
+    manual = [name for name in clients
+              if re.search(r"^\s*manualStore:", (dist / name / "configuracion.js").read_text(encoding="utf-8"), re.M)]
     if MAIN_STORE_PANEL:
         manual.append(MAIN_STORE)
     elif test:

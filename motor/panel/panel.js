@@ -1162,6 +1162,8 @@ function autoPrice(product, version = "publico") {
 const STATUS_TEXT = { nuevo: "Nuevo: no se ve hasta que le pongas precio", "sin-precio-g5": "No se ve: las G5 necesitan precio" };
 
 function listPrice(product, version = "publico") {
+  // Modelo del stock de casa con su propio precio: ese es su precio de lista.
+  if (product.basePrice && version !== "mayorista") return { unit: product.basePrice, wholesale: product.baseWholesale ?? null };
   const pricing = version === "mayorista" ? state.resalePricing : state.listPricing;
   const prices = pricing?.forProduct({ ...product, price: null, wholesalePrice: null, manual: false });
   return prices ? { unit: prices.unit, wholesale: prices.wholesale } : { unit: null, wholesale: null };
