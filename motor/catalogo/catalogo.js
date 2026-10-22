@@ -142,7 +142,11 @@ function paintFilters() {
 const photoOf = (img) => img.sm || img.lg;
 // Algunos modelos llegan del proveedor sin foto: un cuadro que lo dice (no una tarjeta vacía).
 const NO_PHOTO = `<div class="c-nophoto">${icon("image")}<span>Sin foto</span></div>`;
-function card(p) {
+// Al abrir solo se baja la primera foto de cada modelo (la chica): bajar todas de entrada eran
+// más de 90 fotos grandes a la vez y en el celular el catálogo quedaba gris un buen rato.
+// Las demás se bajan cuando la persona desliza las fotos de ese modelo.
+const EAGER_CARDS = 6;
+function card(p, index = EAGER_CARDS) {
   const title = `${p.brand ?? ""} ${p.name}`.trim();
   const sizes = p.available.map((s) => `<li${s.size === state.talle ? ' class="is-match"' : ""}>${esc(s.size)}</li>`).join("");
   const many = p.images.length > 1;
@@ -150,8 +154,9 @@ function card(p) {
   li.innerHTML = `
     <article class="c-card">
       <div class="c-photos">
-        <div class="c-photos__track">${p.images.length ? p.images.map((img, i) =>
-          `<img src="${esc(photoOf(img))}" alt="${esc(title)}, foto ${i + 1}" loading="lazy" decoding="async" width="400" height="400">`).join("")
+        <div class="c-photos__track">${p.images.length ? p.images.map((img, i) => i === 0
+          ? `<img src="${esc(photoOf(img))}" alt="${esc(title)}, foto 1" ${index < EAGER_CARDS ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" width="400" height="400">`
+          : `<img data-src="${esc(photoOf(img))}" alt="${esc(title)}, foto ${i + 1}" decoding="async" width="400" height="400">`).join("")
           : NO_PHOTO}</div>
         ${many ? `<div class="c-dots" aria-hidden="true">${p.images.map((_, i) => `<span${i ? "" : ' class="is-on"'}></span>`).join("")}</div>
           <button class="c-arrow c-arrow--prev" type="button" aria-label="Foto anterior" hidden>${icon("chevronLeft")}</button>
@@ -169,10 +174,17 @@ function card(p) {
   if (many) {
     const dots = [...li.querySelectorAll(".c-dots span")];
     const [prev, next] = li.querySelectorAll(".c-arrow");
-    const go = (step) => track.scrollBy({ left: step * track.clientWidth, behavior: "smooth" });
+    const loadRest = () => {
+      for (const img of track.querySelectorAll("img[data-src]")) { img.src = img.dataset.src; img.removeAttribute("data-src"); }
+    };
+    const go = (step) => { loadRest(); track.scrollBy({ left: step * track.clientWidth, behavior: "smooth" }); };
     prev.addEventListener("click", () => go(-1));
     next.addEventListener("click", () => go(1));
+    // En la compu, al pasar el mouse ya se bajan (así al tocar la flecha la foto está).
+    track.addEventListener("pointerenter", loadRest, { once: true });
+    track.addEventListener("touchstart", loadRest, { once: true, passive: true });
     track.addEventListener("scroll", () => {
+      loadRest();
       const index = Math.round(track.scrollLeft / track.clientWidth);
       dots.forEach((dot, i) => dot.classList.toggle("is-on", i === index));
       prev.hidden = index === 0;
@@ -195,7 +207,7 @@ function paintGrid() {
     grid.querySelector("button").addEventListener("click", clearFilters);
     return;
   }
-  grid.replaceChildren(...list.map(card));
+  grid.replaceChildren(...list.map((p, i) => card(p, i)));
 }
 
 function update() {
