@@ -591,10 +591,31 @@ async function signingKey(env) {
   return crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 }
 
-export async function createSession(env, { usuario, tienda, v }) {
-  const payload = toUrl64(JSON.stringify({ u: usuario, t: tienda, v, exp: Date.now() + SESSION_DAYS * 86_400_000 }));
+/** Firma un contenido (HMAC con PANEL_SECRET): "contenido.firma". Lo usan la cookie del panel y el token de la app. */
+async function signToken(env, content) {
+  const payload = toUrl64(JSON.stringify(content));
   const signature = await crypto.subtle.sign("HMAC", await signingKey(env), encoder.encode(payload));
-  const token = `${payload}.${toUrl64(String.fromCharCode(...new Uint8Array(signature)))}`;
+  return `${payload}.${toUrl64(String.fromCharCode(...new Uint8Array(signature)))}`;
+}
+
+/** Contenido de un token firmado y vigente (o null si la firma no da, venció o está mal armado). */
+async function verifyToken(env, token) {
+  if (typeof token !== "string" || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) return null;
+  const [payload, signature] = token.split(".");
+  try {
+    const bytes = Uint8Array.from(fromUrl64(signature), (c) => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify("HMAC", await signingKey(env), bytes, encoder.encode(payload));
+    if (!valid) return null;
+    const content = JSON.parse(fromUrl64(payload));
+    if (!content.exp || content.exp < Date.now() || !isStoreId(content.t) || typeof content.v !== "string") return null;
+    return content;
+  } catch {
+    return null;
+  }
+}
+
+export async function createSession(env, { usuario, tienda, v }) {
+  const token = await signToken(env, { u: usuario, t: tienda, v, exp: Date.now() + SESSION_DAYS * 86_400_000 });
   return `panel=${token}; HttpOnly; Secure; SameSite=Strict; Path=/api/panel; Max-Age=${SESSION_DAYS * 86400}`;
 }
 export const clearSession = () => "panel=; HttpOnly; Secure; SameSite=Strict; Path=/api/panel; Max-Age=0";
@@ -602,18 +623,32 @@ export const clearSession = () => "panel=; HttpOnly; Secure; SameSite=Strict; Pa
 export async function readSession(env, request) {
   const cookie = request.headers.get("Cookie") ?? "";
   const token = cookie.split(/;\s*/).find((part) => part.startsWith("panel="))?.slice(6);
-  if (!token || !token.includes(".")) return null;
-  const [payload, signature] = token.split(".");
-  try {
-    const bytes = Uint8Array.from(fromUrl64(signature), (c) => c.charCodeAt(0));
-    const valid = await crypto.subtle.verify("HMAC", await signingKey(env), bytes, encoder.encode(payload));
-    if (!valid) return null;
-    const session = JSON.parse(fromUrl64(payload));
-    if (!session.exp || session.exp < Date.now() || !isStoreId(session.t) || typeof session.v !== "string") return null;
-    return { usuario: session.u, tienda: session.t, v: session.v };
-  } catch {
-    return null;
-  }
+  const session = await verifyToken(env, token);
+  // Un token de la app de pedidos (k: "app") no sirve como sesión del panel.
+  if (!session || session.k !== undefined) return null;
+  return { usuario: session.u, tienda: session.t, v: session.v };
+}
+
+// --- token de la app de pedidos (solo stock de casa, desde GitHub) ----------------
+// La app de pedidos en mitiendazapas.github.io no puede usar la cookie del panel (otro sitio):
+// ingresa con usuario y clave en /api/app/ingresar y recibe este token, que manda en
+// "Authorization: Bearer …" a /api/app/casa. Solo sirve para el stock de casa (ver houseStockRequest).
+// Lleva k: "app" (la cookie del panel no lo acepta, y este no acepta una sesión del panel) y la
+// versión de la clave: cambiar la clave o "cerrar sesiones en todos" lo anula, igual que la sesión.
+export const APP_ORIGINS = ["https://mitiendazapas.github.io"];
+const APP_TOKEN_DAYS = 30;
+
+export async function createAppToken(env, { usuario, tienda, v }) {
+  const expira = Date.now() + APP_TOKEN_DAYS * 86_400_000;
+  return { token: await signToken(env, { k: "app", u: usuario, t: tienda, v, exp: expira }), expira };
+}
+
+/** Token de la app del encabezado Authorization (o null). No acepta una sesión del panel. */
+export async function readAppToken(env, request) {
+  const match = /^Bearer\s+(\S+)$/i.exec(request.headers.get("Authorization") ?? "");
+  const content = match ? await verifyToken(env, match[1]) : null;
+  if (!content || content.k !== "app") return null;
+  return { usuario: content.u, tienda: content.t, v: content.v };
 }
 
 // --- fotos ---------------------------------------------------------------------
@@ -935,6 +970,38 @@ export function moveHouseStock(data, input) {
     return { ok: true, despues, nombre: target.name, talle: record.talle };
   }
   throw new Error("Acción inválida.");
+}
+
+/**
+ * Stock de casa desde la app de pedidos (lo usan /api/panel/casa y /api/app/casa): descontar o
+ * devolver un par por un pedido, o ajustarlo a mano. Solo esas tres acciones.
+ * Al sumar pares de casa a un modelo del proveedor ("b:<id>") se guarda también una copia del
+ * modelo (nombre, fotos...), igual que cuando se cargan desde el panel: si después el proveedor lo
+ * saca de su stock, el modelo sigue en la tienda con esos pares. Un "b:<id>" que el proveedor no
+ * tiene (y que no estaba guardado) no se acepta.
+ */
+const HOUSE_ACTIONS = new Set(["descontar", "devolver", "ajustar"]);
+export async function houseStockRequest(env, store, input) {
+  if (!HOUSE_ACTIONS.has(input?.accion)) throw new Error("Acción inválida.");
+  const code = input.accion === "ajustar" && /^b:/.test(String(input?.id ?? "")) ? String(input.id).slice(2) : null;
+  const br = code ? await readBrStock(env) : null;
+  return updateCatalog(env, store, (catalog) => {
+    if (!code) return moveHouseStock(catalog, input);
+    const found = br.products.find((p) => p.id === code);
+    if (!found && !catalog.br?.[code]?.model) return { ok: false, motivo: "no-existe" };
+    const result = moveHouseStock(catalog, input);
+    const change = catalog.br?.[code];
+    if (result.ok && found && change?.extra && !change.model) {
+      const { id, sizes, ...model } = brModel(found, catalog.stockBR);
+      change.model = model;
+    }
+    // Sin pares de casa, la copia ya no hace falta (igual que desde el panel).
+    if (change && !change.extra && change.model) {
+      delete change.model;
+      if (!Object.keys(change).length) delete catalog.br[code];
+    }
+    return { ...result, nombre: result.nombre ?? change?.model?.name ?? found?.name ?? null };
+  });
 }
 
 /** Agrega un talle a un producto propio (desde el stock rápido). Devuelve el talle agregado. */
