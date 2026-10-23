@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deja la Tienda Demo de fábrica (ver resetear_demo.py). Toma la llave de la sesión de wrangler.
+# Deja la Tienda Ejemplo vacía (ver resetear_demo.py). Toma la llave de la sesión de wrangler.
 # Uso (desde la carpeta plataforma-zapas):  bash herramientas/resetear_demo.sh
 set -e
 cd "$(dirname "$0")/.."

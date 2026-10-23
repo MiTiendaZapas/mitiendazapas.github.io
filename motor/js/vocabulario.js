@@ -10,13 +10,14 @@
 const FOOTWEAR = new Set(["zapatillas", "ojotas", "ninos", "g5"]);
 export const isFootwear = (product) => FOOTWEAR.has(product?.category);
 
-const SHOES = { footwear: true, units: "pares", last: "Últimos pares" };
-const GOODS = { footwear: false, units: "unidades", last: "Últimas unidades" };
+// one / many: cómo se llama cada cosa del catálogo ("12 modelos" o "12 productos", "Buscar modelo").
+const SHOES = { footwear: true, units: "pares", last: "Últimos pares", one: "modelo", many: "modelos" };
+const GOODS = { footwear: false, units: "unidades", last: "Últimas unidades", one: "producto", many: "productos" };
 let words = SHOES;
 
-/** Se llama una vez, con el catálogo de la tienda ya cargado. */
+/** Se llama una vez, con el catálogo de la tienda ya cargado. Sin productos todavía: palabras generales. */
 export function setCatalogWords(products) {
-  words = products.length && !products.every(isFootwear) ? GOODS : SHOES;
+  words = !products.length || !products.every(isFootwear) ? GOODS : SHOES;
   return words;
 }
 export const storeWords = () => words;

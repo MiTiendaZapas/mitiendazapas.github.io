@@ -7,6 +7,7 @@
 import { escapeHtml, plural } from "../utils.js";
 import { icon } from "./icons.js";
 import { brandLogo } from "./marcas.js";
+import { storeWords } from "../vocabulario.js";
 
 const SEARCH_DELAY_MS = 150;
 
@@ -14,13 +15,14 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
   const toolbar = catalogView.toolbar;
   const sidebar = catalogView.filtersPanel;
   const categoryNames = config.categories ?? {};
+  const { one, many } = storeWords();
 
   toolbar.innerHTML = `
     <div class="quality-tabs" role="tablist" aria-label="Calidad" data-quality-tabs hidden></div>
     <div class="catalog-toolbar">
       <div class="search">
         ${icon("search")}
-        <input class="search__input" type="search" placeholder="Buscar modelo" aria-label="Buscar modelo o marca"
+        <input class="search__input" type="search" placeholder="Buscar ${one}" aria-label="Buscar ${one} o marca"
           autocomplete="off" enterkeyhint="search" maxlength="60" data-search>
         <button class="search__clear" type="button" data-search-clear aria-label="Borrar búsqueda" hidden>${icon("close")}</button>
       </div>
@@ -65,7 +67,7 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
       <div class="filters-sheet__body" data-sheet-body></div>
       <footer class="filters-sheet__footer">
         <button class="btn btn--outline" type="button" data-clear-all>Limpiar</button>
-        <button class="btn btn--primary" type="button" data-close-sheet data-sheet-results>Ver modelos</button>
+        <button class="btn btn--primary" type="button" data-close-sheet data-sheet-results>Ver ${many}</button>
       </footer>
     </div>`;
   overlays.append(sheet);
@@ -211,20 +213,28 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
     catalogView.setCount(countText(shown, filters.total(), filters.hasAny(), config.catalogHeader));
     renderQualityTabs();
     renderBrandAccess();
-    sheet.querySelector("[data-sheet-results]").textContent = shown ? `Ver ${plural(shown, "modelo", "modelos")}` : "Sin resultados";
+    sheet.querySelector("[data-sheet-results]").textContent = shown ? `Ver ${plural(shown, one, many)}` : "Sin resultados";
 
     if (shown > 0) {
       catalogView.showEmpty(null);
+    } else if (filters.total() === 0) {
+      // Tienda nueva, todavía sin nada cargado (no es que los filtros no encuentren nada).
+      catalogView.showEmpty({
+        title: "Todavía no hay productos",
+        text: "Muy pronto vas a ver acá los productos de la tienda. Mientras tanto, podés consultarnos por WhatsApp.",
+      });
     } else if (filters.state.q && filters.activeCount() === 0) {
       catalogView.showEmpty({
         title: "Sin resultados",
-        text: `No encontramos modelos para “${filters.state.q}”. Probá con otra palabra, por ejemplo la marca o el modelo (dunk, forum, 530).`,
+        text: storeWords().footwear
+          ? `No encontramos modelos para “${filters.state.q}”. Probá con otra palabra, por ejemplo la marca o el modelo (dunk, forum, 530).`
+          : `No encontramos productos para “${filters.state.q}”. Probá con otra palabra.`,
         actionLabel: "Borrar búsqueda",
         onAction: () => { search.value = ""; filters.setQuery(""); },
       });
     } else {
       catalogView.showEmpty({
-        title: "No hay modelos con esos filtros",
+        title: `No hay ${many} con esos filtros`,
         text: "Probá sacando algún filtro o eligiendo otro talle. También podés consultarnos por WhatsApp.",
         actionLabel: "Limpiar filtros",
         onAction: () => filters.clear(),
@@ -292,10 +302,12 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
   update();
 }
 
-/** "179 modelos" / "12 de 179 modelos" (compacto) o "179 modelos disponibles" / "12 modelos de 179" (clásico). */
+/** "179 modelos" / "12 de 179 modelos" (compacto) o "179 modelos disponibles" / "12 modelos de 179" (clásico).
+ *  En tiendas que no son de calzado, "productos". */
 export function countText(shown, total, filtered, headStyle) {
+  const { one, many } = storeWords();
   if (headStyle === "clasico") {
-    return filtered ? `${plural(shown, "modelo", "modelos")} de ${total}` : plural(shown, "modelo disponible", "modelos disponibles");
+    return filtered ? `${plural(shown, one, many)} de ${total}` : plural(shown, `${one} disponible`, `${many} disponibles`);
   }
-  return filtered ? `${shown} de ${plural(total, "modelo", "modelos")}` : plural(shown, "modelo", "modelos");
+  return filtered ? `${shown} de ${plural(total, one, many)}` : plural(shown, one, many);
 }

@@ -1,14 +1,13 @@
-"""Deja la Tienda Demo (mitiendastock.com/demo) como la recibe un revendedor nuevo.
+"""Deja la Tienda Ejemplo (mitiendastock.com/ejemplo) vacía, como la recibe un cliente nuevo.
 
-Borra todo lo que se cargó a mano en su panel:
-  - productos propios, sus fotos y las categorías propias
-  - cambios en los modelos del stock automático (precios, pares, ocultos, ofertas)
-  - precios generales y ajustes de "Mi tienda" (nombre, logo, WhatsApp, textos, color)
-y la deja con el stock de Brasil + el stock de casa de L.A IMP, las G5 esperando precio
-(como todas las tiendas de revendedores) y todo lo demás por defecto (configuracion.js).
+Es la tienda para mostrarle a un cliente cómo es y cómo carga sus productos (22/10: antes era la
+Demo de zapatillas). Después de mostrarla, esto borra todo lo que se cargó en su panel:
+  - productos, sus fotos y las categorías
+  - ajustes de "Mi tienda" (nombre, logo, WhatsApp, textos, color)
+y la deja vacía, sin stock automático, con todo lo demás por defecto (configuracion.js).
 
-El usuario del panel no se toca (demo / demo123).
-Solo funciona con la tienda "demo" (para no borrar nunca una tienda de verdad por error).
+El usuario del panel no se toca (ejemplo / demo123).
+Solo funciona con la tienda "ejemplo" (para no borrar nunca una tienda de verdad por error).
 
 Uso (desde la carpeta plataforma-zapas):  bash herramientas/resetear_demo.sh
 """
@@ -20,10 +19,10 @@ import urllib.parse
 import urllib.request
 
 ACCOUNT = "a5674ec6250ba14982dd00982b69e421"
-STORE = "demo"
+STORE = "ejemplo"
 API = f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT}/r2/buckets"
-# Cómo arranca un revendedor: stock de Brasil con el stock de casa; las G5 se ven cuando les pone precio.
-FRESH = {"version": 1, "store": STORE, "categories": {}, "products": [], "stockBR": {"casa": True, "g5": False}, "br": {}}
+# Vacía: sin productos, sin categorías y sin stock automático (solo lo que cargue el cliente).
+FRESH = {"version": 1, "store": STORE, "categories": {}, "products": []}
 
 
 def call(method, bucket, key="", body=None, query=None):
@@ -60,13 +59,13 @@ def keys(bucket, prefix):
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
-    # Catálogo de fábrica (sin productos propios, categorías, cambios ni precios generales).
+    # Catálogo vacío (sin productos ni categorías).
     call("PUT", "mitiendastock-privado", f"tiendas/{STORE}/productos.json", json.dumps(FRESH).encode("utf-8"))
     # Fotos, logo y ajustes de "Mi tienda" (depósito público).
     files = keys("mitiendastock-catalogo", f"tiendas/{STORE}/")
     for key in files:
         call("DELETE", "mitiendastock-catalogo", key)
-    print(f"Listo: la Demo quedó de fábrica ({len(files)} archivos borrados: fotos, logo y ajustes).")
+    print(f"Listo: la Tienda Ejemplo quedó vacía ({len(files)} archivos borrados: fotos, logo y ajustes).")
 
 
 if __name__ == "__main__":

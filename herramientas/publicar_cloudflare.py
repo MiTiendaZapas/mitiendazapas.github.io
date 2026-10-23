@@ -238,6 +238,8 @@ def build(dist, test=False):
     # Links de mitiendastock.com que se usaron antes de mover la tienda a /laimp/ (09/10).
     redirects = [line for page in MAIN_PAGES for line in (
         f"/{page} /{MAIN_STORE}/{page}/ 301", f"/{page}/* /{MAIN_STORE}/{page}/:splat 301")]
+    # La Tienda Demo pasó a ser la Tienda Ejemplo (22/10): los links viejos llevan a la nueva.
+    redirects += ["/demo /ejemplo/ 301", "/demo/* /ejemplo/:splat 301"]
     if MAIN_STORE_PANEL:
         add_panel(main_store, MAIN_STORE, "L.A IMP")
     elif test:
