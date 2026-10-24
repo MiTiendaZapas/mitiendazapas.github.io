@@ -97,3 +97,7 @@ El usuario quiere que el bot mande desde **otro número**. En la laptop se hace 
 ## Cambio de horario (12/10)
 
 A pedido del usuario, desde el 13/10 el bot envía entre **05:45 y 06:10** (antes 07:45-08:10). Para que a esa hora tenga el stock más actualizado posible, el piloto ahora descansa de **00:00 a 05:15** (antes hasta 07:30): `REST_END_MINUTE` en `piloto.py`. Por qué 05:15: el bot lee el catálogo al enviar, y con esa hora quedan 2 o 3 vueltas antes, lo que absorbe una falla del proveedor (503, ~1,6 % de las vueltas; reintenta a los 30 min). De noche el stock casi no cambia (~3 modelos de ~110 por noche), así que el beneficio es chico pero el costo también. Si se vuelve a mover el horario del bot, mover juntos `HORA_DESDE`, `HORA_HASTA` y `CATALOGO_FRESCO_DESDE`, y el descanso del piloto ~30 min antes de la ventana.
+
+## Textos del bot (24/10)
+
+A pedido del usuario: (1) el proveedor subió $1.000 el stock brasilero, así que todos los precios de `MENSAJE_FINAL_PRECIOS` en `bot_whatsapp.py` subieron $1.000 (adulto $44.000; desde 5 unidades $38.000/$40.000/$42.000; niño $36.000 y por mayor $31.000; ojotas $36.000/$32.000; ojotas Mind $38.000/$36.000; Jordan 11 y Retro 11 Panda $56.000/$51.000). Los precios de G5 e indumentaria no cambiaron. (2) `MENSAJE_PROMO_TIENDA` ahora dice también que las tiendas pueden agregar el stock G5 y agregar sus propios productos. Esos textos son fijos en el código: si cambian los precios, hay que editarlos ahí.
