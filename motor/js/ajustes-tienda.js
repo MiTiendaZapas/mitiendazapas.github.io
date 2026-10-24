@@ -80,10 +80,14 @@ export function applyChannelPrices(products, channelKey) {
 }
 
 /** Venta por mayor que eligió el cliente (o ninguna). */
-export function applyWholesaleSettings(priceTable, settings, { twoVersions = false } = {}) {
+export function applyWholesaleSettings(priceTable, settings, { twoVersions = false, channel = null } = {}) {
   if (!settings) return priceTable;
   // Lo que subió o bajó la lista con "Cambiar precios" en su panel (en porcentaje y/o en pesos).
-  if (settings.brPercent || settings.brAmount) priceTable = { ...priceTable, percent: settings.brPercent || 0, amount: settings.brAmount || 0 };
+  // La versión para revendedores puede tener su propio ajuste; si no, sigue al del público.
+  const separate = channel === "mayorista" && (settings.resalePercent != null || settings.resaleAmount != null);
+  const percent = Number(separate ? settings.resalePercent : settings.brPercent) || 0;
+  const amount = Number(separate ? settings.resaleAmount : settings.brAmount) || 0;
+  if (percent || amount) priceTable = { ...priceTable, percent, amount };
   // Con dos versiones, la venta por mayor de cada una sale de su lista (no de "Mi tienda").
   if (twoVersions) return priceTable;
   if (!settings.wholesale) return { ...priceTable, wholesale: false };

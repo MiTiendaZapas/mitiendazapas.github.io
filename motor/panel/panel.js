@@ -437,6 +437,7 @@ function renderPriceChange() {
   let mode = "porcentaje";    // "porcentaje" | "monto" (pesos fijos, por ejemplo cuando el proveedor sube $1.000 todo)
   let amount = 10;            // porcentaje elegido o "otro"
   let scope = "todos";        // "todos" | "propios" | "brasil"
+  let version = "ambas";      // tiendas con dos versiones: "ambas" | "publico" | "mayorista"
   const custom = h("input", { id: "pc-custom", class: "panel-input", inputmode: "decimal", placeholder: "Ej: 12", autocomplete: "off" });
   const customField = field("pc-custom", "Porcentaje", custom);
   const pesos = h("input", { id: "pc-pesos", class: "panel-input", inputmode: "numeric", placeholder: "Ej: 1000", autocomplete: "off" });
@@ -460,7 +461,10 @@ function renderPriceChange() {
           : [choice([[5, "5%"], [10, "10%"], [15, "15%"], [20, "20%"], ["otro", "Otro"]], amount, (v) => { amount = v; paint(); if (v === "otro") custom.focus(); }),
             amount === "otro" ? customField : null]),
       state.br ? h("section", { class: "panel-card" }, h("h2", {}, "3. ¿A cuáles?"),
-        choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["brasil", "Solo al stock automático"]], scope, (v) => { scope = v; paint(); })) : null].filter(Boolean));
+        choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["brasil", "Solo al stock automático"]], scope, (v) => { scope = v; paint(); })) : null,
+      TWO_VERSIONS ? h("section", { class: "panel-card" }, h("h2", {}, `${state.br ? 4 : 3}. ¿En qué versión de la tienda?`),
+        choice([["ambas", "En las dos"], ["publico", "Solo al público"], ["mayorista", "Solo revendedores"]], version, (v) => { version = v; paint(); }),
+        version !== "ambas" ? h("p", { class: "panel-muted" }, `Los precios ${version === "publico" ? "para revendedores" : "al público"} quedan como están.`) : null) : null].filter(Boolean));
     const n = mode === "monto" ? pesosValue() : percent();
     const valid = mode === "monto" ? n >= 100 && n % 100 === 0 && n <= 100000 : n > 0 && n <= (direction > 0 ? 100 : 50);
     apply.textContent = valid ? `${direction > 0 ? "Subir" : "Bajar"} ${howMuch()} los precios` : mode === "monto" && n ? "Poné un monto de a $100" : "Elegí cuánto";
@@ -474,12 +478,14 @@ function renderPriceChange() {
     event.preventDefault();
     const how = howMuch();
     const what = { todos: "todos tus productos", propios: "tus productos", brasil: "el stock automático" }[state.br ? scope : "propios"];
-    if (!await ask(`¿${direction > 0 ? "Subir" : "Bajar"} ${how} los precios de ${what}?`, { ok: direction > 0 ? "Sí, subir" : "Sí, bajar" })) return;
+    const where = TWO_VERSIONS ? { ambas: " (al público y a revendedores)", publico: " (solo al público)", mayorista: " (solo a revendedores)" }[version] : "";
+    if (!await ask(`¿${direction > 0 ? "Subir" : "Bajar"} ${how} los precios de ${what}${where}?`, { ok: direction > 0 ? "Sí, subir" : "Sí, bajar" })) return;
     const done = await busy(apply, async () => {
       await api("/precios", { method: "POST", body: {
         ...(mode === "monto" ? { amount: direction * pesosValue() } : { percent: direction * percent() }),
         own: !state.br || scope !== "brasil",
         br: Boolean(state.br) && scope !== "propios",
+        ...(TWO_VERSIONS ? { version } : {}),
       } });
       await loadData();
       return true;
@@ -2343,10 +2349,12 @@ async function loadData() {
   if (state.br && !state.priceTable) state.priceTable = await loadPriceTable(Object.values(config.channels ?? {})[0]?.prices);
   if (state.br && TWO_VERSIONS && !state.resaleTable) state.resaleTable = await loadPriceTable(config.channels.mayorista.prices);
   // Las listas con lo que subió o bajó en "Cambiar precios".
-  const percent = state.settings.brPercent || 0;
-  const amount = state.settings.brAmount || 0;
-  state.listPricing = state.priceTable ? createPricing({ ...state.priceTable, percent, amount }) : null;
-  state.resalePricing = state.resaleTable ? createPricing({ ...state.resaleTable, percent, amount }) : null;
+  // Cada versión con su ajuste (la de revendedores sigue a la del público si no tiene uno propio).
+  const separate = state.settings.resalePercent != null || state.settings.resaleAmount != null;
+  const publicAdjust = { percent: state.settings.brPercent || 0, amount: state.settings.brAmount || 0 };
+  const resaleAdjust = separate ? { percent: state.settings.resalePercent || 0, amount: state.settings.resaleAmount || 0 } : publicAdjust;
+  state.listPricing = state.priceTable ? createPricing({ ...state.priceTable, ...publicAdjust }) : null;
+  state.resalePricing = state.resaleTable ? createPricing({ ...state.resaleTable, ...resaleAdjust }) : null;
 }
 
 /** Lista de precios de una versión de la tienda (la que se cobra en los modelos de Brasil sin precio propio). */

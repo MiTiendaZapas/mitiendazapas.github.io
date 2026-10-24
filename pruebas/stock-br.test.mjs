@@ -197,3 +197,38 @@ describe("cambiar precios en un monto fijo (ej. el proveedor sube $1.000 todo)",
     assert.equal(catalog.products[0].price, 100);
   });
 });
+
+describe("cambiar precios en una sola versión (tiendas con público y revendedores)", () => {
+  const catalog = () => ({ products: [{ id: "a", price: 20000, wholesalePrice: 15000 }, { id: "b", price: 30000, mayorista: { price: 25000 } }],
+    br: { x: { price: 62000 }, y: { mayorista: { price: 50000 } } }, pricing: { br: { unit: 60000, mayorista: { price: 55000 } } }, stockBR: {} });
+
+  test("solo al público: revendedores queda como estaba (también lo que seguía al precio del público)", () => {
+    const c = catalog();
+    const s = { brPercent: 0.1 };
+    changePrices(c, s, { amount: 1000, own: true, br: true, version: "publico" });
+    assert.deepEqual(c.products[0], { id: "a", price: 21000, wholesalePrice: 16000, mayorista: { price: 20000, wholesalePrice: 15000 } });
+    assert.deepEqual(c.products[1].mayorista, { price: 25000 });
+    assert.equal(c.br.y.mayorista.price, 50000);
+    assert.deepEqual(c.pricing.br, { unit: 61000, mayorista: { price: 55000 } });
+    assert.deepEqual(s, { brPercent: 0.1, brAmount: 1000, resalePercent: 0.1, resaleAmount: 0 });
+  });
+
+  test("solo revendedores: el público no se mueve", () => {
+    const c = catalog();
+    const s = { brPercent: 0.1 };
+    changePrices(c, s, { amount: 1000, own: true, br: true, version: "mayorista" });
+    assert.deepEqual(c.products[0], { id: "a", price: 20000, wholesalePrice: 15000, mayorista: { price: 21000, wholesalePrice: 16000 } });
+    assert.equal(c.br.x.price, 62000);
+    assert.equal(c.br.y.mayorista.price, 51000);
+    assert.deepEqual(c.pricing.br, { unit: 60000, mayorista: { price: 56000 } });
+    assert.deepEqual(s, { brPercent: 0.1, resalePercent: 0.1, resaleAmount: 1000 });
+  });
+
+  test("la tienda usa el ajuste de cada versión (sin ajuste propio, revendedores sigue al público)", async () => {
+    const { applyWholesaleSettings } = await import("../motor/js/ajustes-tienda.js");
+    const table = { unit: { default: 60000, rules: [] } };
+    assert.deepEqual(applyWholesaleSettings(table, { brAmount: 1000 }, { twoVersions: true, channel: "mayorista" }), { ...table, percent: 0, amount: 1000 });
+    assert.deepEqual(applyWholesaleSettings(table, { brAmount: 1000, resaleAmount: 0, resalePercent: 0 }, { twoVersions: true, channel: "mayorista" }), table);
+    assert.deepEqual(applyWholesaleSettings(table, { brAmount: 1000, resaleAmount: 0 }, { twoVersions: true, channel: "minorista" }), { ...table, percent: 0, amount: 1000 });
+  });
+});

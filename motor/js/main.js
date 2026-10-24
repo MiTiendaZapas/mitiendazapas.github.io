@@ -116,7 +116,7 @@ async function startStore() {
     if (config.manualStore) applyChannelPrices(catalog.products, channelKey);
     // "pares" o "unidades", según lo que vende la tienda (ver vocabulario.js).
     setCatalogWords(catalog.products);
-    const pricing = createPricing(applyWholesaleSettings(priceTable, storeSettings, { twoVersions }));
+    const pricing = createPricing(applyWholesaleSettings(priceTable, storeSettings, { twoVersions, channel: channelKey }));
     // Tienda con panel: las categorías (sus nombres y su orden) y el orden de los productos
     // dentro de cada una los elige el cliente (Categorías → Orden de tu tienda).
     if (catalog.categories) {

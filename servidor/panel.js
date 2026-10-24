@@ -739,6 +739,10 @@ export function cleanSettings(input, current = {}) {
     // y, aparte, en pesos (1000 = $1.000 más). La lista queda: lista × (1 + brPercent) + brAmount.
     brPercent: cleanPercent(input?.brPercent),
     brAmount: cleanAmount(input?.brAmount),
+    // Tiendas con dos versiones: lo mismo, pero solo para la lista de revendedores. Vacío (null) =
+    // sigue a la del público (así eran todas antes de poder elegir la versión en "Cambiar precios").
+    resalePercent: input?.resalePercent == null ? null : cleanPercent(input.resalePercent),
+    resaleAmount: input?.resaleAmount == null ? null : cleanAmount(input.resaleAmount),
   };
 }
 
@@ -750,42 +754,67 @@ const roundPrice = (n) => Math.max(100, Math.round(n / 100) * 100);   // a los $
  * modelos de Brasil se cambian; los modelos de Brasil con el precio de su lista suben con
  * brPercent (se aplica sobre la lista, que maneja L.A IMP). Devuelve cuántos cambió.
  */
-export function changePrices(catalog, settings, { percent = 0, amount = 0, own, br }) {
+export function changePrices(catalog, settings, { percent = 0, amount = 0, own, br, version = "ambas" }) {
   const factor = 1 + percent;
   // En porcentaje (redondeado a los $100) o en un monto fijo (todos suben o bajan lo mismo).
   const move = (n) => (amount ? Math.max(100, n + amount) : roundPrice(n * factor));
-  const scale = (item) => {
-    for (const key of ["price", "wholesalePrice", "compareAt"]) if (item[key]) item[key] = move(item[key]);
-    if (item.bulk?.price) item.bulk.price = move(item.bulk.price);
+  // Tiendas con dos versiones: "publico", "mayorista" (revendedores) o "ambas".
+  const toPublic = version !== "mayorista";
+  const toResale = version !== "publico";
+  const moveResale = (item) => {
+    for (const key of ["price", "wholesalePrice"]) if (item.mayorista?.[key]) item.mayorista[key] = move(item.mayorista[key]);
+  };
+  const scale = (item, isOwn) => {
+    const hasResale = Boolean(item.mayorista?.price);
+    // Un producto propio sin precio para revendedores usa en esa versión el del público: si se cambia
+    // una sola versión, la otra se deja fija en lo que valía (con su propio precio).
+    if (isOwn && version !== "ambas" && !hasResale && item.price) {
+      item.mayorista = { ...(item.mayorista ?? {}), price: item.price, wholesalePrice: item.mayorista?.wholesalePrice ?? item.wholesalePrice ?? null };
+    }
+    if (toPublic) {
+      for (const key of ["price", "wholesalePrice", "compareAt"]) if (item[key]) item[key] = move(item[key]);
+      if (item.bulk?.price) item.bulk.price = move(item.bulk.price);
+      if (item.wholesalePrice && item.price && item.wholesalePrice >= item.price) item.wholesalePrice = null;
+      if (item.compareAt && item.price && item.compareAt <= item.price) item.compareAt = null;
+      delete item.fromList;   // precio cambiado a mano: ya no es el de la lista
+    }
     // Precios para revendedores (tiendas con dos versiones).
-    if (item.mayorista) for (const key of ["price", "wholesalePrice"]) if (item.mayorista[key]) item.mayorista[key] = move(item.mayorista[key]);
-    if (item.wholesalePrice && item.price && item.wholesalePrice >= item.price) item.wholesalePrice = null;
-    if (item.compareAt && item.price && item.compareAt <= item.price) item.compareAt = null;
-    delete item.fromList;   // precio cambiado a mano: ya no es el de la lista
+    if (toResale && item.mayorista) moveResale(item);
+    if (item.mayorista?.wholesalePrice && item.mayorista.price && item.mayorista.wholesalePrice >= item.mayorista.price) item.mayorista.wholesalePrice = null;
   };
   let count = 0;
-  if (own) for (const product of catalog.products) { scale(product); count += 1; }
+  if (own) for (const product of catalog.products) { scale(product, true); count += 1; }
   if (br) {
-    for (const change of Object.values(catalog.br ?? {})) if (change.price || change.compareAt || change.mayorista) scale(change);
-    // La lista de Brasil: un porcentaje sube también lo que ya se había sumado en pesos.
-    if (amount) settings.brAmount = cleanAmount((Number(settings.brAmount) || 0) + amount);
-    else {
-      settings.brPercent = cleanPercent((1 + (Number(settings.brPercent) || 0)) * factor - 1);
-      if (settings.brAmount) settings.brAmount = cleanAmount(settings.brAmount * factor);
-    }
-    // Precios generales (Brasil y G5).
+    for (const change of Object.values(catalog.br ?? {})) if (change.price || change.compareAt || change.mayorista) scale(change, false);
+    // Las listas de Brasil: un porcentaje sube también lo que ya se había sumado en pesos.
+    // La de revendedores sigue a la del público hasta que se cambia una sola versión.
+    const adjust = (percentKey, amountKey) => {
+      if (amount) settings[amountKey] = cleanAmount((Number(settings[amountKey]) || 0) + amount);
+      else {
+        settings[percentKey] = cleanPercent((1 + (Number(settings[percentKey]) || 0)) * factor - 1);
+        if (settings[amountKey]) settings[amountKey] = cleanAmount(settings[amountKey] * factor);
+      }
+    };
+    const separate = settings.resalePercent != null || settings.resaleAmount != null;
+    if (!separate && version !== "ambas") Object.assign(settings, { resalePercent: settings.brPercent ?? 0, resaleAmount: settings.brAmount ?? 0 });
+    if (toPublic) adjust("brPercent", "brAmount");
+    if (toResale && (separate || version !== "ambas")) adjust("resalePercent", "resaleAmount");
+    // Precios generales (Brasil y G5): el del público y, aparte, el de revendedores.
     if (catalog.pricing) for (const key of ["br", "g5"]) {
       const general = catalog.pricing[key];
       if (!general) continue;
-      if (general.unit) general.unit = move(general.unit);
-      if (general.wholesale) general.wholesale = move(general.wholesale);
-      if (general.wholesale && general.unit && general.wholesale >= general.unit) general.wholesale = null;
-      if (general.mayorista) for (const k of ["price", "wholesalePrice"]) if (general.mayorista[k]) general.mayorista[k] = move(general.mayorista[k]);
+      if (toPublic) {
+        if (general.unit) general.unit = move(general.unit);
+        if (general.wholesale) general.wholesale = move(general.wholesale);
+        if (general.wholesale && general.unit && general.wholesale >= general.unit) general.wholesale = null;
+      }
+      if (toResale) moveResale(general);
     }
     count += 1;
   }
   return count;
 }
+
 
 /**
  * Ofertas en grupo (una categoría o varios productos): items = [{ id, price, compareAt }].

@@ -19,13 +19,15 @@ export async function onRequestPost({ request, env, data }) {
     return fail("Poné un porcentaje entre -50 y 100 (por ejemplo 10).");
   }
   const own = input?.own === true;
+  // Tiendas con dos versiones: cuál cambia ("ambas" si no se elige).
+  const version = ["publico", "mayorista"].includes(input?.version) ? input.version : "ambas";
   const br = input?.br === true;
   if (!own && !br) return fail("Elegí a qué productos cambiarles el precio.");
   try {
     const settings = await readSettings(env, store);
     await updateCatalog(env, store, (catalog) => {
       if (br && !catalog.stockBR) throw new Error("Tu tienda no tiene stock de Brasil.");
-      changePrices(catalog, settings, { ...(byAmount ? { amount } : { percent: percent / 100 }), own, br: br && Boolean(catalog.stockBR) });
+      changePrices(catalog, settings, { ...(byAmount ? { amount } : { percent: percent / 100 }), own, br: br && Boolean(catalog.stockBR), version });
     });
     if (br) await saveSettings(env, store, settings);
     return json({ ok: true, brPercent: settings.brPercent ?? 0, brAmount: settings.brAmount ?? 0 });
