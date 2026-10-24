@@ -7,6 +7,7 @@ import { escapeHtml, plural } from "../utils.js";
 import { icon } from "./icons.js";
 import { countText } from "./filters-view.js";
 import { priceHtml, sizeButtonsHtml, stockStatus, qualityBadgeHtml } from "./product-parts.js";
+import { isNewArrival } from "../catalog.js";
 
 const ADDED_FEEDBACK_MS = 1600;
 const EAGER_IMAGES = 4;
@@ -181,6 +182,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
       <a class="product-card__media" href="#p/${encodeURIComponent(product.slug)}" aria-label="Ver fotos y detalle de ${alt}">
         ${image}
         <span class="product-card__zoom" aria-hidden="true">${icon("expand")}</span>
+        ${isNewArrival(product) ? '<span class="new-badge">Nuevo</span>' : ""}
       </a>`;
   }
 

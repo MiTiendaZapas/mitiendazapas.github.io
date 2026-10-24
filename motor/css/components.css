@@ -438,6 +438,22 @@
   .toast-region { left: auto; right: var(--gutter); bottom: var(--space-5); transform: none; }
 }
 
+/* Etiqueta "Nuevo" (nuevo ingreso, lo marca el cliente en su panel): arriba a la izquierda de la foto. */
+.product-card__media { position: relative; }
+.new-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.last-pair__badge.new-badge { background: var(--color-text); color: var(--color-bg); }
+
 /* Etiqueta "Calidad G5": distingue los modelos del proveedor G5 (otra calidad). */
 .quality-badge {
   display: inline-block;

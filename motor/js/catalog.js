@@ -26,6 +26,31 @@ function sortProducts(products, order) {
  */
 const fileUrl = (base, path) => (/^https?:\/\//.test(path) ? path : base + path);
 
+/**
+ * Productos sin marca cargada (por ejemplo los que carga el cliente en su panel): la marca se saca
+ * del nombre ("Bermudas Jordan" -> Jordan), así aparecen en "Elegí tu marca", en los filtros y
+ * ordenados con los de su marca. Gana la primera de la lista que aparezca como palabra entera.
+ */
+const NAME_BRANDS = [
+  ["New Balance", ["new balance", "nb"]], ["Jordan", ["jordan"]], ["Nike", ["nike", "air force", "air max", "dunk"]], ["Adidas", ["adidas"]],
+  ["Puma", ["puma", "pumas"]], ["Vans", ["vans"]], ["Converse", ["converse"]], ["Fila", ["fila"]], ["Asics", ["asics"]],
+  ["Reebok", ["reebok"]], ["Crocs", ["crocs"]], ["Lacoste", ["lacoste"]], ["Calvin Klein", ["calvin klein", "calvin"]],
+  ["Tommy Hilfiger", ["tommy hilfiger", "tommy"]], ["Under Armour", ["under armour"]], ["Louis Vuitton", ["louis vuitton"]],
+  ["Gucci", ["gucci"]], ["Balenciaga", ["balenciaga"]],
+];
+const plain = (text) => ` ${String(text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+export function brandFromName(name) {
+  const text = plain(name);
+  return NAME_BRANDS.find(([, words]) => words.some((word) => text.includes(` ${word} `)))?.[0] ?? null;
+}
+
+/** "Nuevo ingreso": se ve como nuevo durante 30 días desde que el cliente lo marcó en su panel. */
+export const NEW_ARRIVAL_DAYS = 30;
+export function isNewArrival(product, now = Date.now()) {
+  const since = Date.parse(product?.newSince ?? "");
+  return Number.isFinite(since) && now - since < NEW_ARRIVAL_DAYS * 86_400_000;
+}
+
 export async function loadCatalog(base, { order = "marca-modelo", includeHouseStock = true, showG5 = false, extraFiles = null } = {}) {
   // "no-cache": el navegador pregunta si hay versión nueva (stock actualizado),
   // pero si no cambió no vuelve a descargar el archivo.
@@ -60,7 +85,7 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
         id: p.id,
         slug: String(p.slug || p.id),
         name: p.name.trim(),
-        brand: p.brand || null,
+        brand: p.brand || brandFromName(p.name),
         category: p.category || "zapatillas",
         // Tiendas con stock propio: cada producto trae su precio (y, si tiene, su precio por mayor).
         price: Number(p.price) > 0 ? Number(p.price) : null,
@@ -73,6 +98,7 @@ export async function loadCatalog(base, { order = "marca-modelo", includeHouseSt
         description: typeof p.description === "string" && p.description ? p.description : null,
         compareAt: Number(p.compareAt) > 0 ? Number(p.compareAt) : null,
         featured: p.featured === true,
+        newSince: typeof p.newSince === "string" ? p.newSince : null,
         // Precio general de G5 sin precio por mayor (tiendas con panel).
         noWholesale: p.noWholesale === true,
         // Precio por cantidad del mismo producto (lo pone el cliente): { min, price }.

@@ -4,12 +4,16 @@
  * link con filtros se puede compartir y sobrevive a recargar la página.
  */
 import { normalize } from "./utils.js";
+import { isFootwear } from "./vocabulario.js";
 
 const collator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
 const PARAMS = { q: "q", brands: "marca", sizes: "talle", category: "categoria", quality: "calidad" };
 
 /** Calidad de un modelo: "g5" (proveedor G5) o "br" (el resto). */
 export const qualityOf = (product) => (product.category === "g5" ? "g5" : "br");
+// Botones "Calidad BR / G5": son de calzado. Lo demás (ropa, perfumes… que carga el cliente) no es
+// de ninguna calidad: se ve con cualquiera de las dos elegida y no suma en sus contadores.
+const tabOf = (product) => (isFootwear(product) ? qualityOf(product) : null);
 export const QUALITY_LABELS = { br: "Calidad BR", g5: "Calidad G5" };
 
 /** Talles "simples" de un producto: "37/38" (ojotas) cuenta como 37 y 38. */
@@ -29,7 +33,7 @@ export function createFilters(products) {
   // Si el catálogo trae G5, el catálogo se separa por calidad (BR / G5) y nunca se mezclan.
   const hasQualities = products.some((p) => qualityOf(p) === "g5");
   const state = { q: "", brands: new Set(), sizes: new Set(), category: "", quality: hasQualities ? "br" : "" };
-  const inQuality = (product) => !state.quality || qualityOf(product) === state.quality;
+  const inQuality = (product) => !state.quality || tabOf(product) === null || tabOf(product) === state.quality;
   const listeners = new Set();
 
   function matches(product, skip = null) {
@@ -104,7 +108,7 @@ export function createFilters(products) {
       if (!hasQualities) return [];
       return ["br", "g5"].map((value) => ({
         value, label: QUALITY_LABELS[value], selected: state.quality === value,
-        count: products.filter((p) => qualityOf(p) === value).length,
+        count: products.filter((p) => tabOf(p) === value).length,
       }));
     },
 

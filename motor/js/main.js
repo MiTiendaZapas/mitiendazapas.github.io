@@ -23,6 +23,7 @@ import { applyChannelPrices, applyStoreSettings, applyWholesaleSettings, loadSto
 import { createProductView } from "./interfaz/product-view.js";
 import { createToaster } from "./interfaz/toast.js";
 import { renderLastPairs } from "./interfaz/ultimos-pares.js";
+import { renderNewArrivals } from "./interfaz/nuevos-ingresos.js";
 import { isSingleSize, setCatalogWords, storeWords } from "./vocabulario.js";
 
 const OPEN_CART_HASH = "#pedido";
@@ -134,6 +135,7 @@ async function startStore() {
     // Tiendas con panel: cada categoría con su título arriba de sus productos.
     catalogView.render(catalog.products, { sections: catalog.categories ? config.categories : null });
     createFiltersView({ config, filters: createFilters(catalog.products), catalogView, overlays });
+    renderNewArrivals(document.querySelector("[data-new-arrivals]"), { products: catalog.products, pricing });
     renderLastPairs(document.querySelector("[data-last-pairs]"), { products: catalog.products, pricing });
     cartView = createCartView({
       config, channel, cart, pricing, overlays, storagePrefix,

@@ -10,6 +10,7 @@
  * Los modelos del stock de Brasil no tienen fecha de carga ni orden propio: en "nuevos" y
  * "manual" quedan por marca y modelo.
  */
+import { isNewArrival } from "../js/catalog.js";
 const collator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
 
 // "alfabetico" (el de siempre, por defecto): Zapatillas, Ojotas, después las demás de la A a la Z
@@ -61,6 +62,7 @@ export function sortProducts(products, categories = {}, settings = {}, priceOf =
   return [...products].sort((a, b) =>
     (rank.get(a.category) ?? Infinity) - (rank.get(b.category) ?? Infinity)
     || (b.featured ? 1 : 0) - (a.featured ? 1 : 0)          // destacados: primeros en su categoría
+    || (isNewArrival(b) ? 1 : 0) - (isNewArrival(a) ? 1 : 0)  // después, los nuevos ingresos
     || within(a, b)
     || position.get(a.id) - position.get(b.id));
 }

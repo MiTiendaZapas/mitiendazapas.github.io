@@ -172,6 +172,7 @@ export function cleanCategories(input, data) {
  *   description  texto corto (material, medidas, cómo calza)
  *   compareAt    "precio anterior": se muestra tachado con el cartel "Oferta"
  *   featured     destacado: sale primero en su categoría
+ *   newSince     "nuevo ingreso": desde cuándo (la tienda lo muestra como nuevo 30 días)
  */
 /** Precio por cantidad del mismo producto: { min: 3, price: 12000 } ("llevando 3 o más, $12.000 c/u"). */
 function cleanBulk(input, price) {
@@ -188,7 +189,14 @@ function cleanExtras(input, price) {
   const description = cleanText(input?.description, 500, "la descripción");
   const compareAt = cleanPrice(input?.compareAt, "el precio anterior");
   if (compareAt && price && compareAt <= price) throw new Error("El precio anterior (tachado) tiene que ser más alto que el precio.");
-  return { description: description || null, compareAt, featured: input?.featured === true, bulk: cleanBulk(input?.bulk, price) };
+  return { description: description || null, compareAt, featured: input?.featured === true, newSince: cleanDate(input?.newSince), bulk: cleanBulk(input?.bulk, price) };
+}
+
+/** Fecha que manda el panel (ISO), que no sea del futuro (con un día de margen por el reloj). O null. */
+function cleanDate(value) {
+  const time = Date.parse(typeof value === "string" ? value : "");
+  if (!Number.isFinite(time) || time > Date.now() + 86_400_000 || time < Date.UTC(2026, 0, 1)) return null;
+  return new Date(time).toISOString();
 }
 
 /**
@@ -324,6 +332,7 @@ function withChanges(base, change = {}) {
   return {
     ...base, sizes, price: change.price ?? null, wholesalePrice: change.wholesalePrice ?? null, hidden: change.hidden === true,
     description: change.description ?? null, compareAt: change.compareAt ?? null, featured: change.featured === true,
+    newSince: change.newSince ?? null,
     mayorista: change.mayorista ?? null,
     bulk: change.bulk ?? null,
   };
@@ -441,6 +450,7 @@ export function cleanBrChange(input, base) {
   if (extras.description) change.description = extras.description;
   if (extras.compareAt) change.compareAt = extras.compareAt;
   if (extras.featured) change.featured = true;
+  if (extras.newSince) change.newSince = extras.newSince;
   if (extras.bulk) change.bulk = extras.bulk;
   if (Object.keys(extra).length) {
     change.extra = extra;

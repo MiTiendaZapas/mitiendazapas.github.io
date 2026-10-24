@@ -269,3 +269,50 @@ describe("cambiar precios de una sola calidad (Brasil o G5)", () => {
     assert.deepEqual(await prices({ brPercent: 0.1 }), [66000, 66000]);
   });
 });
+
+describe("productos propios en la tienda (marca, nuevo ingreso, calidad)", () => {
+  test("la marca sale del nombre si no está cargada; si no hay una conocida, queda sin marca", async () => {
+    const { brandFromName } = await import("../motor/js/catalog.js");
+    assert.equal(brandFromName("Bermudas Jordan"), "Jordan");
+    assert.equal(brandFromName("Short algodón Nike"), "Nike");
+    assert.equal(brandFromName("Boxer calvin"), "Calvin Klein");
+    assert.equal(brandFromName("Nuevo ingreso 🤍 Adidas súper Start Gucci"), "Adidas");
+    assert.equal(brandFromName("Air force 1 blancas"), "Nike");
+    assert.equal(brandFromName("Perfumes importados"), null);
+    assert.equal(brandFromName("Pumas 180"), "Puma");
+    assert.equal(brandFromName("Bananas"), null);   // "nas" no es una marca: palabras enteras
+  });
+
+  test("nuevo ingreso: 30 días desde que se marcó", async () => {
+    const { isNewArrival } = await import("../motor/js/catalog.js");
+    const now = Date.parse("2026-11-01T00:00:00Z");
+    assert.equal(isNewArrival({ newSince: "2026-10-20T00:00:00Z" }, now), true);
+    assert.equal(isNewArrival({ newSince: "2026-09-20T00:00:00Z" }, now), false);
+    assert.equal(isNewArrival({}, now), false);
+  });
+
+  test("el panel guarda la fecha de nuevo ingreso (una del futuro, no)", () => {
+    const data = store();
+    const base = { name: "Remera", category: "remeras", price: 10000, sizes: [{ size: "M", stock: 1 }], images: [] };
+    assert.equal(cleanProduct({ ...base, newSince: "2026-10-20T10:00:00.000Z" }, null, data).newSince, "2026-10-20T10:00:00.000Z");
+    assert.equal(cleanProduct({ ...base, newSince: "2099-01-01T00:00:00Z" }, null, data).newSince, null);
+    assert.equal(cleanProduct(base, null, data).newSince, null);
+  });
+
+  test("lo que no es calzado no es de ninguna calidad: se ve con Brasil o G5 elegido y no suma", async () => {
+    const { createFilters } = await import("../motor/js/filters.js");
+    // Los filtros escriben la elección en la dirección de la página: acá no hay navegador.
+    globalThis.location ??= new URL("https://mitiendastock.com/prueba/");
+    globalThis.history ??= { replaceState() {} };
+    const products = [
+      { id: "1", name: "Dunk", category: "zapatillas", brand: "Nike", available: [{ size: "40", stock: 1 }], sizes: [{ size: "40", stock: 1 }] },
+      { id: "2", name: "Campus", category: "g5", brand: "Adidas", available: [{ size: "40", stock: 1 }], sizes: [{ size: "40", stock: 1 }] },
+      { id: "3", name: "Bermuda", category: "indumentaria", brand: null, available: [{ size: "M", stock: 1 }], sizes: [{ size: "M", stock: 1 }] },
+    ];
+    const filters = createFilters(products);
+    assert.deepEqual(filters.qualities().map((q) => [q.value, q.count]), [["br", 1], ["g5", 1]]);
+    assert.equal(filters.total(), 2);           // Brasil: el Dunk y la bermuda
+    filters.setQuality("g5");
+    assert.equal(filters.total(), 2);           // G5: el Campus y la bermuda
+  });
+});

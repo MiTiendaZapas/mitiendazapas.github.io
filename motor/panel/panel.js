@@ -13,6 +13,7 @@
 import { icon } from "../js/interfaz/icons.js";
 import { createPricing } from "../js/pricing.js";
 import { adjustedTable } from "../js/ajuste-lista.js";
+import { isNewArrival } from "../js/catalog.js";
 import { compareSizes, sortSizes } from "../js/talles.js";
 import { CATEGORY_ORDERS, PRODUCT_ORDERS, orderedCategories, sortProducts } from "../vidriera/orden.js";
 
@@ -27,6 +28,20 @@ const TWO_VERSIONS = Boolean(config.channels?.mayorista) && Object.keys(config.c
 // WhatsApp de la plataforma (L.A IMP): para quien se olvidó la clave.
 const HELP_WHATSAPP = "5491153773771";
 const money = (n) => `$${Number(n || 0).toLocaleString("es-AR")}`;
+// Letras de ropa en orden (para separar "S al XXL" en S, M, L, XL, XXL).
+const LETTER_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+/** "S al XXL", "35 a 40", "M-XL": varios talles escritos juntos. Devuelve la lista, o null si no es eso. */
+function sizeRange(text) {
+  const match = /^\s*([A-Za-z0-9]+)\s*(?:al|a|hasta|-|–)\s*([A-Za-z0-9]+)\s*$/i.exec(text ?? "");
+  if (!match) return null;
+  const [from, to] = [match[1].toUpperCase(), match[2].toUpperCase()];
+  const [i, j] = [LETTER_SIZES.indexOf(from), LETTER_SIZES.indexOf(to)];
+  if (i >= 0 && j > i) return LETTER_SIZES.slice(i, j + 1);
+  if (/^\d+$/.test(from) && /^\d+$/.test(to) && Number(to) > Number(from) && Number(to) - Number(from) <= 20) {
+    return Array.from({ length: Number(to) - Number(from) + 1 }, (_, k) => String(Number(from) + k));
+  }
+  return null;
+}
 const SIZE_PRESETS = [
   { label: "Ropa (S a XL)", sizes: ["S", "M", "L", "XL"] },
   { label: "Ropa (XS a XXL)", sizes: ["XS", "S", "M", "L", "XL", "XXL"] },
@@ -1137,6 +1152,7 @@ function optionsFold(draft, ...sections) {
 /** Etiquetas chicas en la lista: destacado y oferta. */
 function tagsFor(product) {
   const tags = [
+    isNewArrival(product) ? h("span", { class: "panel-tag" }, "Nuevo") : null,
     product.featured ? h("span", { class: "panel-tag" }, ico("star"), "Destacado") : null,
     product.compareAt ? h("span", { class: "panel-tag panel-tag--offer" }, "Oferta") : null,
   ].filter(Boolean);
@@ -1150,20 +1166,26 @@ function extraFields(prefix, draft) {
   const description = h("textarea", { id: `${prefix}-description`, class: "panel-input panel-textarea", maxlength: 500, rows: 3,
     placeholder: "Ej: Algodón peinado. Calce amplio, si dudás pedí un talle menos." }, draft.description ?? "");
   const featured = h("input", { id: `${prefix}-featured`, type: "checkbox", checked: draft.featured === true });
+  // "Nuevo ingreso": se ve 30 días con la etiqueta "Nuevo" y en la fila "Nuevos ingresos" de la tienda.
+  const wasNew = isNewArrival(draft);
+  const newArrival = h("input", { id: `${prefix}-new`, type: "checkbox", checked: wasNew });
   return {
     // La descripción va en "Datos" (junto al nombre); "Destacado", en "Opciones de precio y más".
     descriptionField: field(`${prefix}-description`, "Descripción (opcional)", description, "Material, medidas, cómo calza… Se ve al abrir el producto."),
     nodes: [
+      h("label", { class: "panel-switch", for: `${prefix}-new` }, newArrival, h("span", {}, "Nuevo ingreso"),
+        h("small", { class: "panel-muted" }, "Se ve con la etiqueta “Nuevo”, primero en su categoría y en la fila “Nuevos ingresos” de tu tienda, durante 30 días.")),
       h("label", { class: "panel-switch", for: `${prefix}-featured` }, featured, h("span", {}, "Destacado"),
         h("small", { class: "panel-muted" }, "Sale primero en su categoría.")),
     ],
-    read: () => ({ description: description.value, featured: featured.checked }),
+    read: () => ({ description: description.value, featured: featured.checked,
+      newSince: newArrival.checked ? (wasNew ? draft.newSince : new Date().toISOString()) : null }),
   };
 }
 
 // --- stock de Brasil ------------------------------------------------------------------
 const brTotal = (product, part) => product.sizes.reduce((sum, s) => sum + s[part], 0);
-const brChanged = (p) => Boolean(p.price || p.wholesalePrice || p.hidden || p.description || p.compareAt || p.featured || brTotal(p, "casa"));
+const brChanged = (p) => Boolean(p.price || p.wholesalePrice || p.hidden || p.description || p.compareAt || p.featured || p.newSince || brTotal(p, "casa"));
 
 /** Precio de la lista para un modelo de Brasil (sin el precio propio que le haya puesto el cliente). */
 /** Precio general (Brasil o G5) que puso el cliente para los modelos sin precio propio. */
@@ -1490,7 +1512,7 @@ function renderBrEditor(product) {
         sellsWholesale ? field("b-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, list.wholesale ? `Vacío = el precio base (${money(list.wholesale)}).` : "Opcional.") : null)),
     resale.node,
     h("section", { class: "panel-card" }, h("h2", {}, "Descripción"), extras.descriptionField),
-    optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Destacado"), ...extras.nodes)),
+    optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Nuevo ingreso y destacado"), ...extras.nodes)),
     h("section", { class: "panel-card panel-card--row" },
       h("label", { class: "panel-switch", for: "b-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para ocultar este modelo de tu tienda."))),
@@ -1706,7 +1728,8 @@ function renderEditor(product) {
         const set = (n) => { s.stock = Math.max(0, n); value.textContent = s.stock; };
         return h("div", { class: "panel-size-row" },
           h("label", { class: "panel-size-row__label" }, h("small", { class: "panel-muted" }, "Talle"),
-            h("input", { class: "panel-input panel-size-row__name", value: s.size, maxlength: 12, placeholder: "Ej: 38", "aria-label": "Talle", autocomplete: "off", oninput: (e) => { s.size = e.target.value; } })),
+            h("input", { class: "panel-input panel-size-row__name", value: s.size, maxlength: 12, placeholder: "Ej: 38", "aria-label": "Talle", autocomplete: "off",
+              oninput: (e) => { s.size = e.target.value; }, onchange: () => splitRange(i) })),
           h("div", { class: "panel-size-row__qty" }, h("small", { class: "panel-muted" }, "Unidades"),
             h("div", { class: "panel-stepper" },
               h("button", { type: "button", "aria-label": `Restar una unidad del talle ${s.size}`, onclick: () => set(s.stock - 1) }, ico("minus")),
@@ -1716,6 +1739,50 @@ function renderEditor(product) {
       }),
       ...(draft.sizes.length ? [] : [h("p", { class: "panel-muted" }, "Agregá los talles que tenés y cuántas unidades de cada uno.")]));
   }
+  /** Un talle escrito como "S al XXL": se ofrece separarlo (cada uno con las mismas unidades). */
+  async function splitRange(i) {
+    const row = draft.sizes[i];
+    const sizes = sizeRange(row?.size);
+    if (!sizes) return;
+    if (!await ask(`“${row.size}” parece ser varios talles: ${sizes.join(", ")}. ¿Los cargo por separado?`, { ok: "Sí, separarlos" })) return;
+    const taken = new Set(draft.sizes.map((s) => s.size.trim().toLowerCase()));
+    const fresh = sizes.filter((size) => !taken.has(size.toLowerCase())).map((size) => ({ size, stock: row.stock }));
+    draft.sizes.splice(i, 1, ...fresh);
+    renderSizes();
+    toast(row.stock ? `Quedaron ${fresh.length} talles con ${row.stock} unidades cada uno: revisá las cantidades.` : "Listo: poné cuántas unidades hay de cada talle.");
+  }
+
+  // "Este producto no tiene talles" (perfumes, accesorios…): un solo talle "Único" y sus unidades.
+  const noSizes = h("input", { id: "f-no-sizes", type: "checkbox", checked: draft.sizes.length === 1 && /^[uú]nico$/i.test(draft.sizes[0].size.trim()) });
+  const sizedBlock = h("div", { class: "panel-sized" });
+  const singleBlock = h("div", { class: "panel-single" });
+  function paintSizeMode() {
+    sizedBlock.hidden = noSizes.checked;
+    singleBlock.hidden = !noSizes.checked;
+    if (!noSizes.checked) return renderSizes();
+    const unit = draft.sizes[0];
+    const value = h("output", { class: "panel-quick__value" }, unit.stock);
+    const set = (n) => { unit.stock = Math.max(0, n); value.textContent = unit.stock; };
+    singleBlock.replaceChildren(h("div", { class: "panel-size-row__qty" }, h("small", { class: "panel-muted" }, "Unidades"),
+      h("div", { class: "panel-stepper" },
+        h("button", { type: "button", "aria-label": "Restar una unidad", onclick: () => set(unit.stock - 1) }, ico("minus")),
+        value,
+        h("button", { type: "button", "aria-label": "Sumar una unidad", onclick: () => set(unit.stock + 1) }, ico("plus")))));
+  }
+  noSizes.addEventListener("change", async () => {
+    if (noSizes.checked) {
+      const total = draft.sizes.reduce((sum, s) => sum + s.stock, 0);
+      if (draft.sizes.some((s) => s.size.trim()) && !await ask(`Se van a sacar los talles y queda una sola cantidad (${total} unidades). ¿Seguir?`, { ok: "Sí, sin talles" })) {
+        noSizes.checked = false;
+        return;
+      }
+      draft.sizes = [{ size: "Único", stock: total }];
+    } else {
+      draft.sizes = [];
+    }
+    paintSizeMode();
+  });
+
   /**
    * Botones de talles: dejan EXACTAMENTE esos talles (en su orden). Los que siguen
    * conservan su cantidad; si se va a sacar alguno que tiene unidades, se pregunta antes.
@@ -1730,6 +1797,12 @@ function renderEditor(product) {
     renderSizes();
   };
 
+  sizedBlock.append(
+    h("p", { class: "panel-muted" }, "Elegí los talles (o escribí uno) y con − y + poné cuántas unidades tenés de cada uno."),
+    h("div", { class: "panel-presets" }, SIZE_PRESETS.filter((p) => p.label !== "Talle único").map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
+      h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, ico("plus"), "Otro talle")),
+    sizesBox);
+
   const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar");
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
@@ -1741,7 +1814,7 @@ function renderEditor(product) {
     if (!price.value.replace(/\D/g, "")) return fieldError(price, "Escribí el precio.");
     if (!draft.sizes.some((s) => s.size.trim())) {
       sizesBox.scrollIntoView({ block: "center", behavior: "smooth" });
-      return toast("Agregá al menos un talle (por ejemplo, tocá “Talle único”).", "error");
+      return toast("Agregá al menos un talle (o tildá “Este producto no tiene talles”).", "error");
     }
     try { offer.check(); } catch (e) { return toast(e.message, "error"); }
     const deal = offer.read();
@@ -1782,17 +1855,17 @@ function renderEditor(product) {
       field("f-category", "Categoría", categorySelect), newCategoryField,
       extras.descriptionField),
     h("section", { class: "panel-card" }, h("h2", {}, "Talles y cantidades"),
-      h("p", { class: "panel-muted" }, "Elegí los talles (o escribí uno) y con − y + poné cuántas unidades tenés de cada uno."),
-      h("div", { class: "panel-presets" }, SIZE_PRESETS.map((p) => h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => usePreset(p.sizes) }, p.label)),
-        h("button", { type: "button", class: "btn btn--outline btn--sm", onclick: () => { draft.sizes.push({ size: "", stock: 0 }); renderSizes(); sizesBox.querySelector(".panel-size-row:last-of-type input")?.focus(); } }, ico("plus"), "Otro talle")),
-      sizesBox),
+      h("label", { class: "panel-switch", for: "f-no-sizes" }, noSizes, h("span", {}, "Este producto no tiene talles"),
+        h("small", { class: "panel-muted" }, "Para perfumes, accesorios, carteras… Solo ponés cuántas unidades tenés.")),
+      singleBlock,
+      sizedBlock),
     h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
       h("div", { class: "panel-two" },
         field("f-price", TWO_VERSIONS ? "Precio al público" : "Precio", price, "El precio normal. Para rebajarlo, usá “Oferta”, más abajo."),
         // Si la tienda no vende por mayor, no se pide (se activa en "Mi tienda").
         !TWO_VERSIONS && state.settings.wholesale === false ? null : field("f-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, wholesaleHelp))),
     resale.node,
-    optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Destacado"), ...extras.nodes)),
+    optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Nuevo ingreso y destacado"), ...extras.nodes)),
     h("section", { class: "panel-card panel-card--row" },
       h("label", { class: "panel-switch", for: "f-visible" }, visible, h("span", {}, "Se ve en la tienda"),
         h("small", { class: "panel-muted" }, "Destildalo para pausarlo sin borrarlo (por ejemplo, mientras llega mercadería)."))),
@@ -1802,7 +1875,7 @@ function renderEditor(product) {
   show(form);
   syncCategory();
   renderPhotos();
-  renderSizes();
+  paintSizeMode();
   window.scrollTo(0, 0);
   // Si sale sin guardar, se le pregunta (ver route).
   const snapshot = () => JSON.stringify([name.value, categorySelect.value, newCategory.value, price.value, wholesale.value,

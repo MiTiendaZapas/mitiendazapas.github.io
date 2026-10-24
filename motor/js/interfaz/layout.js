@@ -146,6 +146,7 @@ export function renderHero(root, { config, channel, links }) {
         ${howToBuy ? `<a class="btn btn--outline btn--lg" href="${escapeHtml(links.page(howToBuy))}">Cómo comprar</a>` : ""}
       </div>
       ${social ? `<nav class="hero__social" aria-label="Redes sociales">${social}</nav>` : ""}
+      <section class="last-pairs" data-new-arrivals aria-labelledby="new-arrivals-title" hidden></section>
       ${hero.brandAccess ? `<section class="brand-access" data-brand-access aria-labelledby="brand-access-title" hidden></section>` : ""}
       ${hero.lastPairs ? `<section class="last-pairs" data-last-pairs aria-labelledby="last-pairs-title" hidden></section>` : ""}
     </div>`;

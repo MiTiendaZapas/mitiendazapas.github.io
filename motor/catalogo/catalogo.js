@@ -18,8 +18,6 @@ const SOURCES = {
   fo: { base: "https://catalogo.mitiendastock.com/", includeHouseStock: false, files: ["productos-br2.json", "productos-g5.json"] },
 };
 const SOURCE = SOURCES[document.body.dataset.stock] ?? SOURCES.laimp;
-// Modelos sin marca cargada: se busca la marca en el nombre ("Pumas 180" -> Puma).
-const KNOWN_BRANDS = ["New Balance", "Nike", "Jordan", "Adidas", "Puma", "Vans", "Fila", "Converse", "Asics", "Reebok", "Lacoste", "Crocs"];
 const THEME_KEY = "catalogo:tema";
 const TYPES = { zapatillas: "Zapatillas", ojotas: "Ojotas" };
 const collator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
@@ -350,9 +348,6 @@ async function start() {
   paintWaiting();
   try {
     catalog = await loadCatalog(SOURCE.base, { includeHouseStock: SOURCE.includeHouseStock, showG5: true, extraFiles: SOURCE.files });
-    for (const p of catalog.products) p.brand ||= KNOWN_BRANDS.find((b) => normal(p.name).includes(normal(b))) ?? null;
-    // Con las marcas encontradas en el nombre, se vuelve a ordenar por marca y modelo.
-    catalog.products.sort((a, b) => (a.brand ? 0 : 1) - (b.brand ? 0 : 1) || collator.compare(a.brand ?? "", b.brand ?? "") || collator.compare(a.name, b.name));
     if (!catalog.products.some(inQuality)) state.calidad = "br";
   } catch {
     $("actualizado").textContent = "No se pudo cargar el stock";
