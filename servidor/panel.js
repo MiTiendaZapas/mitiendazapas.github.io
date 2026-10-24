@@ -675,6 +675,10 @@ function cleanByCategory(value) {
   }
   return result;
 }
+const cleanAmount = (value) => {
+  const n = Math.round(Number(value) / 100) * 100;
+  return Number.isFinite(n) ? Math.min(Math.max(n, -500000), 500000) : 0;
+};
 const cleanPercent = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? Math.min(Math.max(n, -0.9), 5) : 0;
@@ -731,8 +735,10 @@ export function cleanSettings(input, current = {}) {
     // La lista de productos, talles, precios y total se arma sola (no se puede tocar).
     orderGreeting: cleanText(input?.orderGreeting, 120, "el saludo del pedido"),
     orderFooter: cleanText(input?.orderFooter, 300, "el texto al final del pedido"),
-    // Cuánto subió o bajó los precios de su lista de Brasil con "Cambiar precios" (0.1 = 10% más).
+    // Cuánto subió o bajó los precios de su lista de Brasil con "Cambiar precios" (0.1 = 10% más)
+    // y, aparte, en pesos (1000 = $1.000 más). La lista queda: lista × (1 + brPercent) + brAmount.
     brPercent: cleanPercent(input?.brPercent),
+    brAmount: cleanAmount(input?.brAmount),
   };
 }
 
@@ -744,13 +750,15 @@ const roundPrice = (n) => Math.max(100, Math.round(n / 100) * 100);   // a los $
  * modelos de Brasil se cambian; los modelos de Brasil con el precio de su lista suben con
  * brPercent (se aplica sobre la lista, que maneja L.A IMP). Devuelve cuántos cambió.
  */
-export function changePrices(catalog, settings, { percent, own, br }) {
+export function changePrices(catalog, settings, { percent = 0, amount = 0, own, br }) {
   const factor = 1 + percent;
+  // En porcentaje (redondeado a los $100) o en un monto fijo (todos suben o bajan lo mismo).
+  const move = (n) => (amount ? Math.max(100, n + amount) : roundPrice(n * factor));
   const scale = (item) => {
-    for (const key of ["price", "wholesalePrice", "compareAt"]) if (item[key]) item[key] = roundPrice(item[key] * factor);
-    if (item.bulk?.price) item.bulk.price = roundPrice(item.bulk.price * factor);
+    for (const key of ["price", "wholesalePrice", "compareAt"]) if (item[key]) item[key] = move(item[key]);
+    if (item.bulk?.price) item.bulk.price = move(item.bulk.price);
     // Precios para revendedores (tiendas con dos versiones).
-    if (item.mayorista) for (const key of ["price", "wholesalePrice"]) if (item.mayorista[key]) item.mayorista[key] = roundPrice(item.mayorista[key] * factor);
+    if (item.mayorista) for (const key of ["price", "wholesalePrice"]) if (item.mayorista[key]) item.mayorista[key] = move(item.mayorista[key]);
     if (item.wholesalePrice && item.price && item.wholesalePrice >= item.price) item.wholesalePrice = null;
     if (item.compareAt && item.price && item.compareAt <= item.price) item.compareAt = null;
     delete item.fromList;   // precio cambiado a mano: ya no es el de la lista
@@ -759,15 +767,20 @@ export function changePrices(catalog, settings, { percent, own, br }) {
   if (own) for (const product of catalog.products) { scale(product); count += 1; }
   if (br) {
     for (const change of Object.values(catalog.br ?? {})) if (change.price || change.compareAt || change.mayorista) scale(change);
-    settings.brPercent = cleanPercent((1 + (Number(settings.brPercent) || 0)) * factor - 1);
+    // La lista de Brasil: un porcentaje sube también lo que ya se había sumado en pesos.
+    if (amount) settings.brAmount = cleanAmount((Number(settings.brAmount) || 0) + amount);
+    else {
+      settings.brPercent = cleanPercent((1 + (Number(settings.brPercent) || 0)) * factor - 1);
+      if (settings.brAmount) settings.brAmount = cleanAmount(settings.brAmount * factor);
+    }
     // Precios generales (Brasil y G5).
     if (catalog.pricing) for (const key of ["br", "g5"]) {
       const general = catalog.pricing[key];
       if (!general) continue;
-      if (general.unit) general.unit = roundPrice(general.unit * factor);
-      if (general.wholesale) general.wholesale = roundPrice(general.wholesale * factor);
+      if (general.unit) general.unit = move(general.unit);
+      if (general.wholesale) general.wholesale = move(general.wholesale);
       if (general.wholesale && general.unit && general.wholesale >= general.unit) general.wholesale = null;
-      if (general.mayorista) for (const k of ["price", "wholesalePrice"]) if (general.mayorista[k]) general.mayorista[k] = roundPrice(general.mayorista[k] * factor);
+      if (general.mayorista) for (const k of ["price", "wholesalePrice"]) if (general.mayorista[k]) general.mayorista[k] = move(general.mayorista[k]);
     }
     count += 1;
   }

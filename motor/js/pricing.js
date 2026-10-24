@@ -81,10 +81,15 @@ export function createPricing(table) {
   const byCategory = table.wholesale?.byCategory ?? {};
   const groupOf = (product) => (byCategory[product.category] ? `cat:${product.category}` : qualityOf(product));
   const minOf = (key) => (key.startsWith("cat:") ? Number(byCategory[key.slice(4)]) || minPairs : minPairs);
-  // Tiendas con panel: "Cambiar precios" sube (o baja) la lista en este porcentaje (0.1 = 10%).
-  // No toca los productos con precio propio (esos ya se cambiaron uno por uno).
+  // Tiendas con panel: "Cambiar precios" sube (o baja) la lista en este porcentaje (0.1 = 10%) y/o en
+  // un monto fijo (1000 = $1.000 más). No toca los productos con precio propio (esos ya se cambiaron uno por uno).
   const percent = Number(table.percent) || 0;
-  const adjust = (price) => (percent && price ? Math.max(100, Math.round((price * (1 + percent)) / 100) * 100) : price);
+  const amount = Number(table.amount) || 0;
+  const adjust = (price) => {
+    if (!price || (!percent && !amount)) return price;
+    const scaled = percent ? Math.round((price * (1 + percent)) / 100) * 100 : price;
+    return Math.max(100, scaled + amount);
+  };
   const cache = new Map();
 
   function resolve(product) {

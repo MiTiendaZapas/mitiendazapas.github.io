@@ -170,3 +170,30 @@ describe("stock de Brasil", () => {
     assert.throws(() => applyGroupOffers(catalog, brIds, [{ id: "m-1", price: 20000, compareAt: 15000 }]), /más alto/);
   });
 });
+
+describe("cambiar precios en un monto fijo (ej. el proveedor sube $1.000 todo)", () => {
+  test("todos los precios suben exactamente ese monto, sin redondear", () => {
+    const catalog = { products: [{ id: "m", price: 20050, wholesalePrice: 15000, compareAt: 25000, mayorista: { price: 18000 } }],
+      br: { x: { price: 62000 } }, pricing: { br: { unit: 60000 }, g5: { unit: 30000, wholesale: 25000 } }, stockBR: {} };
+    const settings = {};
+    changePrices(catalog, settings, { amount: 1000, own: true, br: true });
+    assert.deepEqual(catalog.products[0], { id: "m", price: 21050, wholesalePrice: 16000, compareAt: 26000, mayorista: { price: 19000 } });
+    assert.equal(catalog.br.x.price, 63000);
+    assert.deepEqual(catalog.pricing, { br: { unit: 61000 }, g5: { unit: 31000, wholesale: 26000 } });
+    assert.equal(settings.brAmount, 1000);
+  });
+
+  test("la lista suma el monto después del porcentaje, y un porcentaje nuevo también sube lo sumado", () => {
+    const table = { unit: { default: 60000, rules: [] }, wholesale: false };
+    assert.equal(createPricing({ ...table, percent: 0.1, amount: 1000 }).forProduct({ id: "a", name: "Dunk", category: "zapatillas", sizes: [] }).unit, 67000);
+    const settings = { brPercent: 0, brAmount: 1000 };
+    changePrices({ products: [], br: {}, stockBR: {} }, settings, { percent: 0.1, own: false, br: true });
+    assert.equal(settings.brAmount, 1100);
+  });
+
+  test("bajar un monto nunca deja un precio por debajo de $100", () => {
+    const catalog = { products: [{ id: "m", price: 800 }], stockBR: null };
+    changePrices(catalog, {}, { amount: -1000, own: true, br: false });
+    assert.equal(catalog.products[0].price, 100);
+  });
+});

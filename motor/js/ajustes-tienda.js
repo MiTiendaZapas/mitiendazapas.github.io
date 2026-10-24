@@ -82,8 +82,8 @@ export function applyChannelPrices(products, channelKey) {
 /** Venta por mayor que eligió el cliente (o ninguna). */
 export function applyWholesaleSettings(priceTable, settings, { twoVersions = false } = {}) {
   if (!settings) return priceTable;
-  // Lo que subió o bajó la lista con "Cambiar precios" en su panel.
-  if (settings.brPercent) priceTable = { ...priceTable, percent: settings.brPercent };
+  // Lo que subió o bajó la lista con "Cambiar precios" en su panel (en porcentaje y/o en pesos).
+  if (settings.brPercent || settings.brAmount) priceTable = { ...priceTable, percent: settings.brPercent || 0, amount: settings.brAmount || 0 };
   // Con dos versiones, la venta por mayor de cada una sale de su lista (no de "Mi tienda").
   if (twoVersions) return priceTable;
   if (!settings.wholesale) return { ...priceTable, wholesale: false };

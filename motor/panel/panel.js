@@ -434,10 +434,14 @@ function pricesButton() {
  */
 function renderPriceChange() {
   let direction = 1;          // 1 subir, -1 bajar
+  let mode = "porcentaje";    // "porcentaje" | "monto" (pesos fijos, por ejemplo cuando el proveedor sube $1.000 todo)
   let amount = 10;            // porcentaje elegido o "otro"
   let scope = "todos";        // "todos" | "propios" | "brasil"
   const custom = h("input", { id: "pc-custom", class: "panel-input", inputmode: "decimal", placeholder: "Ej: 12", autocomplete: "off" });
   const customField = field("pc-custom", "Porcentaje", custom);
+  const pesos = h("input", { id: "pc-pesos", class: "panel-input", inputmode: "numeric", placeholder: "Ej: 1000", autocomplete: "off" });
+  const pesosField = field("pc-pesos", "Monto en pesos (de a $100)", pesos);
+  const pesosValue = () => Number(String(pesos.value).replace(/\D/g, "")) || 0;
   const steps = h("div", { class: "panel-pc" });
   const apply = h("button", { class: "btn btn--primary btn--lg", type: "submit" });
 
@@ -450,25 +454,30 @@ function renderPriceChange() {
       h("section", { class: "panel-card" }, h("h2", {}, "1. ¿Qué querés hacer?"),
         choice([[1, "Subir precios"], [-1, "Bajar precios"]], direction, (v) => { direction = v; paint(); })),
       h("section", { class: "panel-card" }, h("h2", {}, `2. ¿Cuánto querés ${direction > 0 ? "subirlos" : "bajarlos"}?`),
-        choice([[5, "5%"], [10, "10%"], [15, "15%"], [20, "20%"], ["otro", "Otro"]], amount, (v) => { amount = v; paint(); if (v === "otro") custom.focus(); }),
-        amount === "otro" ? customField : null),
+        choice([["porcentaje", "En porcentaje (%)"], ["monto", "Un monto fijo ($)"]], mode, (v) => { mode = v; paint(); if (v === "monto") pesos.focus(); }),
+        mode === "monto"
+          ? [pesosField, h("p", { class: "panel-muted" }, `Todos los precios ${direction > 0 ? "suben" : "bajan"} lo mismo (por ejemplo, $60.000 → $${direction > 0 ? "61.000" : "59.000"} con $1.000).`)]
+          : [choice([[5, "5%"], [10, "10%"], [15, "15%"], [20, "20%"], ["otro", "Otro"]], amount, (v) => { amount = v; paint(); if (v === "otro") custom.focus(); }),
+            amount === "otro" ? customField : null]),
       state.br ? h("section", { class: "panel-card" }, h("h2", {}, "3. ¿A cuáles?"),
         choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["brasil", "Solo al stock automático"]], scope, (v) => { scope = v; paint(); })) : null].filter(Boolean));
-    const n = percent();
-    const valid = n > 0 && n <= (direction > 0 ? 100 : 50);
-    apply.textContent = valid ? `${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios` : "Elegí cuánto";
+    const n = mode === "monto" ? pesosValue() : percent();
+    const valid = mode === "monto" ? n >= 100 && n % 100 === 0 && n <= 100000 : n > 0 && n <= (direction > 0 ? 100 : 50);
+    apply.textContent = valid ? `${direction > 0 ? "Subir" : "Bajar"} ${howMuch()} los precios` : mode === "monto" && n ? "Poné un monto de a $100" : "Elegí cuánto";
     apply.disabled = !valid;
   }
+  const howMuch = () => (mode === "monto" ? money(pesosValue()) : `${percent()}%`);
   custom.addEventListener("input", () => { const keep = document.activeElement === custom; paint(); if (keep) custom.focus(); });
+  pesos.addEventListener("input", () => { const keep = document.activeElement === pesos; paint(); if (keep) pesos.focus(); });
 
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
-    const n = percent();
+    const how = howMuch();
     const what = { todos: "todos tus productos", propios: "tus productos", brasil: "el stock automático" }[state.br ? scope : "propios"];
-    if (!await ask(`¿${direction > 0 ? "Subir" : "Bajar"} ${n}% los precios de ${what}?`, { ok: direction > 0 ? "Sí, subir" : "Sí, bajar" })) return;
+    if (!await ask(`¿${direction > 0 ? "Subir" : "Bajar"} ${how} los precios de ${what}?`, { ok: direction > 0 ? "Sí, subir" : "Sí, bajar" })) return;
     const done = await busy(apply, async () => {
       await api("/precios", { method: "POST", body: {
-        percent: direction * n,
+        ...(mode === "monto" ? { amount: direction * pesosValue() } : { percent: direction * percent() }),
         own: !state.br || scope !== "brasil",
         br: Boolean(state.br) && scope !== "propios",
       } });
@@ -476,7 +485,7 @@ function renderPriceChange() {
       return true;
     });
     if (done) {
-      toast(`Listo: precios ${direction > 0 ? "subidos" : "bajados"} ${n}%.`);
+      toast(`Listo: precios ${direction > 0 ? "subidos" : "bajados"} ${how}.`);
       location.hash = "#productos";
     }
   } },
@@ -485,7 +494,7 @@ function renderPriceChange() {
       h("h1", {}, "Cambiar precios")),
     h("p", { class: "panel-muted panel-intro" }, "Cambiá todos los precios de una vez, por ejemplo cuando aumenta todo."),
     steps,
-    h("p", { class: "panel-muted" }, "Se redondea a los $100. También cambian el precio por mayor y las ofertas."),
+    h("p", { class: "panel-muted" }, "En porcentaje se redondea a los $100. También cambian el precio por mayor, el de revendedores y las ofertas."),
     h("div", { class: "panel-savebar" }, apply));
   show(form);
   paint();
@@ -2335,8 +2344,9 @@ async function loadData() {
   if (state.br && TWO_VERSIONS && !state.resaleTable) state.resaleTable = await loadPriceTable(config.channels.mayorista.prices);
   // Las listas con lo que subió o bajó en "Cambiar precios".
   const percent = state.settings.brPercent || 0;
-  state.listPricing = state.priceTable ? createPricing({ ...state.priceTable, percent }) : null;
-  state.resalePricing = state.resaleTable ? createPricing({ ...state.resaleTable, percent }) : null;
+  const amount = state.settings.brAmount || 0;
+  state.listPricing = state.priceTable ? createPricing({ ...state.priceTable, percent, amount }) : null;
+  state.resalePricing = state.resaleTable ? createPricing({ ...state.resaleTable, percent, amount }) : null;
 }
 
 /** Lista de precios de una versión de la tienda (la que se cobra en los modelos de Brasil sin precio propio). */
