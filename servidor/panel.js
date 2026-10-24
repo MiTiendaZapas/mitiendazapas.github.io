@@ -18,6 +18,7 @@
  */
 import { compareSizes } from "../motor/js/talles.js";
 import { LIST_CELLS, listAdjustment } from "../motor/js/ajuste-lista.js";
+import { fullPhone } from "../motor/js/utils.js";
 
 export const LIMITS = {
   products: 150,          // productos por tienda
@@ -698,7 +699,8 @@ export async function saveSettings(env, store, settings) {
 
 /** Revisa los ajustes que mandó el panel. Las redes se arman desde el usuario (@nombre). */
 export function cleanSettings(input, current = {}) {
-  const phone = String(input?.whatsapp ?? "").replace(/\D/g, "");
+  // Se guarda completo (con el 549 si es de Argentina y lo escribieron sin él). Ver fullPhone.
+  const phone = fullPhone(input?.whatsapp);
   if (phone && (phone.length < 10 || phone.length > 15)) throw new Error("El WhatsApp tiene que tener código de país y área. Ej: 5491123456789");
   const handle = (value, field) => {
     const text = String(value ?? "").trim().replace(/^@/, "").replace(/^https?:\/\/[^/]+\//, "").replace(/\/$/, "");

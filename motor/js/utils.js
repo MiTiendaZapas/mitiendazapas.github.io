@@ -55,10 +55,25 @@ export function writeStorage(key, value) {
  */
 export const PLATFORM_URL = "https://mitiendastock.com/?desde=tienda";
 
+/**
+ * Número de WhatsApp completo, solo dígitos, como lo pide wa.me. Un número argentino escrito sin el
+ * código de país (por ejemplo "1151237124", o "011 5123-7124", o "54 11…" sin el 9) se completa con
+ * el 549: sin eso, WhatsApp lo toma como un número de otro país y el pedido no le llega a nadie
+ * (le pasó a una tienda el 22/10).
+ */
+export function fullPhone(number) {
+  let digits = String(number ?? "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.length === 12 && digits.startsWith("1115")) digits = `11${digits.slice(4)}`;   // 11 15 1234-5678
+  if (digits.length === 10) digits = `549${digits}`;
+  if (digits.length === 12 && digits.startsWith("54") && !digits.startsWith("549")) digits = `549${digits.slice(2)}`;
+  return digits;
+}
+
 /** Número de WhatsApp limpio (solo dígitos) para armar links wa.me. */
 export function whatsappLink(number, message = "") {
-  const digits = String(number).replace(/\D/g, "");
-  return `https://wa.me/${digits}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
+  return `https://wa.me/${fullPhone(number)}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
 }
 
 /**

@@ -20,7 +20,7 @@ BOTS = re.compile(r"bot|crawl|spider|slurp|curl|python|wget|headless|lighthouse|
 PREVIEWS = {"WhatsApp": "WhatsApp", "facebookexternalhit": "Facebook/Instagram", "Instagram": "Facebook/Instagram",
             "TelegramBot": "Telegram", "Twitterbot": "X"}
 STORES = {"portada", "laimp", "laimp/mayorista", "fo", "fo/mayorista", "importalestore", "emma",
-          "erii-importados", "importados-more", "deuna-imp", "importados-flor"}
+          "erii-importados", "importados-more", "deuna-imp", "importados-flor", "ejemplo", "catalogo", "catalogo/fo"}
 DAYS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
 
