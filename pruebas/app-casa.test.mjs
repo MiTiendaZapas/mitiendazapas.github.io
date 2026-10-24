@@ -104,7 +104,25 @@ describe("app de pedidos desde GitHub (/api/app)", () => {
     assert.deepEqual(await response.json(), { ok: true, antes: 2, despues: 3, nombre: "Remera", id: "p:m-1", talle: "40" });
   });
 
-  test("token alterado, vencido o ausente: 401", async () => {
+  test("sin token: el stock de casa de L.A IMP, de a un par por vez (pedido del usuario, 24/10)", async () => {
+    const one = await throughApp(req("/api/app/casa", { body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 1 } }), appCasa);
+    assert.equal(one.status, 200);
+    assert.deepEqual(await one.json(), { ok: true, antes: 2, despues: 3, nombre: "Remera", id: "p:m-1", talle: "40" });
+    const many = await throughApp(req("/api/app/casa", { body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 5 } }), appCasa);
+    assert.equal(many.status, 400);
+    assert.equal((await many.json()).error, "Desde la app se suma o se resta de a un par por vez.");
+    const sold = await throughApp(req("/api/app/casa", { body: { accion: "descontar", pedido: "pedido-1", id: "p:m-1", talle: "40" } }), appCasa);
+    assert.equal((await sold.json()).despues, 2);
+  });
+
+  test("con un token válido se puede ajustar más de un par", async () => {
+    const { body: { token } } = await login();
+    const response = await throughApp(req("/api/app/casa", { token, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 3 } }), appCasa);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).despues, 5);
+  });
+
+  test("un token alterado o vencido no da permisos de más: cuenta como sin token", async () => {
     const { body: { token } } = await login();
     const [payload, signature] = token.split(".");
     const content = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
@@ -113,23 +131,27 @@ describe("app de pedidos desde GitHub (/api/app)", () => {
     const realNow = Date.now;
     Date.now = () => realNow() + 31 * 86_400_000;   // 31 días después
     try {
-      const late = await throughApp(req("/api/app/casa", { token: expired.token, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 1 } }), appCasa);
-      assert.equal(late.status, 401);
+      const late = await throughApp(req("/api/app/casa", { token: expired.token, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 5 } }), appCasa);
+      assert.equal(late.status, 400);
     } finally {
       Date.now = realNow;
     }
-    for (const bad of [`${forged}.${signature}`, `${payload}.AAAA`, "no-es-un-token", null]) {
-      const response = await throughApp(req("/api/app/casa", { token: bad, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 1 } }), appCasa);
-      assert.equal(response.status, 401);
+    for (const bad of [`${forged}.${signature}`, `${payload}.AAAA`, "no-es-un-token"]) {
+      const many = await throughApp(req("/api/app/casa", { token: bad, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 5 } }), appCasa);
+      assert.equal(many.status, 400);
     }
+    // El token alterado decía otra tienda: igual se toca solo L.A IMP.
+    const one = await throughApp(req("/api/app/casa", { token: `${forged}.${signature}`, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 1 } }), appCasa);
+    assert.equal((await one.json()).despues, 3);
+    assert.equal(JSON.parse(env.PRIVADO.items.get("tiendas/laimp/productos.json").text).products[0].sizes[0].stock, 3);
   });
 
-  test("la cookie del panel no sirve en /api/app/casa, y el token de la app no sirve en /api/panel", async () => {
+  test("la cookie del panel no da permisos en /api/app/casa, y el token de la app no sirve en /api/panel", async () => {
     const result = await panel.checkLogin(env, "socio", "clave-buena");
     const cookie = (await panel.createSession(env, result)).split(";")[0];          // "panel=<token del panel>"
     const panelToken = cookie.slice("panel=".length);
-    const withPanelToken = await throughApp(req("/api/app/casa", { token: panelToken, cookie, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 1 } }), appCasa);
-    assert.equal(withPanelToken.status, 401);
+    const withPanelToken = await throughApp(req("/api/app/casa", { token: panelToken, cookie, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 5 } }), appCasa);
+    assert.equal(withPanelToken.status, 400);
 
     const { body: { token } } = await login();
     const panelRequest = req("/api/panel/casa", { origin: "https://mitiendastock.com", cookie: `panel=${token}`, token, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 1 } });
@@ -139,17 +161,17 @@ describe("app de pedidos desde GitHub (/api/app)", () => {
     assert.deepEqual(await panel.readSession(env, req("/x", { cookie })), { usuario: "socio", tienda: "laimp", v: result.v });
   });
 
-  test("al cambiar la clave (o cerrar sesiones en todos), el token deja de valer", async () => {
+  test("al cambiar la clave (o cerrar sesiones en todos), el token pierde sus permisos", async () => {
     const { body: { token } } = await login();
     await panel.closeAllSessions(env, "socio");
-    const response = await throughApp(req("/api/app/casa", { token, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 1 } }), appCasa);
-    assert.equal(response.status, 401);
+    const response = await throughApp(req("/api/app/casa", { token, body: { accion: "ajustar", id: "p:m-1", talle: "40", delta: 5 } }), appCasa);
+    assert.equal(response.status, 400);
   });
 
   test("solo acciones de stock de casa: cualquier otra se rechaza", async () => {
     const { body: { token } } = await login();
-    for (const accion of ["precios", "borrar", "productos", undefined]) {
-      const response = await throughApp(req("/api/app/casa", { token, body: { accion, id: "p:m-1", talle: "40", delta: 1 } }), appCasa);
+    for (const [accion, withToken] of [["precios", true], ["borrar", true], ["productos", false], [undefined, false]]) {
+      const response = await throughApp(req("/api/app/casa", { token: withToken ? token : null, body: { accion, id: "p:m-1", talle: "40", delta: 1 } }), appCasa);
       assert.equal(response.status, 400);
       assert.equal((await response.json()).error, "Acción inválida.");
     }
