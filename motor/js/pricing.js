@@ -83,9 +83,11 @@ export function createPricing(table) {
   const minOf = (key) => (key.startsWith("cat:") ? Number(byCategory[key.slice(4)]) || minPairs : minPairs);
   // Tiendas con panel: "Cambiar precios" sube (o baja) la lista en este porcentaje (0.1 = 10%) y/o en
   // un monto fijo (1000 = $1.000 más). No toca los productos con precio propio (esos ya se cambiaron uno por uno).
-  const percent = Number(table.percent) || 0;
-  const amount = Number(table.amount) || 0;
-  const adjust = (price) => {
+  // Las G5 pueden tener su propio ajuste (g5Adjust); si no, el mismo que Brasil. Ver ajuste-lista.js.
+  const brAdjust = { percent: Number(table.percent) || 0, amount: Number(table.amount) || 0 };
+  const g5Adjust = table.g5Adjust ? { percent: Number(table.g5Adjust.percent) || 0, amount: Number(table.g5Adjust.amount) || 0 } : brAdjust;
+  const adjust = (price, product) => {
+    const { percent, amount } = product?.category === "g5" ? g5Adjust : brAdjust;
     if (!price || (!percent && !amount)) return price;
     const scaled = percent ? Math.round((price * (1 + percent)) / 100) * 100 : price;
     return Math.max(100, scaled + amount);
@@ -100,7 +102,7 @@ export function createPricing(table) {
     const override = overrides[product.slug] ?? overrides[product.id] ?? own;
     // Producto propio del cliente: solo su precio (ninguna regla de la lista, ni "llevando 10 o más").
     const unitRule = product.manual ? null : findRule(unitList, key, shortKey, product.category);
-    const unit = Number(override.unit) || adjust(unitRule?.price || unitList.default);
+    const unit = Number(override.unit) || adjust(unitRule?.price || unitList.default, product);
     // Precio por cantidad del mismo producto: el que puso el cliente en su panel, o el de la lista.
     const own_bulk = product.bulk?.min && product.bulk?.price && product.bulk.price < unit ? { min: product.bulk.min, price: product.bulk.price } : null;
     const bulk = own_bulk ?? (product.manual ? null : unitRule?.bulk ?? null);
@@ -109,7 +111,7 @@ export function createPricing(table) {
       // Producto propio del cliente: solo su precio por mayor (nunca el de la lista de precios).
       wholesale = product.manual
         ? Number(product.wholesalePrice) || null
-        : Number(override.wholesale) || adjust(findRule(wholesaleList, key, shortKey, product.category)?.price || wholesaleList.default);
+        : Number(override.wholesale) || adjust(findRule(wholesaleList, key, shortKey, product.category)?.price || wholesaleList.default, product);
       if (override.wholesale === false || product.noWholesale) wholesale = null;   // "sin precio por mayor" elegido a mano
       if (!wholesale || wholesale >= unit) wholesale = null;   // sin precio por mayor (0) se cobra el de unidad   // nunca mostrar un "precio por mayor" que no conviene
     }

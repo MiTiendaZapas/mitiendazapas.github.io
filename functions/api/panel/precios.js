@@ -21,13 +21,15 @@ export async function onRequestPost({ request, env, data }) {
   const own = input?.own === true;
   // Tiendas con dos versiones: cuál cambia ("ambas" si no se elige).
   const version = ["publico", "mayorista"].includes(input?.version) ? input.version : "ambas";
+  // Stock automático: solo la calidad Brasil ("br"), solo las G5 ("g5") o las dos ("ambas").
+  const quality = ["br", "g5"].includes(input?.quality) ? input.quality : "ambas";
   const br = input?.br === true;
   if (!own && !br) return fail("Elegí a qué productos cambiarles el precio.");
   try {
     const settings = await readSettings(env, store);
     await updateCatalog(env, store, (catalog) => {
       if (br && !catalog.stockBR) throw new Error("Tu tienda no tiene stock de Brasil.");
-      changePrices(catalog, settings, { ...(byAmount ? { amount } : { percent: percent / 100 }), own, br: br && Boolean(catalog.stockBR), version });
+      changePrices(catalog, settings, { ...(byAmount ? { amount } : { percent: percent / 100 }), own, br: br && Boolean(catalog.stockBR), version, quality });
     });
     if (br) await saveSettings(env, store, settings);
     return json({ ok: true, brPercent: settings.brPercent ?? 0, brAmount: settings.brAmount ?? 0 });

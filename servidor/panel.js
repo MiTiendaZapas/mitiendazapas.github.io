@@ -17,6 +17,7 @@
  *   - Todo lo que llega se revisa (largo, tipo, cantidad) antes de guardarlo.
  */
 import { compareSizes } from "../motor/js/talles.js";
+import { LIST_CELLS, listAdjustment } from "../motor/js/ajuste-lista.js";
 
 export const LIMITS = {
   products: 150,          // productos por tienda
@@ -743,6 +744,11 @@ export function cleanSettings(input, current = {}) {
     // sigue a la del público (así eran todas antes de poder elegir la versión en "Cambiar precios").
     resalePercent: input?.resalePercent == null ? null : cleanPercent(input.resalePercent),
     resaleAmount: input?.resaleAmount == null ? null : cleanAmount(input.resaleAmount),
+    // Lo mismo para la lista de G5 (al público y revendedores). Vacío = sigue a Brasil (ver ajuste-lista.js).
+    g5Percent: input?.g5Percent == null ? null : cleanPercent(input.g5Percent),
+    g5Amount: input?.g5Amount == null ? null : cleanAmount(input.g5Amount),
+    g5ResalePercent: input?.g5ResalePercent == null ? null : cleanPercent(input.g5ResalePercent),
+    g5ResaleAmount: input?.g5ResaleAmount == null ? null : cleanAmount(input.g5ResaleAmount),
   };
 }
 
@@ -754,7 +760,7 @@ const roundPrice = (n) => Math.max(100, Math.round(n / 100) * 100);   // a los $
  * modelos de Brasil se cambian; los modelos de Brasil con el precio de su lista suben con
  * brPercent (se aplica sobre la lista, que maneja L.A IMP). Devuelve cuántos cambió.
  */
-export function changePrices(catalog, settings, { percent = 0, amount = 0, own, br, version = "ambas" }) {
+export function changePrices(catalog, settings, { percent = 0, amount = 0, own, br, version = "ambas", quality = "ambas" }) {
   const factor = 1 + percent;
   // En porcentaje (redondeado a los $100) o en un monto fijo (todos suben o bajan lo mismo).
   const move = (n) => (amount ? Math.max(100, n + amount) : roundPrice(n * factor));
@@ -785,22 +791,30 @@ export function changePrices(catalog, settings, { percent = 0, amount = 0, own, 
   let count = 0;
   if (own) for (const product of catalog.products) { scale(product, true); count += 1; }
   if (br) {
-    for (const change of Object.values(catalog.br ?? {})) if (change.price || change.compareAt || change.mayorista) scale(change, false);
-    // Las listas de Brasil: un porcentaje sube también lo que ya se había sumado en pesos.
-    // La de revendedores sigue a la del público hasta que se cambia una sola versión.
-    const adjust = (percentKey, amountKey) => {
-      if (amount) settings[amountKey] = cleanAmount((Number(settings[amountKey]) || 0) + amount);
+    // Calidad: "br" (Brasil), "g5" o "ambas". Las G5 tienen código "g5-…".
+    const wanted = (isG5) => quality === "ambas" || (quality === "g5") === isG5;
+    for (const [id, change] of Object.entries(catalog.br ?? {})) {
+      if (!wanted(id.startsWith("g5-") || change.model?.category === "g5")) continue;
+      if (change.price || change.compareAt || change.mayorista) scale(change, false);
+    }
+    // Las listas (al público / revendedores, Brasil / G5): primero cada una queda con su ajuste actual
+    // (así las que no se eligieron no se mueven) y después se cambian las elegidas. Un porcentaje
+    // sube también lo que ya se había sumado en pesos.
+    const current = Object.fromEntries(Object.keys(LIST_CELLS).map((key) => [key, listAdjustment(settings, ...key.split(":"))]));
+    for (const [key, [percentKey, amountKey]] of Object.entries(LIST_CELLS)) {
+      settings[percentKey] = current[key].percent;
+      settings[amountKey] = current[key].amount;
+      const [cellVersion, cellQuality] = key.split(":");
+      if (!(cellVersion === "publico" ? toPublic : toResale) || !wanted(cellQuality === "g5")) continue;
+      if (amount) settings[amountKey] = cleanAmount(settings[amountKey] + amount);
       else {
-        settings[percentKey] = cleanPercent((1 + (Number(settings[percentKey]) || 0)) * factor - 1);
+        settings[percentKey] = cleanPercent((1 + settings[percentKey]) * factor - 1);
         if (settings[amountKey]) settings[amountKey] = cleanAmount(settings[amountKey] * factor);
       }
-    };
-    const separate = settings.resalePercent != null || settings.resaleAmount != null;
-    if (!separate && version !== "ambas") Object.assign(settings, { resalePercent: settings.brPercent ?? 0, resaleAmount: settings.brAmount ?? 0 });
-    if (toPublic) adjust("brPercent", "brAmount");
-    if (toResale && (separate || version !== "ambas")) adjust("resalePercent", "resaleAmount");
+    }
     // Precios generales (Brasil y G5): el del público y, aparte, el de revendedores.
     if (catalog.pricing) for (const key of ["br", "g5"]) {
+      if (!wanted(key === "g5")) continue;
       const general = catalog.pricing[key];
       if (!general) continue;
       if (toPublic) {

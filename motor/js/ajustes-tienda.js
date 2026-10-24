@@ -3,6 +3,8 @@
  * textos de la portada y venta por mayor) los cambia el cliente en su panel. Acá se leen
  * y se aplican sobre configuracion.js antes de dibujar la página.
  */
+import { adjustedTable } from "./ajuste-lista.js";
+
 const NETWORKS = {
   instagram: { label: "Instagram", url: (u) => `https://www.instagram.com/${u}/`, handle: (u) => `@${u}` },
   tiktok: { label: "TikTok", url: (u) => `https://www.tiktok.com/@${u}`, handle: (u) => `@${u}` },
@@ -82,12 +84,9 @@ export function applyChannelPrices(products, channelKey) {
 /** Venta por mayor que eligió el cliente (o ninguna). */
 export function applyWholesaleSettings(priceTable, settings, { twoVersions = false, channel = null } = {}) {
   if (!settings) return priceTable;
-  // Lo que subió o bajó la lista con "Cambiar precios" en su panel (en porcentaje y/o en pesos).
-  // La versión para revendedores puede tener su propio ajuste; si no, sigue al del público.
-  const separate = channel === "mayorista" && (settings.resalePercent != null || settings.resaleAmount != null);
-  const percent = Number(separate ? settings.resalePercent : settings.brPercent) || 0;
-  const amount = Number(separate ? settings.resaleAmount : settings.brAmount) || 0;
-  if (percent || amount) priceTable = { ...priceTable, percent, amount };
+  // Lo que subió o bajó la lista con "Cambiar precios" en su panel (en porcentaje y/o en pesos), con
+  // el ajuste de esta versión (al público o revendedores) para Brasil y para G5. Ver ajuste-lista.js.
+  priceTable = adjustedTable(priceTable, settings, channel === "mayorista" ? "mayorista" : "publico");
   // Con dos versiones, la venta por mayor de cada una sale de su lista (no de "Mi tienda").
   if (twoVersions) return priceTable;
   if (!settings.wholesale) return { ...priceTable, wholesale: false };
