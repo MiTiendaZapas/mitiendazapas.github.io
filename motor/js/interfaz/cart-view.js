@@ -1,30 +1,23 @@
 /*
  * Pedido: contador del header, barra fija en celular y panel.
- * Un solo paso: revisar el pedido, elegir por mayor o por unidad (si lleva
- * 5 o más pares) y enviarlo por WhatsApp. No se piden datos: nombre y envío
+ * Un solo paso: revisar el pedido y enviarlo por WhatsApp. Llevando la cantidad
+ * mínima (5 o más pares) el precio por mayor se aplica solo: ya no se elige entre
+ * por mayor o por unidad (nadie lo usaba, 26/10). No se piden datos: nombre y envío
  * se coordinan en el chat.
  */
-import { escapeHtml, money, plural, readStorage, whatsappLink, writeStorage } from "../utils.js";
+import { escapeHtml, money, plural, whatsappLink } from "../utils.js";
 import { buildOrderMessage, isFootwear, orderLink } from "../whatsapp.js";
 import { storeWords } from "../vocabulario.js";
 import { icon } from "./icons.js";
 import { sizeLabel } from "./g5.js";
 import { socialLinksHtml } from "./social.js";
 
-const MODE_KEY = "purchase-mode";
-
-
-export function createCartView({ config, channel, cart, pricing, overlays, storagePrefix, onOpenProduct }) {
+export function createCartView({ config, channel, cart, pricing, overlays, onOpenProduct }) {
   const headerButton = document.querySelector("[data-open-cart]");
   const headerCount = document.querySelector("[data-cart-count]");
-  const modeKey = `${storagePrefix}:${MODE_KEY}`;
-  // Si la versión de la tienda define "purchaseModes", el cliente elige por mayor o
-  // por unidad. Si no, el precio por mayor se aplica solo al llegar a la cantidad.
-  const modes = channel.purchaseModes ?? null;
-  // "mayor" | "unidad" | null (sin elegir). Lo guardado solo vale si es una forma de compra
-  // que existe en la configuración; si no (dato viejo o dañado), se toma como "sin elegir".
-  const savedMode = modes ? readStorage(modeKey, null) : null;
-  let purchaseMode = modes ? (Object.hasOwn(modes, savedMode ?? "") ? savedMode : null) : "mayor";
+  // El precio por mayor se aplica solo al llegar a la cantidad. Los textos de "purchaseModes"
+  // (si la tienda los tiene) siguen sirviendo para la página de cambios y el mensaje del pedido.
+  const purchaseMode = "mayor";
   let sent = false;   // true después de tocar "Enviar pedido por WhatsApp"
 
   // --- barra fija (celular) --------------------------------------------------
@@ -81,7 +74,6 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   });
 
   const currentQuote = () => pricing.quote(cart.lines(), purchaseMode);
-  const needsModeChoice = (quote) => Boolean(modes) && quote.canChoose && !purchaseMode;
 
   // --- resumen (header + barra) ------------------------------------------------
   /** "3 pares" si son todos calzados; "3 productos" si hay indumentaria. */
@@ -93,8 +85,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   function updateSummary({ bump = false } = {}) {
     const count = cart.count();
     const quote = currentQuote();
-    // Si todavía no eligió, se muestra el total por mayor como referencia.
-    const showWholesale = quote.canChoose && quote.mode !== "unidad";
+    const showWholesale = quote.canChoose;
     headerCount.textContent = String(count);
     headerButton.classList.toggle("has-items", count > 0);
     headerButton.setAttribute("aria-label", count ? `Ver tu pedido, ${itemsText(count)}` : "Ver tu pedido, vacío");
@@ -113,32 +104,8 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   }
 
   // --- paso 1: revisar ---------------------------------------------------------
-  function modeChoice(quote) {
-    return `
-      <fieldset class="mode-choice" aria-describedby="mode-help">
-        <legend class="mode-choice__legend">Llevás ${plural(quote.pairs, ...pricing.words)}: ¿cómo querés comprar?</legend>
-        <p class="mode-choice__help" id="mode-help">${quote.byQuality
-          ? `El precio por mayor se aplica a cada calidad que llegue a ${pricing.minPairs} ${pricing.words[1]}.`
-          : `Con ${pricing.minPairs} o más ${pricing.words[1]} surtidos podés elegir.`}</p>
-        <div class="choice-list">
-          ${["mayor", "unidad"].map((key) => `
-            <label class="choice">
-              <input type="radio" name="purchaseMode" value="${key}" ${purchaseMode === key ? "checked" : ""}>
-              <span class="choice__box choice__box--row">
-                <span>
-                  <span class="choice__title">${escapeHtml(modes[key].title)}</span>
-                  <span class="choice__text">${escapeHtml(modes[key].note)}</span>
-                </span>
-                <strong class="choice__price money">${money(quote.totals[key])}</strong>
-              </span>
-            </label>`).join("")}
-        </div>
-      </fieldset>`;
-  }
-
   function wholesaleProgress(quote) {
     if (quote.pairs === 0 || !pricing.hasWholesale) return "";
-    if (quote.canChoose && modes) return modeChoice(quote);
     if (quote.byQuality) return "";   // con BR y G5, cada bloque muestra su propio aviso
     if (quote.canChoose) {
       const savings = quote.totals.unidad - quote.totals.mayor;
@@ -197,10 +164,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
     // Con G5 en el pedido: un bloque por calidad, con su subtotal y su aviso de precio por mayor.
     const groupHint = (group, label) => {
       if (!pricing.hasWholesale) return "";
-      if (group.canChoose) {
-        const applied = !modes || quote.mode === "mayor";
-        return `<p class="cart-group__hint is-done">${icon("check")} ${applied ? "Precio por mayor aplicado" : "Llega al precio por mayor"}</p>`;
-      }
+      if (group.canChoose) return `<p class="cart-group__hint is-done">${icon("check")} Precio por mayor aplicado</p>`;
       return `<p class="cart-group__hint">Sumá <strong>${plural(group.pairsToWholesale, "par", "pares")} ${label} más</strong> para el precio por mayor de esta calidad.</p>`;
     };
     const linesHtml = quote.byQuality
@@ -223,16 +187,13 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
       ${linesHtml}
       <p class="drawer__note">${icon("chat")} No se paga por la web. Te confirmamos el stock por WhatsApp y ahí coordinamos el envío.</p>`;
 
-    const pending = needsModeChoice(quote);
     footer.innerHTML = `
       <div class="drawer__total">
-        <span>Total <small>(${itemsText(cart.count())}${quote.canChoose && !pending ? `, ${modes ? modes[quote.mode].title.toLowerCase() : "por mayor"}` : ""}, sin envío)</small></span>
-        ${pending ? `<span class="drawer__pending">Elegí por mayor o por unidad</span>` : `<strong class="money">${money(quote.total)}</strong>`}
+        <span>Total <small>(${itemsText(cart.count())}${quote.canChoose ? ", por mayor" : ""}, sin envío)</small></span>
+        <strong class="money">${money(quote.total)}</strong>
       </div>
-      ${pending
-        ? `<button class="btn btn--whatsapp btn--block btn--lg" type="button" disabled>${icon("whatsapp")} Enviar pedido por WhatsApp</button>`
-        : `<a class="btn btn--whatsapp btn--block btn--lg" href="${orderLink(config, buildOrderMessage({ config, channel, quote }))}" target="_blank" rel="noopener" data-send>
-            ${icon("whatsapp")} Enviar pedido por WhatsApp</a>`}`;
+      <a class="btn btn--whatsapp btn--block btn--lg" href="${orderLink(config, buildOrderMessage({ config, channel, quote }))}" target="_blank" rel="noopener" data-send>
+        ${icon("whatsapp")} Enviar pedido por WhatsApp</a>`;
     footer.querySelector("[data-send]")?.addEventListener("click", () => {
       document.dispatchEvent(new CustomEvent("store:order-sent", { detail: { total: quote.total, items: cart.count() } }));
       sent = true;
@@ -240,14 +201,6 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
       setTimeout(render, 300);
     });
   }
-
-  body.addEventListener("change", (event) => {
-    if (event.target.name !== "purchaseMode") return;
-    purchaseMode = event.target.value;
-    writeStorage(modeKey, purchaseMode);
-    render();
-    updateSummary();
-  });
 
   body.addEventListener("click", (event) => {
     const lineEl = event.target.closest("[data-line-product]");
@@ -270,7 +223,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   // --- después de enviar ----------------------------------------------------------
   function renderSent() {
     const quote = currentQuote();
-    if (!quote.lines.length || needsModeChoice(quote)) {
+    if (!quote.lines.length) {
       sent = false;
       renderReview();
       return;
@@ -318,11 +271,6 @@ export function createCartView({ config, channel, cart, pricing, overlays, stora
   }
 
   cart.subscribe((event) => {
-    // Si el pedido baja de la cantidad mínima (o se vacía), la elección se vuelve a pedir.
-    if (modes && purchaseMode && !pricing.quote(cart.lines()).canChoose) {
-      purchaseMode = null;
-      writeStorage(modeKey, null);
-    }
     updateSummary({ bump: event.type === "add" });
     if (dialog.open && !sent) render();
   });

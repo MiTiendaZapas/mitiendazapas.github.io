@@ -139,7 +139,7 @@ async function startStore() {
     renderNewArrivals(document.querySelector("[data-new-arrivals]"), { products: catalog.products, pricing });
     renderLastPairs(document.querySelector("[data-last-pairs]"), { products: catalog.products, pricing });
     cartView = createCartView({
-      config, channel, cart, pricing, overlays, storagePrefix,
+      config, channel, cart, pricing, overlays,
       onOpenProduct: (product) => { location.hash = `#p/${encodeURIComponent(product.slug)}`; },
     });
 
