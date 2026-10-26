@@ -177,3 +177,19 @@ describe("app de pedidos desde GitHub (/api/app)", () => {
     }
   });
 });
+
+describe("ojotas de casa desde la app", () => {
+  test("al sumarle pares a una ojota del proveedor queda marcada, y sigue marcada al llegar a 0", async () => {
+    env.CATALOGO = bucket({ "productos.json": { products: [
+      { id: "vp-oj", slug: "ojotas-total-black", name: "Ojotas total black", category: "ojotas", sizes: [{ size: "39/40", stock: 9 }], images: [] },
+    ] }, "productos-g5.json": { products: [] } });
+    const read = () => JSON.parse(env.PRIVADO.items.get("tiendas/laimp/productos.json").text).br["vp-oj"];
+    const send = (delta) => throughApp(req("/api/app/casa", { body: { accion: "ajustar", id: "b:vp-oj", talle: "39/40", delta } }), appCasa);
+    assert.equal((await (await send(1)).json()).despues, 1);
+    assert.equal(read().soloCasa, true);
+    assert.equal((await (await send(-1)).json()).despues, 0);
+    assert.deepEqual(read(), { soloCasa: true });
+    const { house } = await panel.readBrStock(env);
+    assert.ok(house.ids.has("vp-oj"));
+  });
+});

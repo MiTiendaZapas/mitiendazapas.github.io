@@ -1,7 +1,7 @@
 // POST /api/panel/br  { id, price?, wholesalePrice?, hidden?, extra?: [{ size, stock }] }
 //   ->  guarda lo que el cliente cambió en un modelo de Brasil: su precio, ocultarlo, o los
 //       pares que tiene en su casa. Sin nada de eso, el modelo vuelve a ser automático.
-import { brModel, cleanBrChange, fail, json, readBrStock, readCatalog, updateCatalog } from "../../../servidor/panel.js";
+import { brModel, cleanBrChange, fail, json, markHouseSandal, readBrStock, readCatalog, updateCatalog } from "../../../servidor/panel.js";
 
 export async function onRequestPost({ request, env, data }) {
   const store = data.session.tienda;
@@ -17,7 +17,9 @@ export async function onRequestPost({ request, env, data }) {
     if (!found && !saved?.model) return fail("Ese modelo ya no está en el stock de Brasil.");
     const change = await updateCatalog(env, store, (catalog) => {
       const base = found ? brModel(found, catalog.stockBR) : { ...catalog.br?.[input.id]?.model, id: input.id, sizes: [] };
-      const cleaned = cleanBrChange(input, base);
+      markHouseSandal(store, catalog.br?.[input.id], base.category);   // (por si ahora la deja en 0)
+      const cleaned = cleanBrChange(input, base, catalog.br?.[input.id]);
+      markHouseSandal(store, cleaned, base.category);
       catalog.br = { ...(catalog.br ?? {}) };
       if (cleaned) catalog.br[input.id] = cleaned;
       else delete catalog.br[input.id];

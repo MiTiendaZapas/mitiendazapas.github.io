@@ -18,7 +18,7 @@
  */
 import { compareSizes } from "../motor/js/talles.js";
 import { LIST_CELLS, listAdjustment } from "../motor/js/ajuste-lista.js";
-import { fullPhone } from "../motor/js/utils.js";
+import { fullPhone, normalize } from "../motor/js/utils.js";
 
 export const LIMITS = {
   products: 150,          // productos por tienda
@@ -292,16 +292,52 @@ const brCategoryIds = (data) => (g5Off(data) ? ["zapatillas", "ojotas"] : ["zapa
 const BR_FILES_URL = "https://catalogo.mitiendastock.com/";
 const MAX_EXTRA_SIZES = 30;
 
-/** Stock del proveedor tal como lo publicó el piloto (con o sin G5). */
+/** Stock del proveedor tal como lo publicó el piloto (con o sin G5), y qué ojotas son de casa. */
 export async function readBrStock(env) {
   const files = ["productos.json", "productos-g5.json"];
-  const lists = await Promise.all(files.map(async (key) => {
+  const [lists, house] = await Promise.all([Promise.all(files.map(async (key) => {
     const object = await env.CATALOGO.get(key);
     return object ? object.json() : { products: [] };
-  }));
+  })), readHouseSandals(env)]);
   const products = lists.flatMap((list) => list.products ?? [])
     .filter((p) => p && typeof p.id === "string" && typeof p.name === "string" && Array.isArray(p.sizes));
-  return { generatedAt: lists[0].generatedAt ?? null, products };
+  return { generatedAt: lists[0].generatedAt ?? null, products, house };
+}
+
+// --- ojotas de casa (pedido del usuario, 26/10) -------------------------------------
+// Las ojotas que el socio carga como stock de casa en la tienda de L.A IMP se venden SOLO con esos
+// pares, en todas las tiendas (L.A IMP, Fabri y clientes): ya no se suma el stock del proveedor,
+// porque esos pares tienen otro precio. Si los pares de casa llegan a 0, la ojota queda agotada
+// (no vuelve al proveedor). Las ojotas sin stock de casa siguen con el stock del proveedor.
+// Son de casa:
+//   - los modelos del proveedor a los que L.A IMP les sumó pares (data.br[id].soloCasa, queda
+//     guardado aunque los pares lleguen a 0),
+//   - y los que se llaman igual que una ojota propia de L.A IMP (Ojotas camuflada...).
+// En L.A IMP esos pares ya están en su panel: ahí el proveedor pone 0. En las demás tiendas se ven
+// los pares de casa que publica el piloto (talle.casa), con el precio de cada tienda.
+export const HOUSE_STORE = "laimp";
+const SANDALS = "ojotas";
+
+async function readHouseSandals(env) {
+  const object = await env.PRIVADO?.get(`tiendas/${HOUSE_STORE}/productos.json`);
+  const data = object ? await object.json() : null;
+  // (Las que ya tenían pares antes de la marca cuentan igual; la marca se guarda en el próximo cambio.)
+  const ids = Object.entries(data?.br ?? {})
+    .filter(([, change]) => change?.soloCasa === true || (change?.extra && change.model?.category === SANDALS)).map(([id]) => id);
+  const names = (data?.products ?? []).filter((p) => p.category === SANDALS).map((p) => normalize(p.name));
+  return { ids: new Set(ids), names: new Set(names) };
+}
+
+/** Si un modelo del proveedor es una ojota de casa: "marcada" (soloCasa), "nombre" (ojota propia) o null. */
+function houseSandal(product, house) {
+  if (product.category !== SANDALS || !house) return null;
+  if (house.ids.has(product.id)) return "marcada";
+  return house.names.has(normalize(product.name)) ? "nombre" : null;
+}
+
+/** Al sumar pares de casa a una ojota del proveedor en L.A IMP, queda marcada como ojota de casa. */
+export function markHouseSandal(store, change, category) {
+  if (store === HOUSE_STORE && change?.extra && category === SANDALS) change.soloCasa = true;
 }
 
 /** Un modelo de Brasil sin los cambios del cliente. Las fotos van con su dirección completa. */
@@ -368,11 +404,29 @@ export function brProducts(data, br) {
   const seen = new Set();
   // Sin stock de casa, los modelos que son SOLO de casa no van (quedarían sin pares).
   const withHouse = data.stockBR?.casa === true;
-  const list = br.products.filter((p) => withHouse || !(Array.isArray(p.origin) && p.origin.length && p.origin.every((o) => o === "casa")))
-    .filter((p) => !(g5Off(data) && isG5(p))).map((p) => {
+  const isHouseStore = data.store === HOUSE_STORE;
+  const list = [];
+  for (const p of br.products) {
+    if (g5Off(data) && isG5(p)) continue;
+    const sandal = houseSandal(p, br.house);
+    const onlyHouse = Array.isArray(p.origin) && p.origin.length && p.origin.every((o) => o === "casa");
+    if (sandal) {
+      // L.A IMP ya tiene esa ojota como producto propio: el modelo del proveedor no va.
+      if (isHouseStore && sandal === "nombre") continue;
+      seen.add(p.id);
+      const model = brModel(p, { casa: true });
+      // L.A IMP: sus pares están en el panel (extra), el proveedor pone 0. Las demás: solo los de casa.
+      const casa = new Map(p.sizes.map((s) => [String(s.size), Number(s.casa) || 0]));
+      model.sizes = model.sizes.map((s) => ({ size: s.size, stock: isHouseStore ? 0 : casa.get(s.size) ?? 0 }));
+      // Fuera de L.A IMP llevan el precio de cada tienda, no el que les puso L.A IMP.
+      if (!isHouseStore) Object.assign(model, { basePrice: null, baseWholesale: null });
+      list.push(withChanges(model, changes[p.id]));
+      continue;
+    }
+    if (!withHouse && onlyHouse) continue;
     seen.add(p.id);
-    return withChanges(brModel(p, data.stockBR), changes[p.id]);
-  });
+    list.push(withChanges(brModel(p, data.stockBR), changes[p.id]));
+  }
   for (const [id, change] of Object.entries(changes)) {
     if (!seen.has(id) && change.model && change.extra && !(g5Off(data) && isG5(change.model))) list.push(withChanges({ ...change.model, id, sizes: [] }, change));
   }
@@ -425,7 +479,7 @@ export function publicMixedCatalog(data, br) {
 }
 
 /** Revisa lo que mandó el panel para un modelo de Brasil. Devuelve null si quedó todo automático. */
-export function cleanBrChange(input, base) {
+export function cleanBrChange(input, base, previous = null) {
   const price = cleanPrice(input?.price, "el precio");
   const wholesalePrice = cleanPrice(input?.wholesalePrice, "el precio por mayor");
   if (price && wholesalePrice && wholesalePrice >= price) throw new Error("El precio por mayor tiene que ser menor que el precio por unidad.");
@@ -458,6 +512,8 @@ export function cleanBrChange(input, base) {
     const { id, sizes, ...model } = base;
     change.model = model;
   }
+  // Una ojota de casa sigue siéndolo aunque se queden sin pares (ver "ojotas de casa").
+  if (previous?.soloCasa === true) change.soloCasa = true;
   return Object.keys(change).length ? change : null;
 }
 
@@ -1058,12 +1114,15 @@ export async function houseStockRequest(env, store, input) {
     if (!code) return moveHouseStock(catalog, input);
     const found = br.products.find((p) => p.id === code);
     if (!found && !catalog.br?.[code]?.model) return { ok: false, motivo: "no-existe" };
+    const category = found?.category ?? catalog.br?.[code]?.model?.category;
+    markHouseSandal(store, catalog.br?.[code], category);   // (antes de restar: por si llega a 0)
     const result = moveHouseStock(catalog, input);
     const change = catalog.br?.[code];
     if (result.ok && found && change?.extra && !change.model) {
       const { id, sizes, ...model } = brModel(found, catalog.stockBR);
       change.model = model;
     }
+    markHouseSandal(store, change, category);
     // Sin pares de casa, la copia ya no hace falta (igual que desde el panel).
     if (change && !change.extra && change.model) {
       delete change.model;

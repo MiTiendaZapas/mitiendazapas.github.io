@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-const { brModel, brProducts, applyGroupOffers, changePrices, cleanBrChange, cleanupPhotos, cleanCategories, cleanProduct, publicMixedCatalog, storeCategories } = await import("../servidor/panel.js");
+const { brModel, brProducts, markHouseSandal, applyGroupOffers, changePrices, cleanBrChange, cleanupPhotos, cleanCategories, cleanProduct, publicMixedCatalog, storeCategories } = await import("../servidor/panel.js");
 const { createPricing } = await import("../motor/js/pricing.js");
 
 const brazil = {
@@ -327,5 +327,60 @@ describe("cambiar precios de una sola categoría propia", () => {
     assert.equal(catalog.br["vp-1"].price, 62000);
     assert.deepEqual(catalog.pricing, { br: { unit: 60000 } });
     assert.deepEqual(settings, {});
+  });
+});
+
+describe("ojotas de casa: si el socio les cargó pares, se venden solo esos (26/10)", () => {
+  // Como lo publica el piloto: el proveedor + los pares de casa (talle.casa) de L.A IMP.
+  const sandals = {
+    generatedAt: "2026-10-26T10:00:00Z",
+    products: [
+      { id: "vp-tb", slug: "ojotas-total-black", name: "Ojotas total black", category: "ojotas", origin: ["casa", "proveedor"],
+        sizes: [{ size: "37/38", stock: 14, casa: 5 }, { size: "39/40", stock: 69 }], images: [] },
+      { id: "vp-lv", slug: "ojotas-lv", name: "Ojotas Louis Vuitton negras", category: "ojotas", origin: ["casa", "proveedor"],
+        sizes: [{ size: "39/40", stock: 76, casa: 2 }], images: [] },
+      { id: "casa-cam", slug: "ojotas-camuflada", name: "Ojotas camuflada", category: "ojotas", origin: ["casa"], price: 40000, wholesalePrice: 29000,
+        sizes: [{ size: "37/38", stock: 4, casa: 4 }], images: [] },
+      { id: "vp-mind", slug: "mind", name: "Mind rojas", category: "ojotas", origin: ["proveedor"], sizes: [{ size: "41/42", stock: 23 }], images: [] },
+      { id: "vp-dunk", slug: "dunk", name: "Dunk", category: "zapatillas", origin: ["casa", "proveedor"], sizes: [{ size: "40", stock: 3, casa: 1 }], images: [] },
+    ],
+    house: { ids: new Set(["vp-tb"]), names: new Set(["ojotas louis vuitton negras", "ojotas camuflada"]) },
+  };
+  const byId = (list) => Object.fromEntries(list.map((p) => [p.id, p]));
+  const stockOf = (p) => p && p.sizes.map((s) => [s.size, s.stock]);
+
+  test("Fabri y clientes: solo los pares de casa, con el precio de su tienda; las demás ojotas y zapatillas, igual que antes", () => {
+    for (const casa of [false, true]) {
+      const list = byId(brProducts(store({ store: "fo", stockBR: { casa, g5: true } }), sandals));
+      assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 5], ["39/40", 0]]);
+      assert.deepEqual(stockOf(list["vp-lv"]), [["39/40", 2]]);
+      assert.deepEqual(stockOf(list["casa-cam"]), [["37/38", 4]]);
+      assert.equal(list["casa-cam"].basePrice, null);
+      assert.deepEqual(stockOf(list["vp-mind"]), [["41/42", 23]]);
+      assert.deepEqual(stockOf(list["vp-dunk"]), [["40", casa ? 3 : 2]]);
+    }
+  });
+
+  test("L.A IMP: el proveedor pone 0 (sus pares están en el panel) y la ojota que ya es producto propio no se repite", () => {
+    const change = { extra: { "39/40": 3 }, soloCasa: true };
+    const list = byId(brProducts(store({ store: "laimp", br: { "vp-tb": change } }), sandals));
+    assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 0], ["39/40", 3]]);
+    assert.equal(list["vp-lv"], undefined);
+    assert.equal(list["casa-cam"], undefined);
+    assert.deepEqual(stockOf(list["vp-mind"]), [["41/42", 23]]);
+  });
+
+  test("la marca de ojota de casa queda aunque los pares lleguen a 0 (queda agotada, no vuelve al proveedor)", () => {
+    const base = brModel(sandals.products[0]);
+    const withPairs = cleanBrChange({ extra: [{ size: "37/38", stock: 1 }] }, base);
+    markHouseSandal("laimp", withPairs, "ojotas");
+    assert.equal(withPairs.soloCasa, true);
+    const empty = cleanBrChange({ extra: [] }, base, withPairs);
+    assert.deepEqual(empty, { soloCasa: true });
+    // En otra tienda (o con zapatillas) no se marca nada.
+    const other = cleanBrChange({ extra: [{ size: "37/38", stock: 1 }] }, base);
+    markHouseSandal("fo", other, "ojotas");
+    markHouseSandal("laimp", other, "zapatillas");
+    assert.equal(other.soloCasa, undefined);
   });
 });
