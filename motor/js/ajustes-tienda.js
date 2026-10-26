@@ -17,7 +17,9 @@ export async function loadStoreSettings(config) {
     const response = await fetch(`/api/tienda/${encodeURIComponent(config.manualStore)}/ajustes.json`, { cache: "no-cache" });
     if (!response.ok) return null;
     const settings = await response.json();
-    return settings?.name ? settings : null;
+    // Aunque nunca haya guardado "Mi tienda" (sin nombre), puede tener ajustes de "Cambiar precios"
+    // u orden: se devuelven igual (antes se ignoraban y la suba de precios no se veía, 25/10).
+    return settings && typeof settings === "object" && Object.keys(settings).length ? settings : null;
   } catch {
     return null;   // sin ajustes: queda lo de configuracion.js
   }
