@@ -452,7 +452,10 @@ function renderPriceChange() {
   let direction = 1;          // 1 subir, -1 bajar
   let mode = "monto";         // "monto" (pesos fijos, lo más común: el proveedor sube $1.000 todo) | "porcentaje"
   let amount = 10;            // porcentaje elegido o "otro"
-  let scope = "todos";        // "todos" | "propios" | "automatico" | "brasil" | "g5"
+  // Categorías de sus productos (para "Solo una categoría").
+  const ownCategories = [...new Set(state.products.map((p) => p.category))].sort((a, b) => categoryName(a).localeCompare(categoryName(b)));
+  let scope = state.br ? "todos" : "propios";   // "todos" | "propios" | "categoria" | "automatico" | "brasil" | "g5"
+  let category = ownCategories[0] ?? null;
   let version = "ambas";      // tiendas con dos versiones: "ambas" | "publico" | "mayorista"
   const custom = h("input", { id: "pc-custom", class: "panel-input", inputmode: "decimal", placeholder: "Ej: 12", autocomplete: "off" });
   const customField = field("pc-custom", "Porcentaje", custom);
@@ -467,6 +470,12 @@ function renderPriceChange() {
     h("button", { type: "button", class: "panel-chip", "aria-pressed": String(current === value), onclick: () => onPick(value) }, label)));
 
   function paint() {
+    let step = 2;
+    const scopes = state.br
+      ? [["todos", "A todos"], ["propios", "Solo a mis productos"], ...(ownCategories.length ? [["categoria", "Solo una categoría mía"]] : []),
+        ["automatico", "Todo el stock automático"], ["brasil", "Solo Calidad Brasil"],
+        ...(state.br.products.some((p) => p.category === "g5") ? [["g5", "Solo Calidad G5"]] : [])]
+      : ownCategories.length > 1 ? [["propios", "A todos mis productos"], ["categoria", "Solo una categoría"]] : null;
     steps.replaceChildren(...[
       h("section", { class: "panel-card" }, h("h2", {}, "1. ¿Qué querés hacer?"),
         choice([[1, "Subir precios"], [-1, "Bajar precios"]], direction, (v) => { direction = v; paint(); })),
@@ -476,10 +485,11 @@ function renderPriceChange() {
           ? [pesosField, h("p", { class: "panel-muted" }, `Todos los precios ${direction > 0 ? "suben" : "bajan"} lo mismo (por ejemplo, $60.000 → $${direction > 0 ? "61.000" : "59.000"} con $1.000).`)]
           : [choice([[5, "5%"], [10, "10%"], [15, "15%"], [20, "20%"], ["otro", "Otro"]], amount, (v) => { amount = v; paint(); if (v === "otro") custom.focus(); }),
             amount === "otro" ? customField : null]),
-      state.br ? h("section", { class: "panel-card" }, h("h2", {}, "3. ¿A cuáles?"),
-        choice([["todos", "A todos"], ["propios", "Solo a mis productos"], ["automatico", "Todo el stock automático"], ["brasil", "Solo Calidad Brasil"],
-          ...(state.br.products.some((p) => p.category === "g5") ? [["g5", "Solo Calidad G5"]] : [])], scope, (v) => { scope = v; paint(); })) : null,
-      TWO_VERSIONS ? h("section", { class: "panel-card" }, h("h2", {}, `${state.br ? 4 : 3}. ¿En qué versión de la tienda?`),
+      scopes ? h("section", { class: "panel-card" }, h("h2", {}, `${++step}. ¿A cuáles?`),
+        choice(scopes, scope, (v) => { scope = v; paint(); }),
+        scope === "categoria" ? [h("p", { class: "panel-muted" }, "¿Cuál categoría?"),
+          choice(ownCategories.map((id) => [id, categoryName(id)]), category, (v) => { category = v; paint(); })] : null) : null,
+      TWO_VERSIONS ? h("section", { class: "panel-card" }, h("h2", {}, `${++step}. ¿En qué versión de la tienda?`),
         choice([["ambas", "En las dos"], ["publico", "Solo al público"], ["mayorista", "Solo revendedores"]], version, (v) => { version = v; paint(); }),
         version !== "ambas" ? h("p", { class: "panel-muted" }, `Los precios ${version === "publico" ? "para revendedores" : "al público"} quedan como están.`) : null) : null].filter(Boolean));
     const n = mode === "monto" ? pesosValue() : percent();
@@ -494,14 +504,16 @@ function renderPriceChange() {
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
     const how = howMuch();
-    const what = { todos: "todos tus productos", propios: "tus productos", automatico: "el stock automático", brasil: "la calidad Brasil", g5: "la calidad G5" }[state.br ? scope : "propios"];
+    const what = { todos: "todos tus productos", propios: "tus productos", categoria: `tus productos de “${categoryName(category)}”`,
+      automatico: "el stock automático", brasil: "la calidad Brasil", g5: "la calidad G5" }[scope];
     const where = TWO_VERSIONS ? { ambas: " (al público y a revendedores)", publico: " (solo al público)", mayorista: " (solo a revendedores)" }[version] : "";
     if (!await ask(`¿${direction > 0 ? "Subir" : "Bajar"} ${how} los precios de ${what}${where}?`, { ok: direction > 0 ? "Sí, subir" : "Sí, bajar" })) return;
     const done = await busy(apply, async () => {
       await api("/precios", { method: "POST", body: {
         ...(mode === "monto" ? { amount: direction * pesosValue() } : { percent: direction * percent() }),
-        own: !state.br || scope === "todos" || scope === "propios",
-        br: Boolean(state.br) && scope !== "propios",
+        own: ["todos", "propios", "categoria"].includes(scope),
+        br: Boolean(state.br) && !["propios", "categoria"].includes(scope),
+        ...(scope === "categoria" ? { category } : {}),
         quality: scope === "brasil" ? "br" : scope === "g5" ? "g5" : "ambas",
         ...(TWO_VERSIONS ? { version } : {}),
       } });

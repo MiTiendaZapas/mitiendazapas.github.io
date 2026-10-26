@@ -316,3 +316,16 @@ describe("productos propios en la tienda (marca, nuevo ingreso, calidad)", () =>
     assert.equal(filters.total(), 2);           // G5: el Campus y la bermuda
   });
 });
+
+describe("cambiar precios de una sola categoría propia", () => {
+  test("sube solo los productos de esa categoría; lo demás (otros productos y stock automático) queda igual", () => {
+    const catalog = { products: [{ id: "a", category: "remeras", price: 20000 }, { id: "b", category: "buzos", price: 30000 }],
+      br: { "vp-1": { price: 62000 } }, pricing: { br: { unit: 60000 } }, stockBR: {} };
+    const settings = {};
+    changePrices(catalog, settings, { amount: 1000, own: true, br: false, category: "remeras" });
+    assert.deepEqual(catalog.products.map((p) => p.price), [21000, 30000]);
+    assert.equal(catalog.br["vp-1"].price, 62000);
+    assert.deepEqual(catalog.pricing, { br: { unit: 60000 } });
+    assert.deepEqual(settings, {});
+  });
+});

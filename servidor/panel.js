@@ -772,7 +772,7 @@ const roundPrice = (n) => Math.max(100, Math.round(n / 100) * 100);   // a los $
  * modelos de Brasil se cambian; los modelos de Brasil con el precio de su lista suben con
  * brPercent (se aplica sobre la lista, que maneja L.A IMP). Devuelve cuántos cambió.
  */
-export function changePrices(catalog, settings, { percent = 0, amount = 0, own, br, version = "ambas", quality = "ambas" }) {
+export function changePrices(catalog, settings, { percent = 0, amount = 0, own, br, version = "ambas", quality = "ambas", category = null }) {
   const factor = 1 + percent;
   // En porcentaje (redondeado a los $100) o en un monto fijo (todos suben o bajan lo mismo).
   const move = (n) => (amount ? Math.max(100, n + amount) : roundPrice(n * factor));
@@ -801,7 +801,8 @@ export function changePrices(catalog, settings, { percent = 0, amount = 0, own, 
     if (item.mayorista?.wholesalePrice && item.mayorista.price && item.mayorista.wholesalePrice >= item.mayorista.price) item.mayorista.wholesalePrice = null;
   };
   let count = 0;
-  if (own) for (const product of catalog.products) { scale(product, true); count += 1; }
+  // category: solo los productos propios de esa categoría (por ejemplo, "remeras").
+  if (own) for (const product of catalog.products) if (!category || product.category === category) { scale(product, true); count += 1; }
   if (br) {
     // Calidad: "br" (Brasil), "g5" o "ambas". Las G5 tienen código "g5-…".
     const wanted = (isG5) => quality === "ambas" || (quality === "g5") === isG5;
