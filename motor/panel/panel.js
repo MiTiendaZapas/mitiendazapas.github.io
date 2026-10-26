@@ -956,9 +956,11 @@ function paintTotal(el, total, word = "unidades", empty = "Sin stock") {
 }
 
 /** Un talle con − y + en una sola línea (compacto: dos por fila en el celular). */
-function sizeCell(label, value, onMinus, onPlus, sub) {
+function sizeCell(label, value, onMinus, onPlus, sub, onDelete) {
   return h("div", { class: `panel-quick__size${Number(value.textContent) === 0 ? " is-zero" : ""}` },
-    h("span", { class: "panel-quick__label" }, h("strong", {}, label), sub ? h("small", { class: "panel-muted" }, sub) : null),
+    h("span", { class: "panel-quick__label" }, h("strong", {}, label), sub ? h("small", { class: "panel-muted" }, sub) : null,
+      // Borrar el talle (por ejemplo, uno cargado mal): pregunta antes.
+      onDelete ? h("button", { type: "button", class: "panel-quick__del", "aria-label": `Borrar el talle ${label}`, title: "Borrar talle", onclick: onDelete }, ico("trash")) : null),
     h("div", { class: "panel-stepper" },
       h("button", { type: "button", "aria-label": `Restar uno al talle ${label}`, onclick: onMinus }, ico("minus")),
       value,
@@ -990,7 +992,18 @@ function renderQuickStock(product, box, totalEl) {
           if (!pending) { s.stock = stock; paint(); }
         }, () => { s.stock -= pending; pending = 0; paint(); });
       };
-      cell = sizeCell(s.size, value, change(-1), change(1));
+      const remove = async () => {
+        if (!await ask(`¿Borrar el talle ${s.size}${s.stock ? ` (con ${s.stock} ${s.stock === 1 ? "unidad" : "unidades"})` : ""}?`, { ok: "Sí, borrar", danger: true })) return;
+        try {
+          const { sizes } = await api("/stock", { method: "POST", body: { id: product.id, size: s.size, borrar: true } });
+          product.sizes = sizes;
+          renderQuickStock(product, box, totalEl);
+          toast(`Talle ${s.size} borrado.`);
+        } catch (e) {
+          toast(e.message, "error");
+        }
+      };
+      cell = sizeCell(s.size, value, change(-1), change(1), null, product.sizes.length > 1 ? remove : null);
       return cell;
     }),
     // Un talle nuevo (por ejemplo, te llegó un 45): se agrega acá mismo, con 1 unidad.
@@ -1385,7 +1398,23 @@ function renderQuickPairs(product, box, onChange, { onlyMine = false } = {}) {
           onChange();
         });
       };
-      cell = sizeCell(s.size, value, change(-1), change(1), product.category === "g5" ? "EU" : null);
+      // Un talle que cargaste vos y Brasil no tiene (por ejemplo, uno escrito mal): se puede borrar.
+      const remove = async () => {
+        if (!await ask(`¿Borrar el talle ${s.size}${s.casa ? ` (con ${s.casa} ${s.casa === 1 ? "par" : "pares"} tuyos)` : ""}?`, { ok: "Sí, borrar", danger: true })) return;
+        const before = product.sizes;
+        product.sizes = product.sizes.filter((x) => x !== s);
+        try {
+          await api("/br", { method: "POST", body: brBody(product) });
+        } catch (e) {
+          product.sizes = before;
+          return toast(e.message, "error");
+        }
+        if (shown) { shown.delete(s.size); box.dataset.shown = JSON.stringify([...shown]); }
+        renderQuickPairs(product, box, onChange, { onlyMine });
+        onChange();
+        toast(`Talle ${s.size} borrado.`);
+      };
+      cell = sizeCell(s.size, value, change(-1), change(1), product.category === "g5" ? "EU" : null, s.soloCasa ? remove : null);
       return cell;
     }),
     // Un talle que Brasil no tiene (por ejemplo, un 45 que tenés en tu casa): se agrega acá mismo.

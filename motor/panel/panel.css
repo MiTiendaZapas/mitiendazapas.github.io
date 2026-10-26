@@ -66,6 +66,9 @@
 .panel-quick { display: grid; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border); }
 .panel-quick__grid { display: grid; grid-template-columns: 1fr; gap: var(--space-2); }
 @media (min-width: 640px) { .panel-quick__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.panel-quick__del { display: inline-grid; place-items: center; width: 32px; height: 32px; margin: 2px 0 -4px -6px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--color-text-muted); cursor: pointer; }
+.panel-quick__del:hover { color: var(--color-danger); background: var(--color-surface); }
+.panel-quick__del .panel-ico { width: 16px; height: 16px; }
 .panel-quick__size { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 56px; padding: 6px 8px 6px 12px; border-radius: var(--radius-control); background: var(--color-surface-2); }
 .panel-quick__label { display: grid; gap: 1px; font-size: 15px; line-height: 1.25; }
 .panel-quick__label small { font-size: 13px; }
