@@ -450,7 +450,7 @@ function pricesButton() {
  */
 function renderPriceChange() {
   let direction = 1;          // 1 subir, -1 bajar
-  let mode = "porcentaje";    // "porcentaje" | "monto" (pesos fijos, por ejemplo cuando el proveedor sube $1.000 todo)
+  let mode = "monto";         // "monto" (pesos fijos, lo más común: el proveedor sube $1.000 todo) | "porcentaje"
   let amount = 10;            // porcentaje elegido o "otro"
   let scope = "todos";        // "todos" | "propios" | "automatico" | "brasil" | "g5"
   let version = "ambas";      // tiendas con dos versiones: "ambas" | "publico" | "mayorista"
@@ -471,7 +471,7 @@ function renderPriceChange() {
       h("section", { class: "panel-card" }, h("h2", {}, "1. ¿Qué querés hacer?"),
         choice([[1, "Subir precios"], [-1, "Bajar precios"]], direction, (v) => { direction = v; paint(); })),
       h("section", { class: "panel-card" }, h("h2", {}, `2. ¿Cuánto querés ${direction > 0 ? "subirlos" : "bajarlos"}?`),
-        choice([["porcentaje", "En porcentaje (%)"], ["monto", "Un monto fijo ($)"]], mode, (v) => { mode = v; paint(); if (v === "monto") pesos.focus(); }),
+        choice([["monto", "Un monto fijo ($)"], ["porcentaje", "En porcentaje (%)"]], mode, (v) => { mode = v; paint(); if (v === "monto") pesos.focus(); }),
         mode === "monto"
           ? [pesosField, h("p", { class: "panel-muted" }, `Todos los precios ${direction > 0 ? "suben" : "bajan"} lo mismo (por ejemplo, $60.000 → $${direction > 0 ? "61.000" : "59.000"} con $1.000).`)]
           : [choice([[5, "5%"], [10, "10%"], [15, "15%"], [20, "20%"], ["otro", "Otro"]], amount, (v) => { amount = v; paint(); if (v === "otro") custom.focus(); }),
