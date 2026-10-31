@@ -101,3 +101,7 @@ A pedido del usuario, desde el 13/10 el bot envía entre **05:45 y 06:10** (ante
 ## Textos del bot (24/10)
 
 A pedido del usuario: (1) el proveedor subió $1.000 el stock brasilero, así que todos los precios de `MENSAJE_FINAL_PRECIOS` en `bot_whatsapp.py` subieron $1.000 (adulto $44.000; desde 5 unidades $38.000/$40.000/$42.000; niño $36.000 y por mayor $31.000; ojotas $36.000/$32.000; ojotas Mind $38.000/$36.000; Jordan 11 y Retro 11 Panda $56.000/$51.000). Los precios de G5 e indumentaria no cambiaron. (2) `MENSAJE_PROMO_TIENDA` ahora usa el título "Beneficios:", dice "El mismo stock de zapatillas BR y G5" y suma "Pueden agregar sus propios productos". Esos textos son fijos en el código: si cambian los precios, hay que editarlos ahí.
+
+## Ojotas de casa en el bot (31/10)
+
+Siguiendo la regla de las tiendas del 26/10 (las ojotas de casa se venden SOLO con los pares de casa), el bot ahora manda, para una ojota con pares de casa, solo los talles de la columna `casa` de `productos.json` y no el stock total con el del proveedor. Recuerda en `automatizacion/ojotas_de_casa.json` qué ojotas alguna vez tuvieron pares de casa: si llegan a 0, quedan agotadas y no vuelven al proveedor (igual que en las tiendas). Si cambia esa regla en el panel, avisarlo en una guía para adaptar el bot. Nota: el mensaje de precios del bot tiene un solo precio de ojotas; las ojotas de casa tienen su propio precio en el panel.
