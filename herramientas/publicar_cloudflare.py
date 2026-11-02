@@ -58,6 +58,10 @@ CLIENT_PANELS = True
 # disponible por el momento" en vez del stock. Las tiendas no se tocan. Se pone en False para
 # reactivarlos y volver a publicar. (02/11: pausados y reactivados el mismo día.)
 CATALOGS_PAUSED = False
+# Catálogos dados de baja: no se publican, su link deja de existir (queda el "no encontramos esta
+# página" de siempre). La tienda del cliente NO se toca. Se saca de la lista para reactivarlo.
+# (02/11: /catalogo/fo/ fuera a pedido del usuario; su tienda /fo/ sigue normal.)
+CATALOGS_OFF = ["catalogo/fo"]
 # Cartel que se ve cuando los catálogos están pausados (mismo estilo que el catálogo).
 CATALOG_PAUSED_PAGE = """<!DOCTYPE html>
 <html lang="es-AR" data-theme="light">
@@ -254,6 +258,8 @@ def build(dist, test=False):
     # /catalogo/ es el stock de L.A IMP; /catalogo/fo/ el de la tienda de Fabri (sin stock de casa).
     page = (ROOT / "herramientas" / "catalogo.html").read_text(encoding="utf-8")
     for folder, stock in (("catalogo", "laimp"), ("catalogo/fo", "fo")):
+        if folder in CATALOGS_OFF:
+            continue   # dado de baja: el link no existe (404 normal)
         (dist / folder).mkdir(parents=True)
         if CATALOGS_PAUSED:
             (dist / folder / "index.html").write_text(CATALOG_PAUSED_PAGE, encoding="utf-8")
