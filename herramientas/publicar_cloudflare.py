@@ -56,8 +56,8 @@ MAIN_STORE_PANEL = True
 CLIENT_PANELS = True
 # True: los catálogos para compartir (/catalogo/ y /catalogo/fo/) muestran un cartel de "no
 # disponible por el momento" en vez del stock. Las tiendas no se tocan. Se pone en False para
-# reactivarlos y volver a publicar. (02/11: pausados a pedido del usuario.)
-CATALOGS_PAUSED = True
+# reactivarlos y volver a publicar. (02/11: pausados y reactivados el mismo día.)
+CATALOGS_PAUSED = False
 # Cartel que se ve cuando los catálogos están pausados (mismo estilo que el catálogo).
 CATALOG_PAUSED_PAGE = """<!DOCTYPE html>
 <html lang="es-AR" data-theme="light">
