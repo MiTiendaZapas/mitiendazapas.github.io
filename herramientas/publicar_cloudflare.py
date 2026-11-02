@@ -56,8 +56,8 @@ MAIN_STORE_PANEL = True
 CLIENT_PANELS = True
 # True: los catálogos para compartir (/catalogo/ y /catalogo/fo/) muestran un cartel de "no
 # disponible por el momento" en vez del stock. Las tiendas no se tocan. Se pone en False para
-# reactivarlos y volver a publicar. (02/11: en mantenimiento para una prueba del usuario.)
-CATALOGS_PAUSED = True
+# reactivarlos y volver a publicar. (02/11: en mantenimiento para una prueba del usuario y reactivados.)
+CATALOGS_PAUSED = False
 # Catálogos dados de baja: no se publican, su link deja de existir (queda el "no encontramos esta
 # página" de siempre). La tienda del cliente NO se toca. Se saca de la lista para reactivarlo.
 # (02/11: /catalogo/fo/ se dio de baja y se reactivó el mismo día.)
