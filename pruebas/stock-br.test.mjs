@@ -349,16 +349,12 @@ describe("ojotas de casa: si el socio les cargó pares, se venden solo esos (26/
   const byId = (list) => Object.fromEntries(list.map((p) => [p.id, p]));
   const stockOf = (p) => p && p.sizes.map((s) => [s.size, s.stock]);
 
-  test("solo Fabri: las ojotas de casa se venden solo con esos pares, con el precio de su tienda", () => {
-    for (const casa of [false, true]) {
-      const list = byId(brProducts(store({ store: "fo", stockBR: { casa, g5: true } }), sandals));
-      assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 5], ["39/40", 0]]);
-      assert.deepEqual(stockOf(list["vp-lv"]), [["39/40", 2]]);
-      assert.deepEqual(stockOf(list["casa-cam"]), [["37/38", 4]]);
-      assert.equal(list["casa-cam"].basePrice, null);
-      assert.deepEqual(stockOf(list["vp-mind"]), [["41/42", 23]]);
-      assert.deepEqual(stockOf(list["vp-dunk"]), [["40", casa ? 3 : 2]]);
-    }
+  test("Fabri: también suma proveedor + casa en las ojotas (pedido del usuario, 02/11)", () => {
+    const list = byId(brProducts(store({ store: "fo", stockBR: { casa: true, g5: true } }), sandals));
+    assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 14], ["39/40", 69]]);
+    assert.deepEqual(stockOf(list["vp-lv"]), [["39/40", 76]]);
+    assert.deepEqual(stockOf(list["casa-cam"]), [["37/38", 4]]);
+    assert.deepEqual(stockOf(list["vp-mind"]), [["41/42", 23]]);
   });
 
   test("clientes (no Fabri): vuelven a sumar proveedor + casa, como antes (pedido del usuario, 02/11)", () => {

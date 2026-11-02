@@ -317,9 +317,10 @@ export async function readBrStock(env) {
 // los pares de casa que publica el piloto (talle.casa), con el precio de cada tienda.
 export const HOUSE_STORE = "laimp";
 // Tiendas que venden las ojotas de casa SOLO con los pares de casa (sin el stock del proveedor).
-// Pedido del usuario (02/11): quedó solo para Fabri. Tu tienda y los demás clientes vuelven a
-// sumar proveedor + casa con los precios de antes. (Marcar las ojotas de casa sigue en L.A IMP.)
-const HOUSE_ONLY_STORES = new Set(["fo"]);
+// Pedido del usuario (02/11): primero quedó solo para Fabri y ese mismo día también volvió a sumar
+// proveedor + casa. La lista queda vacía (todas las tiendas suman); si hace falta de nuevo, se agrega
+// la tienda acá. (Marcar las ojotas de casa sigue en L.A IMP.)
+const HOUSE_ONLY_STORES = new Set();
 const SANDALS = "ojotas";
 
 async function readHouseSandals(env) {
