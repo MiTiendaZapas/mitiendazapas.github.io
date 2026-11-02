@@ -54,6 +54,31 @@ MAIN_STORE_PANEL = True
 # (stock de Brasil con los precios de su lista de siempre) y cada cliente maneja su tienda solo.
 # Antes hay que activarlas con herramientas/activar_stock_br.mjs y crearles usuario.
 CLIENT_PANELS = True
+# True: los catálogos para compartir (/catalogo/ y /catalogo/fo/) muestran un cartel de "no
+# disponible por el momento" en vez del stock. Las tiendas no se tocan. Se pone en False para
+# reactivarlos y volver a publicar. (02/11: pausados a pedido del usuario.)
+CATALOGS_PAUSED = True
+# Cartel que se ve cuando los catálogos están pausados (mismo estilo que el catálogo).
+CATALOG_PAUSED_PAGE = """<!DOCTYPE html>
+<html lang="es-AR" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Catálogo no disponible</title>
+  <meta name="theme-color" content="#ffffff">
+  <link rel="stylesheet" href="/motor/catalogo/catalogo.css">
+</head>
+<body data-stock="laimp">
+  <main class="c-wrap" style="max-width:32rem;margin:0 auto;padding:4rem 1.25rem;text-align:center">
+    <h1 style="margin:0 0 .75rem">Catálogo no disponible por el momento</h1>
+    <p class="c-muted" style="font-size:1.05rem;line-height:1.5">
+      Este catálogo está pausado. Para ver el stock, escribile a quien te lo compartió.
+    </p>
+  </main>
+</body>
+</html>
+"""
 PANEL_PAGE = """<!DOCTYPE html>
 <html lang="es-AR">
 <head>
@@ -230,7 +255,10 @@ def build(dist, test=False):
     page = (ROOT / "herramientas" / "catalogo.html").read_text(encoding="utf-8")
     for folder, stock in (("catalogo", "laimp"), ("catalogo/fo", "fo")):
         (dist / folder).mkdir(parents=True)
-        (dist / folder / "index.html").write_text(page.replace('data-stock="laimp"', f'data-stock="{stock}"'), encoding="utf-8")
+        if CATALOGS_PAUSED:
+            (dist / folder / "index.html").write_text(CATALOG_PAUSED_PAGE, encoding="utf-8")
+        else:
+            (dist / folder / "index.html").write_text(page.replace('data-stock="laimp"', f'data-stock="{stock}"'), encoding="utf-8")
     # Sin 404.html, Cloudflare responde la portada (con "todo bien") a cualquier archivo que
     # no existe. Si un celular pedía un estilo nuevo justo mientras se publicaba, se quedaba
     # horas con esa portada en vez del estilo y la tienda se veía sin diseño.
