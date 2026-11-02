@@ -60,8 +60,8 @@ CLIENT_PANELS = True
 CATALOGS_PAUSED = False
 # Catálogos dados de baja: no se publican, su link deja de existir (queda el "no encontramos esta
 # página" de siempre). La tienda del cliente NO se toca. Se saca de la lista para reactivarlo.
-# (02/11: /catalogo/fo/ fuera a pedido del usuario; su tienda /fo/ sigue normal.)
-CATALOGS_OFF = ["catalogo/fo"]
+# (02/11: /catalogo/fo/ se dio de baja y se reactivó el mismo día.)
+CATALOGS_OFF = []
 # Cartel que se ve cuando los catálogos están pausados (mismo estilo que el catálogo).
 CATALOG_PAUSED_PAGE = """<!DOCTYPE html>
 <html lang="es-AR" data-theme="light">
