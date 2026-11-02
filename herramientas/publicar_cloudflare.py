@@ -56,8 +56,8 @@ MAIN_STORE_PANEL = True
 CLIENT_PANELS = True
 # True: los catálogos para compartir (/catalogo/ y /catalogo/fo/) muestran un cartel de "no
 # disponible por el momento" en vez del stock. Las tiendas no se tocan. Se pone en False para
-# reactivarlos y volver a publicar. (02/11: pausados y reactivados el mismo día.)
-CATALOGS_PAUSED = False
+# reactivarlos y volver a publicar. (02/11: en mantenimiento para una prueba del usuario.)
+CATALOGS_PAUSED = True
 # Catálogos dados de baja: no se publican, su link deja de existir (queda el "no encontramos esta
 # página" de siempre). La tienda del cliente NO se toca. Se saca de la lista para reactivarlo.
 # (02/11: /catalogo/fo/ se dio de baja y se reactivó el mismo día.)
@@ -69,15 +69,15 @@ CATALOG_PAUSED_PAGE = """<!DOCTYPE html>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex">
-  <title>Catálogo no disponible</title>
+  <title>Catálogo en mantenimiento</title>
   <meta name="theme-color" content="#ffffff">
   <link rel="stylesheet" href="/motor/catalogo/catalogo.css">
 </head>
 <body data-stock="laimp">
   <main class="c-wrap" style="max-width:32rem;margin:0 auto;padding:4rem 1.25rem;text-align:center">
-    <h1 style="margin:0 0 .75rem">Catálogo no disponible por el momento</h1>
+    <h1 style="margin:0 0 .75rem">Estamos en mantenimiento</h1>
     <p class="c-muted" style="font-size:1.05rem;line-height:1.5">
-      Este catálogo está pausado. Para ver el stock, escribile a quien te lo compartió.
+      El catálogo vuelve en un rato. Disculpá las molestias.
     </p>
   </main>
 </body>
