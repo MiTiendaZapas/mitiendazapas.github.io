@@ -381,6 +381,16 @@ describe("ojotas de casa: si el socio les cargó pares, se venden solo esos (26/
     assert.deepEqual(stockOf(list["vp-mind"]), [["41/42", 23]]);
   });
 
+  test("L.A IMP: la ojota propia con el mismo nombre que la del proveedor suma los pares de los dos, con su precio", () => {
+    const own = { id: "m-lv", slug: "lv", name: "Ojotas Louis Vuitton negras", category: "ojotas", price: 40000, wholesalePrice: 29000,
+      sizes: [{ size: "37/38", stock: 0 }, { size: "39/40", stock: 1 }], images: [] };
+    const result = publicMixedCatalog(store({ store: "laimp", stockBR: { casa: false, g5: true }, products: [own] }), sandals);
+    const lv = result.products.filter((p) => p.name === "Ojotas Louis Vuitton negras");
+    assert.equal(lv.length, 1);
+    assert.deepEqual(lv[0].sizes.map((s) => [s.size, s.stock]), [["37/38", 0], ["39/40", 75]]);   // 1 propio + 74 del proveedor (sin sus 2 de casa)
+    assert.equal(lv[0].price, 40000);
+  });
+
   test("la marca de ojota de casa queda aunque los pares lleguen a 0 (queda agotada, no vuelve al proveedor)", () => {
     const base = brModel(sandals.products[0]);
     const withPairs = cleanBrChange({ extra: [{ size: "37/38", stock: 1 }] }, base);

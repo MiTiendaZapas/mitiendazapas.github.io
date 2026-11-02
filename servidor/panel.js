@@ -485,6 +485,21 @@ export function publicMixedCatalog(data, br) {
     // "extra": pares del cliente en ese talle (el piloto los toma de la tienda de L.A IMP como stock de casa).
     .map(({ hidden, status, sizes, ...p }) => ({ ...p, sizes: sizes.map(({ size, stock, casa }) => ({ size, stock, ...(casa > 0 ? { extra: casa } : {}) })) }));
   const own = publicCatalog(data).products;
+  // L.A IMP: una ojota propia con el mismo nombre que una del proveedor suma los pares de los dos
+  // en un solo modelo (con el precio propio). El modelo del proveedor no se repite (ver brProducts).
+  if (data.store === HOUSE_STORE) {
+    const provider = new Map(br.products.filter((p) => p.category === SANDALS).map((p) => [normalize(p.name), brModel(p)]));
+    for (const product of own) {
+      const extra = product.category === SANDALS ? provider.get(normalize(product.name)) : null;
+      if (!extra) continue;
+      const total = new Map(product.sizes.map((s) => [s.size, { ...s }]));
+      for (const s of extra.sizes) {
+        const mine = total.get(s.size);
+        if (mine) mine.stock += s.stock; else total.set(s.size, { size: s.size, stock: s.stock });
+      }
+      product.sizes = [...total.values()].sort((a, b) => compareSizes(a.size, b.size));
+    }
+  }
   const categories = storeCategories(data);
   const dates = [br.generatedAt, data.generatedAt].filter(Boolean).sort();
   return { version: 1, store: data.store, generatedAt: dates.at(-1) ?? null, categories, products: [...fromBrazil, ...own] };
