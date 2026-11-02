@@ -316,6 +316,10 @@ export async function readBrStock(env) {
 // En L.A IMP esos pares ya están en su panel: ahí el proveedor pone 0. En las demás tiendas se ven
 // los pares de casa que publica el piloto (talle.casa), con el precio de cada tienda.
 export const HOUSE_STORE = "laimp";
+// Tiendas que venden las ojotas de casa SOLO con los pares de casa (sin el stock del proveedor).
+// Pedido del usuario (02/11): quedó solo para Fabri. Tu tienda y los demás clientes vuelven a
+// sumar proveedor + casa con los precios de antes. (Marcar las ojotas de casa sigue en L.A IMP.)
+const HOUSE_ONLY_STORES = new Set(["fo"]);
 const SANDALS = "ojotas";
 
 async function readHouseSandals(env) {
@@ -405,10 +409,18 @@ export function brProducts(data, br) {
   // Sin stock de casa, los modelos que son SOLO de casa no van (quedarían sin pares).
   const withHouse = data.stockBR?.casa === true;
   const isHouseStore = data.store === HOUSE_STORE;
+  // Solo Fabri vende las ojotas de casa sin el proveedor; las demás tiendas suman como siempre.
+  const houseOnly = HOUSE_ONLY_STORES.has(data.store);
+  // En L.A IMP, una ojota del proveedor que ya es producto propio (mismo nombre) no se repite:
+  // manda el producto propio. (Antes del 02/11 esto lo hacía el modo "solo casa".)
+  const ownSandals = isHouseStore
+    ? new Set((data.products ?? []).filter((p) => p.category === SANDALS).map((p) => normalize(p.name)))
+    : null;
   const list = [];
   for (const p of br.products) {
     if (g5Off(data) && isG5(p)) continue;
-    const sandal = houseSandal(p, br.house);
+    if (ownSandals && p.category === SANDALS && ownSandals.has(normalize(p.name))) continue;
+    const sandal = houseOnly ? houseSandal(p, br.house) : null;
     const onlyHouse = Array.isArray(p.origin) && p.origin.length && p.origin.every((o) => o === "casa");
     if (sandal) {
       // L.A IMP ya tiene esa ojota como producto propio: el modelo del proveedor no va.

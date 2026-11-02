@@ -349,7 +349,7 @@ describe("ojotas de casa: si el socio les cargó pares, se venden solo esos (26/
   const byId = (list) => Object.fromEntries(list.map((p) => [p.id, p]));
   const stockOf = (p) => p && p.sizes.map((s) => [s.size, s.stock]);
 
-  test("Fabri y clientes: solo los pares de casa, con el precio de su tienda; las demás ojotas y zapatillas, igual que antes", () => {
+  test("solo Fabri: las ojotas de casa se venden solo con esos pares, con el precio de su tienda", () => {
     for (const casa of [false, true]) {
       const list = byId(brProducts(store({ store: "fo", stockBR: { casa, g5: true } }), sandals));
       assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 5], ["39/40", 0]]);
@@ -361,12 +361,23 @@ describe("ojotas de casa: si el socio les cargó pares, se venden solo esos (26/
     }
   });
 
-  test("L.A IMP: el proveedor pone 0 (sus pares están en el panel) y la ojota que ya es producto propio no se repite", () => {
+  test("clientes (no Fabri): vuelven a sumar proveedor + casa, como antes (pedido del usuario, 02/11)", () => {
+    const list = byId(brProducts(store({ store: "emma", stockBR: { casa: true, g5: true } }), sandals));
+    assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 14], ["39/40", 69]]);
+    assert.deepEqual(stockOf(list["vp-lv"]), [["39/40", 76]]);
+    assert.deepEqual(stockOf(list["casa-cam"]), [["37/38", 4]]);
+    assert.equal(list["casa-cam"].basePrice, 40000);
+    assert.deepEqual(stockOf(list["vp-mind"]), [["41/42", 23]]);
+  });
+
+  test("L.A IMP: también vuelve a sumar (proveedor sin los pares ya contados + los pares de su panel)", () => {
     const change = { extra: { "39/40": 3 }, soloCasa: true };
-    const list = byId(brProducts(store({ store: "laimp", br: { "vp-tb": change } }), sandals));
-    assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 0], ["39/40", 3]]);
-    assert.equal(list["vp-lv"], undefined);
-    assert.equal(list["casa-cam"], undefined);
+    // "Ojotas Louis Vuitton negras" es también producto propio de L.A IMP: no se repite el del proveedor.
+    const laimp = store({ store: "laimp", br: { "vp-tb": change }, products: [{ id: "m-lv", name: "Ojotas Louis Vuitton negras", category: "ojotas", sizes: [], images: [] }] });
+    const list = byId(brProducts(laimp, sandals));
+    assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 9], ["39/40", 72]]);
+    assert.equal(list["vp-lv"], undefined);       // lo cubre el producto propio del mismo nombre
+    assert.equal(list["casa-cam"], undefined);    // es producto propio de L.A IMP (va aparte, no en el feed de Brasil)
     assert.deepEqual(stockOf(list["vp-mind"]), [["41/42", 23]]);
   });
 
