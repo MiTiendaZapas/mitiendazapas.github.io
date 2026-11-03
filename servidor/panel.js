@@ -576,8 +576,6 @@ export async function copyPhotos(env, store, images) {
  * "fotos/<modelo>/…"), con nombres nuevos de la tienda: el producto propio queda con sus fotos
  * aunque el proveedor después borre ese modelo. Si una foto no tiene versión chica, va la grande.
  */
-// Solo estas tiendas pueden usar las fotos del stock automático en sus productos (pedido del usuario, 22/10).
-export const CATALOG_PHOTOS_STORES = new Set(["laimp", "fo"]);
 const BR_PHOTO_KEY = /^fotos\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(webp|jpg)$/;
 export async function copyBrPhotos(env, store, images, room) {
   // Todas a la vez (de a una tardaba varios segundos con 4 o 5 fotos).
@@ -856,7 +854,9 @@ export function cleanSettings(input, current = {}) {
     wholesaleByCategory: cleanByCategory(input?.wholesaleByCategory),
     logo,
     // Modo catálogo: sin carrito de compra (el cliente consulta por WhatsApp), con precios y nombre/logo opcionales.
-    mode: input?.mode === "catalogo" ? "catalogo" : "tienda",
+    // "tienda" (pedido con precios), "catalogo" (lista de consulta, precios y marca opcionales) o
+    // "compartir" (el diseño de los catálogos para compartir, sin precios, con lista de consulta).
+    mode: ["catalogo", "compartir"].includes(input?.mode) ? input.mode : "tienda",
     showPrices: input?.showPrices !== false,
     showBrand: input?.showBrand !== false,
     // Aviso arriba de la tienda (por ejemplo "Envío gratis este fin de semana").
