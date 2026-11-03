@@ -69,15 +69,17 @@ export async function onRequestGet({ request, env, params, next, waitUntil }) {
     .on('meta[property="og:title"]', new SetContent(title))
     .on('meta[property="og:description"]', new SetContent(description));
   if (hideBrand) {
-    // Ni el logo ni el nombre: la imagen es una foto de sus productos (o ninguna, si todavía no tiene).
+    // Ni el logo ni el nombre: la imagen es una foto de sus productos. Sin fotos todavía, queda la imagen
+    // genérica de la propia página (y su ícono de pestaña), si la tiene.
     const photo = await sharePhoto(env, params.tienda, origin, waitUntil);
-    rewriter
-      .on('meta[property="og:image"]', new SetContent(photo))
-      .on('meta[property="og:image:type"]', new SetContent(null))
-      .on('meta[property="og:image:width"]', new SetContent(null))
-      .on('meta[property="og:image:height"]', new SetContent(null))
-      .on('meta[property="og:image:alt"]', new SetContent(null))
-      .on('link[rel="icon"]', { element(el) { el.remove(); } });
+    if (photo) {
+      rewriter
+        .on('meta[property="og:image"]', new SetContent(photo))
+        .on('meta[property="og:image:type"]', new SetContent(null))
+        .on('meta[property="og:image:width"]', new SetContent(null))
+        .on('meta[property="og:image:height"]', new SetContent(null))
+        .on('meta[property="og:image:alt"]', new SetContent(null));
+    }
   } else if (settings.logo) {
     // Logo subido en el panel: es el ícono de la pestaña y la imagen al compartir. Sin logo subido
     // quedan los de la página (antes se borraban y L.A IMP se quedaba sin ícono ni imagen al compartir).
