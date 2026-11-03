@@ -192,3 +192,31 @@ img { display: block; max-width: 100%; }
   .c-sheet__body { align-content: start; padding: 56px 28px 28px; }
   .c-sheet__body h2 { font-size: 26px; }
 }
+
+/* Mi consulta (carrito del catálogo de una tienda con panel) */
+.c-btn--wa { background: #1f9d55; color: #ffffff; text-decoration: none; }
+.c-btn--wa:disabled { background: var(--c-surface-2); color: var(--c-muted); opacity: 1; cursor: not-allowed; }
+.c-sheet__sizes--pick li { padding: 0; }
+.c-sheet__sizes--pick button { width: 100%; min-width: 56px; min-height: 48px; padding: 4px 10px; border: 0; border-radius: 12px; background: transparent; font-weight: 700; font-variant-numeric: tabular-nums; }
+.c-sheet__sizes--pick li:has([aria-pressed="true"]) { border-color: var(--c-accent); background: var(--c-accent); color: var(--c-on-accent); }
+.c-sheet__sizes--pick li:has([aria-pressed="true"]) button { color: var(--c-on-accent); }
+.c-cart-btn { position: relative; }
+.c-cart-btn__count { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--c-accent); color: var(--c-on-accent); font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+.c-cart-btn:not(.has-items) .c-cart-btn__count { display: none; }
+.c-cartbar { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 30; display: flex; align-items: center; gap: 12px; max-width: 520px; margin: 0 auto; padding: 14px 18px; border: 0; border-radius: 14px; background: #1f9d55; color: #ffffff; font-weight: 700; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); }
+.c-cartbar[hidden] { display: none; }
+.c-cartbar__count { display: grid; place-items: center; min-width: 26px; height: 26px; border-radius: 13px; background: rgb(255 255 255 / 0.22); }
+.c-cartbar__text { flex: 1; text-align: left; }
+.c-consulta { width: min(100%, 520px); }
+.c-consulta__body { display: grid; gap: 14px; padding: 4px 16px calc(20px + env(safe-area-inset-bottom)); }
+.c-consulta__body h2 { margin: 0; font-size: 22px; }
+.c-consulta__list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.c-line { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--c-border); border-radius: 12px; }
+.c-line__img { width: 56px; height: 56px; border-radius: 8px; background: var(--c-surface-2); object-fit: cover; }
+.c-line__info { display: grid; gap: 2px; min-width: 0; }
+.c-line__info strong { overflow-wrap: anywhere; }
+.c-step { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; }
+.c-step button, .c-line__remove { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--c-border); border-radius: 10px; background: var(--c-bg); }
+.c-step button:disabled { opacity: 0.4; cursor: not-allowed; }
+.c-step output { min-width: 28px; text-align: center; font-weight: 700; }
+.c-consulta__total { margin: 0; }

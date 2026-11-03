@@ -10,6 +10,7 @@ import { loadCatalog } from "../js/catalog.js";
 import { compareSizes } from "../js/talles.js";
 import { icon } from "../js/interfaz/icons.js";
 import { brandLogo } from "../js/interfaz/marcas.js";
+import { createConsulta } from "./consulta.js";
 
 // De dónde sale el stock de cada catálogo (<body data-stock="…">).
 const SOURCES = {
@@ -17,7 +18,11 @@ const SOURCES = {
   // "Brasil 2": la calidad Brasil de la tienda de las G5 (la trae el piloto aparte).
   fo: { base: "https://catalogo.mitiendastock.com/", includeHouseStock: false, files: ["productos-br2.json", "productos-g5.json"] },
 };
-const SOURCE = SOURCES[document.body.dataset.stock] ?? SOURCES.laimp;
+// Catálogo de una tienda con panel (<body data-stock="tienda:<tienda>">): su stock, con "Mi consulta" (carrito).
+const STORE = String(document.body.dataset.stock ?? "").startsWith("tienda:") ? document.body.dataset.stock.slice(7) : null;
+const SOURCE = STORE ? { base: `/api/tienda/${encodeURIComponent(STORE)}/`, includeHouseStock: true, files: null }
+  : SOURCES[document.body.dataset.stock] ?? SOURCES.laimp;
+let consulta = null;
 const THEME_KEY = "catalogo:tema";
 const TYPES = { zapatillas: "Zapatillas", ojotas: "Ojotas" };
 const collator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
@@ -244,6 +249,7 @@ function openSheet(p, photo = 0) {
   sheet.querySelector("[data-close]").addEventListener("click", () => sheet.close());
   sheet.querySelector("[data-photo]").addEventListener("click", (event) => sendPhoto(p, event.currentTarget));
   sheet.querySelector("[data-photo]").hidden = !p.images.length;
+  consulta?.decorate(sheet, p);
   state.modelo = p.slug;
   writeUrl();
   if (!sheet.open) sheet.showModal();
@@ -358,6 +364,11 @@ async function start() {
     return;
   }
   $("actualizado").textContent = updatedText(catalog.updatedAt);
+  if (STORE && !consulta) {
+    let settings = {};
+    try { settings = await (await fetch(`/api/tienda/${encodeURIComponent(STORE)}/ajustes.json`, { cache: "no-cache" })).json(); } catch { /* sin ajustes: sin carrito */ }
+    if (settings.whatsapp) consulta = createConsulta({ store: STORE, products: () => catalog.products, settings, toast });
+  }
   $("orden").value = state.orden === "talles" ? "talles" : "marca";
   update();
   const model = state.modelo && catalog.getBySlug(state.modelo);
