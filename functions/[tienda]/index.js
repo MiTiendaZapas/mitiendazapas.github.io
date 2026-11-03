@@ -45,7 +45,7 @@ async function sharePhoto(env, store, origin, waitUntil) {
 }
 
 export async function onRequestGet({ request, env, params, next, waitUntil }) {
-  const response = await next();
+  let response = await next();
   if (!isStoreId(params.tienda) || !(response.headers.get("Content-Type") ?? "").includes("text/html")) return response;
   let settings;
   try {
@@ -56,7 +56,15 @@ export async function onRequestGet({ request, env, params, next, waitUntil }) {
   if (!settings?.name) return response;
 
   const origin = new URL(request.url).origin;
-  const catalog = settings.mode === "catalogo";
+  // "Catálogo para compartir": en vez de la tienda, el diseño de los catálogos para compartir (con
+  // "Mi consulta"). Es la misma dirección de la tienda: el cliente cambia de tipo desde su panel.
+  const share = settings.mode === "compartir";
+  if (share) {
+    const template = await env.ASSETS.fetch(new Request(`${origin}/_catalogo-tienda/`));
+    if (!template.ok) return response;
+    response = new Response(template.body, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" } });
+  }
+  const catalog = settings.mode === "catalogo" || share;
   const hideBrand = catalog && settings.showBrand === false;
   const title = hideBrand ? "Catálogo" : `${settings.name} · Catálogo`;
   const fallback = catalog ? "Mirá los productos, armá tu lista y consultá por WhatsApp."
@@ -89,5 +97,6 @@ export async function onRequestGet({ request, env, params, next, waitUntil }) {
       .on('meta[property="og:image:alt"]', new SetContent(`Logo de ${settings.name}`))
       .on('link[rel="icon"]', { element(el) { el.setAttribute("href", `${origin}/api/tienda/${params.tienda}/${settings.logo.small}`); } });
   }
+  if (share) rewriter.on("body", { element(el) { el.setAttribute("data-stock", `tienda:${params.tienda}`); } });
   return rewriter.transform(response);
 }

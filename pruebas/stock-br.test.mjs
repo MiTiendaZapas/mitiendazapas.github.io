@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-const { brModel, brProducts, markHouseSandal, applyGroupOffers, changePrices, cleanBrChange, cleanupPhotos, cleanCategories, cleanProduct, publicMixedCatalog, storeCategories } = await import("../servidor/panel.js");
+const { cleanSettings, brModel, brProducts, markHouseSandal, applyGroupOffers, changePrices, cleanBrChange, cleanupPhotos, cleanCategories, cleanProduct, publicMixedCatalog, storeCategories } = await import("../servidor/panel.js");
 const { createPricing } = await import("../motor/js/pricing.js");
 
 const brazil = {
@@ -439,5 +439,15 @@ describe("fotos propias en modelos automáticos", () => {
     } };
     await cleanupPhotos(env, "prueba", store({ br: { "vp-1": { images: [own] } } }));
     assert.deepEqual(removed, ["tiendas/prueba/fotos/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb-lg.webp"]);
+  });
+});
+
+describe("tipo de tienda", () => {
+  const base = { name: "Mi tienda", whatsapp: "5491153773771" };
+  test("tienda, catálogo y catálogo para compartir; cualquier otra cosa es tienda", () => {
+    assert.equal(cleanSettings(base).mode, "tienda");
+    assert.equal(cleanSettings({ ...base, mode: "catalogo" }).mode, "catalogo");
+    assert.equal(cleanSettings({ ...base, mode: "compartir" }).mode, "compartir");
+    assert.equal(cleanSettings({ ...base, mode: "otro" }).mode, "tienda");
   });
 });

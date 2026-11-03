@@ -367,6 +367,12 @@ async function start() {
   if (STORE && !consulta) {
     let settings = {};
     try { settings = await (await fetch(`/api/tienda/${encodeURIComponent(STORE)}/ajustes.json`, { cache: "no-cache" })).json(); } catch { /* sin ajustes: sin carrito */ }
+    // Con "Mostrar el nombre y el logo" prendido (Mi tienda), el catálogo lleva el nombre y el logo de la tienda.
+    if (settings.showBrand !== false && settings.name) {
+      $("titulo").textContent = settings.name;
+      document.title = `${settings.name} · Catálogo`;
+      if (settings.logo) $("titulo").insertAdjacentHTML("beforebegin", `<img class="c-header__logo" src="/api/tienda/${encodeURIComponent(STORE)}/${esc(settings.logo.small)}" alt="" width="40" height="40">`);
+    }
     if (settings.whatsapp) consulta = createConsulta({ store: STORE, products: () => catalog.products, settings, toast });
   }
   $("orden").value = state.orden === "talles" ? "talles" : "marca";

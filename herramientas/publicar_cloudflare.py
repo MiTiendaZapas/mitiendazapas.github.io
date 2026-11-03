@@ -265,6 +265,24 @@ def build(dist, test=False):
             (dist / folder / "index.html").write_text(CATALOG_PAUSED_PAGE, encoding="utf-8")
         else:
             (dist / folder / "index.html").write_text(page.replace('data-stock="laimp"', f'data-stock="{stock}"'), encoding="utf-8")
+    # Plantilla del "Catálogo para compartir" de las tiendas con panel (Mi tienda → Tipo de tienda): el
+    # programa de la portada de la tienda (functions/[tienda]/index.js) la entrega en vez de la tienda.
+    # Lleva un ícono y una imagen genéricos, sin nombre de ninguna tienda.
+    template = (page.replace('data-stock="laimp"', 'data-stock="tienda:"')
+                .replace("<title>Catálogo · Stock disponible</title>", "<title>Catálogo</title>")
+                .replace('<meta name="theme-color" content="#ffffff">',
+                         '<link rel="icon" type="image/png" sizes="32x32" href="/motor/catalogo/icono-32.png">\n'
+                         '  <link rel="icon" type="image/png" sizes="192x192" href="/motor/catalogo/icono-192.png">\n'
+                         '  <link rel="apple-touch-icon" href="/motor/catalogo/icono-192.png">\n'
+                         '  <meta name="theme-color" content="#ffffff">')
+                .replace('  <meta property="og:description"',
+                         '  <meta property="og:image" content="https://mitiendastock.com/motor/catalogo/icono-512.png">\n'
+                         '  <meta property="og:image:type" content="image/png">\n'
+                         '  <meta property="og:image:width" content="512">\n'
+                         '  <meta property="og:image:height" content="512">\n'
+                         '  <meta property="og:description"', 1))
+    (dist / "_catalogo-tienda").mkdir()
+    (dist / "_catalogo-tienda" / "index.html").write_text(template, encoding="utf-8")
     # Sin 404.html, Cloudflare responde la portada (con "todo bien") a cualquier archivo que
     # no existe. Si un celular pedía un estilo nuevo justo mientras se publicaba, se quedaba
     # horas con esa portada en vez del estilo y la tienda se veía sin diseño.

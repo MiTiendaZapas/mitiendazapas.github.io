@@ -1712,8 +1712,8 @@ function renderEditor(product) {
   // copian a la tienda, sin sacarle fotos de nuevo. Solo en tiendas con stock automático.
   const picker = h("div", { class: "panel-pick", hidden: true });
   function catalogPhotosButton() {
-    // Solo en la tienda de L.A IMP y en la de Fabri (el servidor también lo controla).
-    if (!["laimp", "fo"].includes(config.manualStore) || !state.br?.products?.length) return null;
+    // Cualquier tienda con el stock automático prendido (el servidor también lo controla).
+    if (!state.br?.products?.length) return null;
     return h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: openPicker }, ico("image"), "Usar fotos de un modelo");
   }
   const normalText = (text) => String(text ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -2231,17 +2231,30 @@ function renderStoreSettings() {
   }
   renderLogo();
 
+  const autoStock = h("input", { id: "s-auto-stock", type: "checkbox", checked: Boolean(state.br), onchange: async (event) => {
+    const box = event.target;
+    try {
+      await api("/stock-automatico", { method: "POST", body: { enabled: box.checked } });
+      await loadData();
+      renderTop({ loggedIn: true });
+      toast(box.checked ? "Stock automático prendido: ya aparece en Productos." : "Stock automático apagado.");
+    } catch (error) {
+      box.checked = !box.checked;
+      toast(error.message, "error");
+    }
+  } });
   // Tienda (con pedido y precios) o Catálogo (el cliente arma una lista y consulta por WhatsApp).
-  let mode = s.mode === "catalogo" ? "catalogo" : "tienda";
+  let mode = ["catalogo", "compartir"].includes(s.mode) ? s.mode : "tienda";
   const showPrices = h("input", { id: "s-show-prices", type: "checkbox", checked: s.showPrices !== false });
   const showBrand = h("input", { id: "s-show-brand", type: "checkbox", checked: s.showBrand !== false });
-  const catalogOptions = h("div", { class: "panel-catalog-options", hidden: mode !== "catalogo" },
-    h("label", { class: "panel-switch", for: "s-show-prices" }, showPrices, h("span", {}, "Mostrar los precios"),
-      h("small", { class: "panel-muted" }, "Apagalo para pasar el catálogo sin precios (por ejemplo a un grupo de revendedores): los precios se hablan por WhatsApp.")),
+  const pricesOption = h("label", { class: "panel-switch", for: "s-show-prices", hidden: mode === "compartir" }, showPrices, h("span", {}, "Mostrar los precios"),
+    h("small", { class: "panel-muted" }, "Apagalo para pasar el catálogo sin precios (por ejemplo a un grupo de revendedores): los precios se hablan por WhatsApp."));
+  const catalogOptions = h("div", { class: "panel-catalog-options", hidden: mode === "tienda" },
+    pricesOption,
     h("label", { class: "panel-switch", for: "s-show-brand" }, showBrand, h("span", {}, "Mostrar el nombre y el logo"),
       h("small", { class: "panel-muted" }, "Apagalo para un catálogo sin marca: arriba dice solo “Catálogo” y al compartir el link no aparecen tu nombre ni tu logo.")));
   const modeChoice = (value, label, help) => h("label", { class: "panel-choice" },
-    h("input", { type: "radio", name: "s-mode", value, checked: mode === value, onchange: () => { mode = value; catalogOptions.hidden = mode !== "catalogo"; } }),
+    h("input", { type: "radio", name: "s-mode", value, checked: mode === value, onchange: () => { mode = value; catalogOptions.hidden = mode === "tienda"; pricesOption.hidden = mode === "compartir"; } }),
     h("span", {}, h("strong", {}, label), h("small", { class: "panel-muted" }, help)));
 
   const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar cambios");
@@ -2265,8 +2278,12 @@ function renderStoreSettings() {
     h("section", { class: "panel-card" }, h("h2", {}, "Tipo de tienda"),
       h("div", { class: "panel-choices", role: "radiogroup", "aria-label": "Tipo de tienda" },
         modeChoice("tienda", "Tienda", "Tus clientes arman el pedido y lo envían por WhatsApp, con precios y total."),
-        modeChoice("catalogo", "Catálogo", "Tus clientes arman una lista de lo que les interesa y te consultan por WhatsApp. Podés ocultar los precios y tu marca.")),
+        modeChoice("catalogo", "Catálogo", "Tus clientes arman una lista de lo que les interesa y te consultan por WhatsApp. Podés ocultar los precios y tu marca."),
+        modeChoice("compartir", "Catálogo para compartir", "El diseño de los catálogos para pasar por WhatsApp: filtros por marca y talle, fotos grandes y lista de consulta. Sin precios. Podés ocultar tu marca.")),
       catalogOptions),
+    h("section", { class: "panel-card" }, h("h2", {}, "Stock automático"),
+      h("label", { class: "panel-switch", for: "s-auto-stock" }, autoStock, h("span", {}, "Usar el stock automático"),
+        h("small", { class: "panel-muted" }, "Los modelos del proveedor (Brasil y calidad G5) llegan solos a tu tienda y su stock se actualiza solo. Si lo apagás, dejan de verse; tus cambios (precios, fotos, pares de tu casa) quedan guardados por si lo volvés a prender."))),
     h("section", { class: "panel-card" }, h("h2", {}, "Nombre y logo"),
       field("s-name", "Nombre de la tienda", name),
       field("s-tagline", "Frase corta", tagline, "Aparece al pie y al compartir el link."),

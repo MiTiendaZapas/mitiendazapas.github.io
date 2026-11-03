@@ -220,3 +220,6 @@ img { display: block; max-width: 100%; }
 .c-step button:disabled { opacity: 0.4; cursor: not-allowed; }
 .c-step output { min-width: 28px; text-align: center; font-weight: 700; }
 .c-consulta__total { margin: 0; }
+.c-header__title { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; }
+.c-header__logo { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
+.c-header__title p { flex-basis: 100%; }
