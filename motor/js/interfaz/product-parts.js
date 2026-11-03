@@ -1,8 +1,10 @@
 /* Piezas que comparten la tarjeta del catálogo y la vista de detalle. */
 import { escapeHtml, money } from "../utils.js";
+import { modo } from "../modo-catalogo.js";
 
 /** Precio por unidad y, debajo, el precio por mayor (o por cantidad en indumentaria). */
 export function priceHtml(product, pricing) {
+  if (!modo.prices) return "";   // catálogo sin precios
   const prices = pricing.forProduct(product);
   let bulkLine = "";
   if (prices.bulk) {

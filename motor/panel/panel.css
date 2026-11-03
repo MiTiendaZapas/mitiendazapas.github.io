@@ -764,3 +764,12 @@
   .panel-tab { min-height: 44px; display: inline-flex; align-items: center; }
   .panel-jump .panel-chip { min-height: 44px; }
 }
+.panel-photos__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.panel-photos__actions:empty { display: none; }
+.panel-choices { display: grid; gap: var(--space-2); }
+.panel-choice { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2); align-items: start; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: 12px; cursor: pointer; }
+.panel-choice:has(input:checked) { border-color: var(--color-accent); }
+.panel-choice input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--color-accent); }
+.panel-choice span { display: grid; gap: 2px; }
+.panel-catalog-options { display: grid; gap: var(--space-3); margin-top: var(--space-3); }
+.panel-catalog-options[hidden] { display: none; }

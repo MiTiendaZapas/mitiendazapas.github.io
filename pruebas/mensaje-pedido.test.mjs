@@ -43,3 +43,22 @@ test("una sola categoría o sin textos propios: como siempre", () => {
   const text = message({ ...config, orderGreeting: "", orderFooter: "" }, [{ product: remera, productId: remera.id, size: "M", qty: 1 }]);
   assert.equal(text, "¡Hola! Quiero hacer el siguiente pedido del catálogo:\n\nRemera básica blanca (M) $15.000\n\nTotal: 1 producto - $15.000");
 });
+
+test("catálogo: la consulta no lleva precios ni total, y no habla de envío ni de formas de compra", async () => {
+  const { modo } = await import("../motor/js/modo-catalogo.js");
+  Object.assign(modo, { on: true, prices: false, brand: false });
+  try {
+    const text = message({ ...config, orderShippingNote: true, orderGreeting: undefined, orderFooter: undefined }, [
+      { product: remera, productId: remera.id, size: "M", qty: 2 },
+      { product: buzo, productId: buzo.id, size: "L", qty: 1 },
+    ]);
+    assert.ok(text.startsWith("¡Hola! Quiero consultar por estos productos del catálogo:"));
+    assert.ok(text.includes("Remera básica blanca (M) x2"));
+    assert.ok(text.includes("Total: 3 productos"));
+    assert.ok(!text.includes("$") && !text.includes("envío"), text);
+    Object.assign(modo, { prices: true });
+    assert.ok(message(config, [{ product: remera, productId: remera.id, size: "M", qty: 1 }]).includes("$"));
+  } finally {
+    Object.assign(modo, { on: false, prices: true, brand: true });
+  }
+});

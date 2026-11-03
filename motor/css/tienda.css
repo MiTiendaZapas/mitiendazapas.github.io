@@ -12,3 +12,8 @@
 @import url("sections.css");
 @import url("pages.css");
 @import url("density.css");
+
+/* Catálogo sin precios: por si algún precio se escapa, no se ve (ver motor/js/modo-catalogo.js). */
+[data-sin-precios] .price,
+[data-sin-precios] .money,
+[data-sin-precios] .wholesale-meter { display: none !important; }

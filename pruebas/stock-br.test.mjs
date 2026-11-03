@@ -401,3 +401,43 @@ describe("ojotas de casa: si el socio les cargó pares, se venden solo esos (26/
     assert.equal(other.soloCasa, undefined);
   });
 });
+
+describe("fotos propias en modelos automáticos", () => {
+  const own = { lg: "fotos/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa-lg.webp", sm: "fotos/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa-sm.webp", w: 900, h: 1200 };
+  const base = brModel(brazil.products[0]);
+
+  test("con fotos propias, el modelo usa esas y no las del proveedor (y se marca)", () => {
+    const change = cleanBrChange({ images: [own] }, base);
+    assert.deepEqual(change.images, [own]);
+    const [dunk] = brProducts(store({ br: { "vp-1": change } }), brazil);
+    assert.deepEqual(dunk.images, [own]);
+    assert.equal(dunk.customImages, true);
+    const [open] = publicMixedCatalog(store({ br: { "vp-1": change }, pricing: { br: { unit: 50000 } } }), brazil).products;
+    assert.equal(open.customImages, undefined);
+    assert.deepEqual(open.images, [own]);
+  });
+
+  test("sin tocar las fotos se conservan; con la lista vacía vuelven a las automáticas", () => {
+    const first = cleanBrChange({ images: [own], price: "60000" }, base);
+    assert.deepEqual(cleanBrChange({ price: "65000" }, base, first).images, [own]);
+    const back = cleanBrChange({ images: [], price: "65000" }, base, first);
+    assert.equal(back.images, undefined);
+    assert.equal(brProducts(store({ br: { "vp-1": back } }), brazil)[0].images[0].lg, "https://catalogo.mitiendastock.com/fotos/vp-1/a-lg.webp");
+  });
+
+  test("solo fotos de la tienda y hasta el máximo", () => {
+    assert.throws(() => cleanBrChange({ images: [{ lg: "https://otro.com/a.jpg", sm: "https://otro.com/b.jpg" }] }, base), /foto/);
+    assert.throws(() => cleanBrChange({ images: Array(7).fill(own) }, base), /Máximo/);
+  });
+
+  test("las fotos propias de un modelo automático no se borran como sobrantes", async () => {
+    const removed = [];
+    const env = { CATALOGO: {
+      list: async () => ({ objects: [{ key: `tiendas/prueba/${own.lg}`, uploaded: "2020-01-01" }, { key: `tiendas/prueba/${own.sm}`, uploaded: "2020-01-01" },
+        { key: "tiendas/prueba/fotos/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb-lg.webp", uploaded: "2020-01-01" }], truncated: false }),
+      delete: async (keys) => removed.push(...keys),
+    } };
+    await cleanupPhotos(env, "prueba", store({ br: { "vp-1": { images: [own] } } }));
+    assert.deepEqual(removed, ["tiendas/prueba/fotos/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb-lg.webp"]);
+  });
+});

@@ -6,6 +6,7 @@
 import { escapeHtml, fromRoot, PLATFORM_URL, whatsappLink } from "../utils.js";
 import { icon } from "./icons.js";
 import { socialLinksHtml } from "./social.js";
+import { modo } from "../modo-catalogo.js";
 
 const esc = escapeHtml;
 
@@ -245,7 +246,7 @@ export function renderFooter(root, { config, channel, links }) {
         </div>
       </div>
       <div class="site-footer__bottom">
-        <p>© ${year} ${esc(config.name)}. Todos los derechos reservados.</p>
+        ${modo.on && !modo.brand ? "" : `<p>© ${year} ${esc(config.name)}. Todos los derechos reservados.</p>`}
         <p>${esc(config.footer?.legal ?? "")}</p>
         ${platformCredit(config, channel)}
       </div>

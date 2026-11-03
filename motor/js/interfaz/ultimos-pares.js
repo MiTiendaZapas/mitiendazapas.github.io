@@ -4,6 +4,7 @@
  * stock del catálogo (no necesita datos de ventas). En cada visita muestra una selección distinta.
  */
 import { escapeHtml, money } from "../utils.js";
+import { modo } from "../modo-catalogo.js";
 import { isFootwear, leftText, storeWords } from "../vocabulario.js";
 
 const MAX_STOCK = 3;      // "pocos" = 3 o menos en total
@@ -46,7 +47,7 @@ export function renderLastPairs(root, { products, pricing }) {
               <img class="last-pair__img" src="${escapeHtml(p.images[0].sm ?? p.images[0].lg)}" alt="" width="140" height="187" loading="lazy" decoding="async">
               <span class="last-pair__badge">${leftText(p, left)}</span>
               <span class="last-pair__name">${escapeHtml(p.name)}</span>
-              <span class="last-pair__price money">${money(pricing.forProduct(p).unit)}</span>
+              ${modo.prices ? `<span class="last-pair__price money">${money(pricing.forProduct(p).unit)}</span>` : ""}
             </a>
           </li>`;
       }).join("")}

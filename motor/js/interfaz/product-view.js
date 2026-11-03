@@ -13,6 +13,7 @@ import { G5_SIZE_CHART } from "./g5.js";
 import { createSharer, shareButtonHtml } from "./share.js";
 import { attachSwipe } from "./swipe.js";
 import { isSingleSize, itemWord } from "../vocabulario.js";
+import { modo, say } from "../modo-catalogo.js";
 import { createZoomViewer } from "./zoom-viewer.js";
 
 const HASH_PREFIX = "#p/";
@@ -36,8 +37,8 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
         <button class="btn btn--ghost product-view__back" type="button" data-close>
           ${icon("chevronLeft")} <span>Catálogo</span>
         </button>
-        <button class="cart-button" type="button" data-to-cart aria-label="Ver tu pedido">
-          ${icon("bag")} <span class="cart-button__label">Tu pedido</span>
+        <button class="cart-button" type="button" data-to-cart aria-label="${say("Ver tu pedido", "Ver tu consulta")}">
+          ${icon("bag")} <span class="cart-button__label">${say("Tu pedido", "Tu consulta")}</span>
           <span class="cart-button__count" data-pv-count aria-hidden="true">0</span>
         </button>
       </header>
@@ -179,7 +180,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
   function buyHtml() {
     if (!state.size) {
       return `
-        <p class="stock-hint" data-pv-hint>Elegí un talle para agregarlo a tu pedido.</p>
+        <p class="stock-hint" data-pv-hint>Elegí un talle para agregarlo a ${say("tu pedido", "tu consulta")}.</p>
         <button class="btn btn--primary btn--lg add-btn" type="button" disabled>Elegí un talle</button>`;
     }
     const { remaining, hint, low } = stockStatus(cart, product.id, state.size);
@@ -192,7 +193,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
           <button class="stepper__btn" type="button" data-step="1" aria-label="Sumar uno" ${state.qty >= remaining ? "disabled" : ""}>${icon("plus")}</button>
         </div>
         <button class="btn btn--primary btn--lg add-btn" type="button" data-add ${remaining <= 0 ? "disabled" : ""}>
-          ${icon("bag")} ${isSingleSize(product) ? "Agregar al pedido" : `Agregar talle ${escapeHtml(state.size)}`}
+          ${icon("bag")} ${isSingleSize(product) ? say("Agregar al pedido", "Agregar a la consulta") : `Agregar talle ${escapeHtml(state.size)}`}
         </button>
       </div>
       <p class="stock-hint${low ? " is-low" : ""}">${hint}</p>
@@ -202,7 +203,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
   /** "Pedir este par": manda por WhatsApp el pedido de 1 par de ese talle, sin pasar por el carrito. */
   function quickOrderHtml() {
     const size = product.sizes.find((s) => s.size === state.size);
-    if (!size || size.stock <= 0) return "";
+    if (modo.on || !size || size.stock <= 0) return "";   // en catálogo se consulta desde la lista o con "Consultar"
     const quote = pricing.quote([{ product, productId: product.id, size: state.size, qty: 1 }], "unidad");
     const message = buildOrderMessage({ config, channel, quote });
     return `
@@ -228,7 +229,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
         <div class="product-view__buy" data-buy>${buyHtml()}</div>
         <div class="product-view__added" data-added hidden>
           <p>${icon("check")} <span data-added-text></span></p>
-          <button class="btn btn--outline" type="button" data-added-cart>Ver pedido</button>
+          <button class="btn btn--outline" type="button" data-added-cart>${say("Ver pedido", "Ver consulta")}</button>
         </div>
         <div class="product-view__actions">
           <a class="product-view__consult" href="${productQueryLink(config, product, state.size)}" target="_blank" rel="noopener" data-consult>
@@ -237,8 +238,10 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
           ${shareButtonHtml(channel, icon("share"))}
         </div>
         <ul class="product-view__facts">
-          <li>${icon("chat")} No se paga por la web: confirmamos el stock por WhatsApp.</li>
-          <li>${icon("truck")} Envíos: ${escapeHtml(Object.values(config.shipping.methods).map((m) => m.label).join(" y "))}.</li>
+          ${modo.on
+            ? `<li>${icon("chat")} Armá tu lista y consultá por WhatsApp: te confirmamos la disponibilidad.</li>`
+            : `<li>${icon("chat")} No se paga por la web: confirmamos el stock por WhatsApp.</li>
+          <li>${icon("truck")} Envíos: ${escapeHtml(Object.values(config.shipping.methods).map((m) => m.label).join(" y "))}.</li>`}
         </ul>
       </div>`;
     updateCount();
@@ -370,7 +373,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
     const banner = content.querySelector("[data-added]");
     banner.hidden = false;
     banner.querySelector("[data-added-text]").textContent =
-      `${plural(qty, `${pricing.words[0]} agregado`, `${pricing.words[1]} agregados`)} (talle ${size}). Tenés ${plural(cart.count(), ...pricing.words)} en tu pedido.`;
+      `${plural(qty, `${pricing.words[0]} agregado`, `${pricing.words[1]} agregados`)} (talle ${size}). Tenés ${plural(cart.count(), ...pricing.words)} en ${say("tu pedido", "tu consulta")}.`;
     clearTimeout(showAdded.timer);
     showAdded.timer = setTimeout(() => { if (product) renderBuy(); }, ADDED_FEEDBACK_MS);
   }

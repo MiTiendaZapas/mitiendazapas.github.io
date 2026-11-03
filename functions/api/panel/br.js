@@ -1,7 +1,7 @@
 // POST /api/panel/br  { id, price?, wholesalePrice?, hidden?, extra?: [{ size, stock }] }
-//   ->  guarda lo que el cliente cambió en un modelo de Brasil: su precio, ocultarlo, o los
+//   ->  guarda lo que el cliente cambió en un modelo de Brasil: su precio, ocultarlo, sus fotos (images), o los
 //       pares que tiene en su casa. Sin nada de eso, el modelo vuelve a ser automático.
-import { brModel, cleanBrChange, fail, json, markHouseSandal, readBrStock, readCatalog, updateCatalog } from "../../../servidor/panel.js";
+import { brModel, cleanBrChange, deletePhotos, fail, json, markHouseSandal, readBrStock, readCatalog, storeBrImages, updateCatalog } from "../../../servidor/panel.js";
 
 export async function onRequestPost({ request, env, data }) {
   const store = data.session.tienda;
@@ -15,10 +15,14 @@ export async function onRequestPost({ request, env, data }) {
     const found = br.products.find((p) => p.id === input.id);
     const saved = current.br?.[input.id];
     if (!found && !saved?.model) return fail("Ese modelo ya no está en el stock de Brasil.");
+    // Fotos propias: las que dejó del proveedor se copian a la tienda antes de guardar.
+    if (input.images !== undefined) input = { ...input, images: await storeBrImages(env, store, input.images) };
+    let removed = [];
     const change = await updateCatalog(env, store, (catalog) => {
       const base = found ? brModel(found, catalog.stockBR) : { ...catalog.br?.[input.id]?.model, id: input.id, sizes: [] };
       markHouseSandal(store, catalog.br?.[input.id], base.category);   // (por si ahora la deja en 0)
-      const cleaned = cleanBrChange(input, base, catalog.br?.[input.id]);
+      const before = catalog.br?.[input.id];
+      const cleaned = cleanBrChange(input, base, before);
       markHouseSandal(store, cleaned, base.category);
       catalog.br = { ...(catalog.br ?? {}) };
       if (cleaned) catalog.br[input.id] = cleaned;
@@ -27,8 +31,12 @@ export async function onRequestPost({ request, env, data }) {
       if ((input.approve === true || cleaned?.price) && !(catalog.known ?? []).includes(input.id)) {
         catalog.known = [...(catalog.known ?? []), input.id];
       }
+      // Fotos propias que ya no se usan (las sacó o volvió a las automáticas): se borran del depósito.
+      const kept = new Set((cleaned?.images ?? []).map((img) => img.lg));
+      removed = (before?.images ?? []).filter((img) => !kept.has(img.lg));
       return cleaned;
     });
+    await deletePhotos(env, store, removed);
     return json({ ok: true, change });
   } catch (error) {
     return fail(error.message);

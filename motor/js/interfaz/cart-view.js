@@ -11,6 +11,7 @@ import { storeWords } from "../vocabulario.js";
 import { icon } from "./icons.js";
 import { sizeLabel } from "./g5.js";
 import { socialLinksHtml } from "./social.js";
+import { modo, say } from "../modo-catalogo.js";
 
 export function createCartView({ config, channel, cart, pricing, overlays, onOpenProduct }) {
   const headerButton = document.querySelector("[data-open-cart]");
@@ -27,7 +28,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
     <button class="cart-bar__button" type="button" data-open-cart>
       <span class="cart-bar__count" data-bar-count>0</span>
       <span class="cart-bar__summary">
-        <span class="cart-bar__title">Ver tu pedido</span>
+        <span class="cart-bar__title">${say("Ver tu pedido", "Ver tu consulta")}</span>
         <span class="cart-bar__detail" data-bar-detail></span>
       </span>
       <span class="cart-bar__cta"><span class="cart-bar__cta-text">Continuar</span> ${icon("chevronRight")}</span>
@@ -42,7 +43,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
     <div class="drawer__panel">
       <header class="drawer__header">
         <div>
-          <h2 class="drawer__title" id="drawer-title" tabindex="-1">Tu pedido</h2>
+          <h2 class="drawer__title" id="drawer-title" tabindex="-1">${say("Tu pedido", "Tu consulta")}</h2>
         </div>
         <button class="icon-btn" type="button" data-close aria-label="Cerrar">${icon("close")}</button>
       </header>
@@ -88,11 +89,11 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
     const showWholesale = quote.canChoose;
     headerCount.textContent = String(count);
     headerButton.classList.toggle("has-items", count > 0);
-    headerButton.setAttribute("aria-label", count ? `Ver tu pedido, ${itemsText(count)}` : "Ver tu pedido, vacío");
+    headerButton.setAttribute("aria-label", count ? `${say("Ver tu pedido", "Ver tu consulta")}, ${itemsText(count)}` : say("Ver tu pedido, vacío", "Ver tu consulta, vacía"));
     bar.classList.toggle("is-visible", count > 0);
     bar.querySelector("[data-bar-count]").textContent = String(count);
     bar.querySelector("[data-bar-detail]").textContent = count
-      ? `${itemsText(count)} · ${money(showWholesale ? quote.totals.mayor : quote.total)}${showWholesale ? " por mayor" : ""}`
+      ? (modo.prices ? `${itemsText(count)} · ${money(showWholesale ? quote.totals.mayor : quote.total)}${showWholesale ? " por mayor" : ""}` : itemsText(count))
       : "";
     if (bump) {
       for (const el of [headerButton, bar]) {
@@ -105,7 +106,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
 
   // --- paso 1: revisar ---------------------------------------------------------
   function wholesaleProgress(quote) {
-    if (quote.pairs === 0 || !pricing.hasWholesale) return "";
+    if (quote.pairs === 0 || !pricing.hasWholesale || !modo.prices) return "";
     if (quote.byQuality) return "";   // con BR y G5, cada bloque muestra su propio aviso
     if (quote.canChoose) {
       const savings = quote.totals.unidad - quote.totals.mayor;
@@ -130,7 +131,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
       body.innerHTML = `
         <div class="state-message state-message--flat">
           ${icon("bag")}
-          <h3 class="state-message__title">Tu pedido está vacío</h3>
+          <h3 class="state-message__title">${say("Tu pedido está vacío", "Tu consulta está vacía")}</h3>
           <p class="state-message__text">${storeWords().footwear ? "Elegí un talle en cualquier modelo" : "Elegí lo que te guste"} y tocá “Agregar”. Lo vas a ver acá.</p>
         </div>`;
       footer.innerHTML = `<button class="btn btn--primary btn--block btn--lg" type="button" data-close-drawer>Ver catálogo</button>`;
@@ -148,7 +149,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
           </button>
           <div class="cart-line__info">
             <p class="cart-line__name"><button class="cart-line__name-btn" type="button" data-line-open>${escapeHtml(line.product.name)}</button></p>
-            <p class="cart-line__meta">Talle <strong>${escapeHtml(sizeLabel(line.product, line.size))}</strong> · <span class="money">${money(line.price)}</span> c/u</p>
+            <p class="cart-line__meta">Talle <strong>${escapeHtml(sizeLabel(line.product, line.size))}</strong>${modo.prices ? ` · <span class="money">${money(line.price)}</span> c/u` : ""}</p>
             <div class="cart-line__controls">
               <div class="stepper stepper--sm" role="group" aria-label="Cantidad de ${escapeHtml(line.product.name)} talle ${escapeHtml(line.size)}">
                 <button class="stepper__btn" type="button" data-line-step="-1" aria-label="Restar uno" ${line.qty <= 1 ? "disabled" : ""}>${icon("minus")}</button>
@@ -158,12 +159,12 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
               <button class="cart-line__remove" type="button" data-line-remove>${icon("trash")} Quitar</button>
             </div>
           </div>
-          <p class="cart-line__subtotal money">${money(line.subtotal)}</p>
+          ${modo.prices ? `<p class="cart-line__subtotal money">${money(line.subtotal)}</p>` : ""}
         </li>`;
     };
     // Con G5 en el pedido: un bloque por calidad, con su subtotal y su aviso de precio por mayor.
     const groupHint = (group, label) => {
-      if (!pricing.hasWholesale) return "";
+      if (!pricing.hasWholesale || !modo.prices) return "";
       if (group.canChoose) return `<p class="cart-group__hint is-done">${icon("check")} Precio por mayor aplicado</p>`;
       return `<p class="cart-group__hint">Sumá <strong>${plural(group.pairsToWholesale, "par", "pares")} ${label} más</strong> para el precio por mayor de esta calidad.</p>`;
     };
@@ -174,7 +175,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
             <section class="cart-group cart-group--${group.key}">
               <header class="cart-group__head">
                 <span class="cart-group__title">Calidad ${label}</span>
-                <span class="cart-group__sum">${plural(group.pairs, "par", "pares")} · <span class="money">${money(group.subtotal)}</span></span>
+                <span class="cart-group__sum">${plural(group.pairs, "par", "pares")}${modo.prices ? ` · <span class="money">${money(group.subtotal)}</span>` : ""}</span>
               </header>
               ${groupHint(group, label)}
               <ul class="cart-lines">${group.lines.map(lineHtml).join("")}</ul>
@@ -185,15 +186,15 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
     body.innerHTML = `
       ${wholesaleProgress(quote)}
       ${linesHtml}
-      <p class="drawer__note">${icon("chat")} No se paga por la web. Te confirmamos el stock por WhatsApp y ahí coordinamos el envío.</p>`;
+      <p class="drawer__note">${icon("chat")} ${say("No se paga por la web. Te confirmamos el stock por WhatsApp y ahí coordinamos el envío.", "Enviás la lista por WhatsApp y te respondemos con la disponibilidad.")}</p>`;
 
     footer.innerHTML = `
-      <div class="drawer__total">
+      ${modo.prices ? `<div class="drawer__total">
         <span>Total <small>(${itemsText(cart.count())}${quote.canChoose ? ", por mayor" : ""}, sin envío)</small></span>
         <strong class="money">${money(quote.total)}</strong>
-      </div>
+      </div>` : `<div class="drawer__total"><span>${itemsText(cart.count())}</span></div>`}
       <a class="btn btn--whatsapp btn--block btn--lg" href="${orderLink(config, buildOrderMessage({ config, channel, quote }))}" target="_blank" rel="noopener" data-send>
-        ${icon("whatsapp")} Enviar pedido por WhatsApp</a>`;
+        ${icon("whatsapp")} ${say("Enviar pedido por WhatsApp", "Enviar consulta por WhatsApp")}</a>`;
     footer.querySelector("[data-send]")?.addEventListener("click", () => {
       document.dispatchEvent(new CustomEvent("store:order-sent", { detail: { total: quote.total, items: cart.count() } }));
       sent = true;
@@ -233,15 +234,15 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
     body.innerHTML = `
       <div class="sent-panel">
         <span class="sent-panel__icon">${icon("check")}</span>
-        <h3 class="sent-panel__title">¡Listo! Se abrió WhatsApp con tu pedido</h3>
-        <p class="sent-panel__text">Tocá enviar en el chat y te confirmamos el stock y el envío.</p>
+        <h3 class="sent-panel__title">${say("¡Listo! Se abrió WhatsApp con tu pedido", "¡Listo! Se abrió WhatsApp con tu consulta")}</h3>
+        <p class="sent-panel__text">${say("Tocá enviar en el chat y te confirmamos el stock y el envío.", "Tocá enviar en el chat y te respondemos enseguida.")}</p>
       </div>
       <div class="sent-help">
         <p><strong>¿No se abrió WhatsApp?</strong> Copiá el mensaje, abrí nuestro chat y pegalo.</p>
         <div class="sent-help__actions">
           <button class="btn btn--outline" type="button" data-copy>Copiar mensaje</button>
           <a class="btn btn--outline" href="${whatsappLink(config.contact.whatsappOrders)}" target="_blank" rel="noopener">${icon("whatsapp")} Abrir chat</a>
-          <button class="btn btn--ghost" type="button" data-clear>Ya lo envié, vaciar pedido</button>
+          <button class="btn btn--ghost" type="button" data-clear>${say("Ya lo envié, vaciar pedido", "Ya la envié, vaciar la lista")}</button>
         </div>
       </div>
       ${social ? `
@@ -249,7 +250,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
           <p class="sent-social__title">${escapeHtml(config.socialInvite ?? "Seguinos en las redes")}</p>
           ${social}
         </div>` : ""}`;
-    footer.innerHTML = `<button class="btn btn--outline btn--block btn--lg" type="button" data-back-to-cart>${icon("chevronLeft")} Volver al pedido</button>`;
+    footer.innerHTML = `<button class="btn btn--outline btn--block btn--lg" type="button" data-back-to-cart>${icon("chevronLeft")} ${say("Volver al pedido", "Volver a la consulta")}</button>`;
     footer.querySelector("[data-back-to-cart]").addEventListener("click", () => { sent = false; render(); });
     body.querySelector("[data-copy]").addEventListener("click", async (event) => {
       try {

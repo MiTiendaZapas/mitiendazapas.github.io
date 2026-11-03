@@ -4,6 +4,7 @@
  */
 import { money, plural, whatsappLink } from "./utils.js";
 import { sizeLabel } from "./interfaz/g5.js";
+import { modo } from "./modo-catalogo.js";
 
 /**
  * Mensaje del pedido (formato pedido por el usuario el 27/09):
@@ -26,9 +27,11 @@ export function buildOrderMessage({ config, channel, quote }) {
   const source = channel.orderSource ? ` ${channel.orderSource}` : "";
 
   // Tiendas con panel: el saludo lo puede escribir el cliente (Mi tienda → Mensaje de los pedidos).
-  lines.push(config.orderGreeting || `¡Hola! Quiero hacer el siguiente pedido del catálogo${source}:`);
+  lines.push(config.orderGreeting || (modo.on ? "¡Hola! Quiero consultar por estos productos del catálogo:" : `¡Hola! Quiero hacer el siguiente pedido del catálogo${source}:`));
   lines.push("");
   const itemLine = (line) => {
+    // Catálogo sin precios: solo el producto, el talle y la cantidad.
+    if (!modo.prices) return `${line.product.name} (${sizeLabel(line.product, line.size)})${line.qty > 1 ? ` x${line.qty}` : ""}`;
     const many = line.qty > 1 ? ` x${line.qty} = ${money(line.subtotal)}` : "";
     return `${line.product.name} (${sizeLabel(line.product, line.size)}) ${money(line.price)}${many}`;
   };
@@ -42,7 +45,7 @@ export function buildOrderMessage({ config, channel, quote }) {
       const wholesale = quote.isWholesale && group.canChoose ? " por mayor" : "";
       lines.push(`CALIDAD ${label}`);
       group.lines.forEach((line) => lines.push(itemLine(line)));
-      lines.push(`Subtotal ${label}: ${items(group.lines.reduce((s, l) => s + l.qty, 0))}${wholesale} - ${money(group.subtotal)}`);
+      lines.push(`Subtotal ${label}: ${items(group.lines.reduce((s, l) => s + l.qty, 0))}${modo.prices ? `${wholesale} - ${money(group.subtotal)}` : ""}`);
       lines.push("");
     }
   } else if (byCategory(config, quote)) {
@@ -60,21 +63,23 @@ export function buildOrderMessage({ config, channel, quote }) {
     quote.lines.forEach((line) => lines.push(itemLine(line)));
     lines.push("");
   }
-  lines.push(`Total: ${items(count)} - ${money(quote.total)}`);
+  lines.push(modo.prices ? `Total: ${items(count)} - ${money(quote.total)}` : `Total: ${items(count)}`);
   lines.push("");
   // Condición de cambio según cómo compra: por mayor (5 o más, si eligió) o por unidad.
   // Si el texto de esa forma de compra está vacío, no se agrega la línea.
   // Con BR y G5, si solo una calidad llega al precio por mayor, se aclara cuál.
   const partial = quote.byQuality && quote.canChoose && quote.groups.some((g) => !g.canChoose);
   const onlyIn = partial ? ` (solo calidad ${quote.groups.filter((g) => g.canChoose).map((g) => g.key.toUpperCase()).join(" y ")})` : "";
-  if (channel.purchaseModes) {
+  if (modo.on) {
+    // Catálogo: no hay forma de compra ni envío que aclarar, se habla en el chat.
+  } else if (channel.purchaseModes) {
     const modeLine = channel.purchaseModes[quote.canChoose ? quote.mode : "unidad"].message;
     if (modeLine) lines.push(modeLine + (quote.isWholesale ? onlyIn : ""));
   } else if (quote.canChoose) {
     lines.push(`Compra por MAYOR (${quote.minPairs} ${quote.words?.[1] ?? "pares"} o más)${onlyIn}`);
   }
   // Las tiendas de clientes no llevan esta línea (orderShippingNote: false en su configuración).
-  if (config.orderShippingNote !== false) lines.push("El envío se coordina aparte.");
+  if (config.orderShippingNote !== false && !modo.on) lines.push("El envío se coordina aparte.");
   // Texto al final que eligió el cliente (pago, envío, retiro...).
   if (config.orderFooter) lines.push("", config.orderFooter);
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();

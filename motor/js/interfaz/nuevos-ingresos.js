@@ -4,6 +4,7 @@
  * Usa el mismo diseño que "Últimos pares".
  */
 import { escapeHtml, money } from "../utils.js";
+import { modo } from "../modo-catalogo.js";
 import { isNewArrival } from "../catalog.js";
 
 const MAX_CARDS = 12;
@@ -30,7 +31,7 @@ export function renderNewArrivals(root, { products, pricing }) {
               <img class="last-pair__img" src="${escapeHtml(p.images[0].sm ?? p.images[0].lg)}" alt="" width="140" height="187" loading="lazy" decoding="async">
               <span class="last-pair__badge new-badge">Nuevo</span>
               <span class="last-pair__name">${escapeHtml(p.name)}</span>
-              <span class="last-pair__price money">${money(pricing.forProduct(p).unit)}</span>
+              ${modo.prices ? `<span class="last-pair__price money">${money(pricing.forProduct(p).unit)}</span>` : ""}
             </a>
           </li>`).join("")}
     </ul>`;

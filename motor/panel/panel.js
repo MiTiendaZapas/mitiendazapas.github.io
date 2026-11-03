@@ -240,6 +240,8 @@ function fieldError(input, message) {
 }
 
 const storeUrl = (path) => `/api/tienda/${encodeURIComponent(state.store)}/${path}`;
+// Fotos de modelos automaticos: las del proveedor traen su direccion completa; las propias, la de la tienda.
+const photoUrl = (path) => (/^https?:\/\//.test(path) ? path : storeUrl(path));
 // Link público de la tienda (el panel está en /<tienda>/panel/).
 const storeLink = () => new URL("../", location.href).href;
 const productLink = (product) => `${storeLink()}#p/${encodeURIComponent(product.slug)}`;
@@ -1210,7 +1212,7 @@ function extraFields(prefix, draft) {
 
 // --- stock de Brasil ------------------------------------------------------------------
 const brTotal = (product, part) => product.sizes.reduce((sum, s) => sum + s[part], 0);
-const brChanged = (p) => Boolean(p.price || p.wholesalePrice || p.hidden || p.description || p.compareAt || p.featured || p.newSince || brTotal(p, "casa"));
+const brChanged = (p) => Boolean(p.price || p.wholesalePrice || p.hidden || p.description || p.compareAt || p.featured || p.newSince || p.customImages || brTotal(p, "casa"));
 
 /** Precio de la lista para un modelo de Brasil (sin el precio propio que le haya puesto el cliente). */
 /** Precio general (Brasil o G5) que puso el cliente para los modelos sin precio propio. */
@@ -1305,7 +1307,7 @@ function brItemView(product, refresh, { inOwnList = false } = {}) {
   const unit = product.price || autoPrice(product);
   const image = product.images[0];
   const thumb = image
-    ? h("img", { src: image.sm || image.lg, alt: "", width: 64, height: 80, loading: "lazy" })
+    ? h("img", { src: photoUrl(image.sm || image.lg), alt: "", width: 64, height: 80, loading: "lazy" })
     : h("span", { class: "panel-thumb--empty" }, "Sin foto");
   const toggle = async (event) => busy(event.currentTarget, async () => {
     const { change } = await api("/br", { method: "POST", body: brBody(product, { hidden: !product.hidden }) });
@@ -1504,6 +1506,71 @@ function renderBrEditor(product) {
       }));
   }
 
+  // Fotos: se dejan las del proveedor, se sacan, se agregan las tuyas o se cambian todas. Si no tocás nada
+  // acá, el modelo sigue con sus fotos automáticas (que se actualizan solas).
+  let photosEdited = false;
+  let uploadingPhotos = 0;
+  const progress = new Map();
+  const maxPhotos = state.limits.imagesPerProduct;
+  const photoBox = h("div", { class: "panel-photos" });
+  const photoNote = h("p", { class: "panel-muted" });
+  const photoFile = h("input", { type: "file", accept: "image/*", multiple: true, hidden: true, onchange: (e) => addBrPhotos([...e.target.files]) });
+  const editPhotos = (change) => { photosEdited = true; change(); renderBrPhotos(); };
+  const moveBrPhoto = (i, delta) => editPhotos(() => { const [img] = draft.images.splice(i, 1); draft.images.splice(i + delta, 0, img); });
+  function renderBrPhotos() {
+    const last = draft.images.length - 1;
+    const tiles = draft.images.map((img, i) => h("div", { class: "panel-photo" },
+      h("img", { src: photoUrl(img.sm || img.lg), alt: `Foto ${i + 1}` }),
+      i === 0 ? h("span", { class: "panel-photo__tag" }, "Portada") : null,
+      h("button", { type: "button", class: "panel-photo__btn", "aria-label": `Quitar foto ${i + 1}`, onclick: () => editPhotos(() => draft.images.splice(i, 1)) }, ico("close")),
+      h("div", { class: "panel-photo__move" },
+        i > 0 ? h("button", { type: "button", "aria-label": `Mover foto ${i + 1} a la izquierda`, onclick: () => moveBrPhoto(i, -1) }, ico("chevronLeft")) : null,
+        i < last ? h("button", { type: "button", "aria-label": `Mover foto ${i + 1} a la derecha`, onclick: () => moveBrPhoto(i, 1) }, ico("chevronRight")) : null)));
+    const loading = [...progress.values()].map((percent) => h("div", { class: "panel-photo panel-photo--loading" },
+      h("span", {}, percent < 100 ? `Subiendo… ${percent}%` : "Guardando…"),
+      h("span", { class: "panel-progress", style: `--progress:${percent}%` })));
+    const canAdd = draft.images.length + uploadingPhotos < maxPhotos;
+    photoBox.replaceChildren(...tiles, ...loading,
+      ...(canAdd ? [h("button", { type: "button", class: "panel-photo panel-photo--add", onclick: () => photoFile.click() }, "+ Foto")] : []),
+      photoFile);
+    photoNote.textContent = photosEdited && !draft.images.length && !uploadingPhotos
+      ? "Sin fotos: al guardar, el modelo vuelve a usar las fotos automáticas del proveedor."
+      : photosEdited || product.customImages
+        ? `Estas fotos son tuyas y no cambian solas (hasta ${maxPhotos}). La primera es la portada.`
+        : `Son las fotos del proveedor y se actualizan solas. Si sacás, agregás o movés alguna, pasan a ser tuyas (hasta ${maxPhotos}).`;
+  }
+  async function addBrPhotos(files) {
+    photoFile.value = "";
+    const room = maxPhotos - draft.images.length - uploadingPhotos;
+    for (const file of files.slice(0, Math.max(room, 0))) {
+      uploadingPhotos += 1;
+      progress.set(file, 0);
+      renderBrPhotos();
+      try {
+        const img = await uploadImage(file, { endpoint: "/foto", sizes: [["grande", 1200, 0.82], ["chica", 480, 0.75]],
+          onProgress: (percent) => { progress.set(file, percent); renderBrPhotos(); } });
+        photosEdited = true;
+        draft.images.push(img);
+      } catch (e) {
+        toast(e.message, "error");
+      } finally {
+        uploadingPhotos -= 1;
+        progress.delete(file);
+        renderBrPhotos();
+      }
+    }
+    if (files.length > room) toast(`Máximo ${maxPhotos} fotos por producto.`, "error");
+  }
+  const photosSection = h("section", { class: "panel-card" }, h("h2", {}, "Fotos"), photoNote, photoBox,
+    h("div", { class: "panel-photos__actions" },
+      draft.images.length ? h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: async () => {
+        if (await ask("¿Sacar todas las fotos? Después podés agregar las tuyas. Si no agregás ninguna, el modelo vuelve a usar las automáticas.", { ok: "Sí, sacar todas", danger: true })) editPhotos(() => { draft.images = []; });
+      } }, "Sacar todas") : null,
+      product.customImages ? h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: async () => {
+        if (await ask("¿Volver a las fotos automáticas del proveedor? Se borran las fotos que pusiste vos en este modelo.", { ok: "Sí, volver", danger: true })) editPhotos(() => { draft.images = []; });
+      } }, "Volver a las fotos automáticas") : null));
+  renderBrPhotos();
+
   const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar");
   const save = (body, message) => busy(saveButton, async () => {
     await api("/br", { method: "POST", body });
@@ -1525,6 +1592,7 @@ function renderBrEditor(product) {
       ...resale.read(),
       ...bulk.read(),
       ...(deal.on ? { price: deal.sale, compareAt: deal.normal } : { compareAt: "" }),
+      ...(photosEdited ? { images: draft.images } : {}),
     }, "Cambios guardados.");
   } },
     h("div", { class: "panel-editor__head" },
@@ -1532,10 +1600,10 @@ function renderBrEditor(product) {
       h("h1", {}, product.name),
       product.hidden ? null : viewLink(product)),
     h("section", { class: "panel-card panel-br-head" },
-      product.images[0] ? h("img", { src: product.images[0].sm || product.images[0].lg, alt: "", width: 96, height: 120 }) : null,
+      product.images[0] ? h("img", { src: photoUrl(product.images[0].sm || product.images[0].lg), alt: "", width: 96, height: 120 }) : null,
       h("div", {},
         h("p", {}, [categoryName(product.category), product.brand].filter(Boolean).join(" · ")),
-        h("p", { class: "panel-muted" }, "Modelo del stock automático: las fotos, el nombre y el stock del proveedor se actualizan solos."))),
+        h("p", { class: "panel-muted" }, "Modelo del stock automático: el nombre y el stock del proveedor se actualizan solos. Las fotos también, salvo que las cambies más abajo en “Fotos”."))),
     // Lo que más se usa primero: los pares de tu casa. Después el precio y lo opcional.
     h("section", { class: "panel-card" }, h("h2", {}, "Tus pares"),
       h("p", { class: "panel-muted" }, `“${product.category === "g5" ? "Del proveedor" : "De Brasil"}” se actualiza solo. En “En tu casa” sumá los pares que tenés vos: en la tienda se ven todos juntos.`),
@@ -1552,6 +1620,7 @@ function renderBrEditor(product) {
           : "Las G5 necesitan un precio para verse en tu tienda (o poné uno general en “Precios generales”)."),
         sellsWholesale ? field("b-wholesale", TWO_VERSIONS ? "Por mayor al público" : "Precio por mayor", wholesale, list.wholesale ? `Vacío = el precio base (${money(list.wholesale)}).` : "Opcional.") : null)),
     resale.node,
+    photosSection,
     h("section", { class: "panel-card" }, h("h2", {}, "Descripción"), extras.descriptionField),
     optionsFold(draft, offer.node, bulk.node, h("section", { class: "panel-card" }, h("h2", {}, "Nuevo ingreso y destacado"), ...extras.nodes)),
     h("section", { class: "panel-card panel-card--row" },
@@ -1565,7 +1634,7 @@ function renderBrEditor(product) {
   show(form);
   renderSizes();
   window.scrollTo(0, 0);
-  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read(), offer.read(), resale.read(), bulk.read()]);
+  const snapshot = () => JSON.stringify([price.value, wholesale.value, visible.checked, draft.sizes, extras.read(), offer.read(), resale.read(), bulk.read(), photosEdited, draft.images, uploadingPhotos]);
   const initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }
@@ -2162,6 +2231,19 @@ function renderStoreSettings() {
   }
   renderLogo();
 
+  // Tienda (con pedido y precios) o Catálogo (el cliente arma una lista y consulta por WhatsApp).
+  let mode = s.mode === "catalogo" ? "catalogo" : "tienda";
+  const showPrices = h("input", { id: "s-show-prices", type: "checkbox", checked: s.showPrices !== false });
+  const showBrand = h("input", { id: "s-show-brand", type: "checkbox", checked: s.showBrand !== false });
+  const catalogOptions = h("div", { class: "panel-catalog-options", hidden: mode !== "catalogo" },
+    h("label", { class: "panel-switch", for: "s-show-prices" }, showPrices, h("span", {}, "Mostrar los precios"),
+      h("small", { class: "panel-muted" }, "Apagalo para pasar el catálogo sin precios (por ejemplo a un grupo de revendedores): los precios se hablan por WhatsApp.")),
+    h("label", { class: "panel-switch", for: "s-show-brand" }, showBrand, h("span", {}, "Mostrar el nombre y el logo"),
+      h("small", { class: "panel-muted" }, "Apagalo para un catálogo sin marca: arriba dice solo “Catálogo” y al compartir el link no aparecen tu nombre ni tu logo.")));
+  const modeChoice = (value, label, help) => h("label", { class: "panel-choice" },
+    h("input", { type: "radio", name: "s-mode", value, checked: mode === value, onchange: () => { mode = value; catalogOptions.hidden = mode !== "catalogo"; } }),
+    h("span", {}, h("strong", {}, label), h("small", { class: "panel-muted" }, help)));
+
   const saveButton = h("button", { class: "btn btn--primary btn--lg", type: "submit" }, "Guardar cambios");
   const form = h("form", { class: "panel-editor", onsubmit: async (event) => {
     event.preventDefault();
@@ -2170,7 +2252,7 @@ function renderStoreSettings() {
       instagram: instagram.value, tiktok: tiktok.value, facebook: facebook.value,
       heroTitle: heroTitle.value, heroHighlight: heroHighlight.value, heroText: heroText.value, notice: notice.value,
       orderGreeting: orderGreeting.value, orderFooter: orderFooter.value,
-      color,
+      color, mode, showPrices: showPrices.checked, showBrand: showBrand.checked,
     } }));
     if (result) {
       state.settings = result.settings;
@@ -2180,6 +2262,11 @@ function renderStoreSettings() {
     }
   } },
     h("h1", { class: "panel-title" }, "Mi tienda"),
+    h("section", { class: "panel-card" }, h("h2", {}, "Tipo de tienda"),
+      h("div", { class: "panel-choices", role: "radiogroup", "aria-label": "Tipo de tienda" },
+        modeChoice("tienda", "Tienda", "Tus clientes arman el pedido y lo envían por WhatsApp, con precios y total."),
+        modeChoice("catalogo", "Catálogo", "Tus clientes arman una lista de lo que les interesa y te consultan por WhatsApp. Podés ocultar los precios y tu marca.")),
+      catalogOptions),
     h("section", { class: "panel-card" }, h("h2", {}, "Nombre y logo"),
       field("s-name", "Nombre de la tienda", name),
       field("s-tagline", "Frase corta", tagline, "Aparece al pie y al compartir el link."),
@@ -2221,7 +2308,7 @@ function renderStoreSettings() {
     } }, title.textContent))));
   // Si sale sin guardar, se le pregunta (ver route). La clave va aparte y no cuenta.
   const fields = [name, tagline, whatsapp, instagram, tiktok, facebook, heroTitle, heroHighlight, heroText, notice, orderGreeting, orderFooter];
-  const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color]);
+  const snapshot = () => JSON.stringify([...fields.map((f) => f.value), color, mode, showPrices.checked, showBrand.checked]);
   let initial = snapshot();
   state.guard = () => snapshot() !== initial;
 }

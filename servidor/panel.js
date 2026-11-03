@@ -211,6 +211,18 @@ function cleanResale(input) {
 }
 
 /** Revisa y ordena lo que mandó el panel para un producto. */
+/** Revisa la lista de fotos que mandó el panel (solo fotos de la tienda, hasta el máximo por producto). */
+export function cleanImageList(value) {
+  const images = Array.isArray(value) ? value : [];
+  if (images.length > LIMITS.imagesPerProduct) throw new Error(`Máximo ${LIMITS.imagesPerProduct} fotos por producto.`);
+  return images.map((img) => {
+    if (!PHOTO_PATH.test(img?.lg ?? "") || !PHOTO_PATH.test(img?.sm ?? "")) throw new Error("Hay una foto que no es válida.");
+    const w = Math.round(Number(img.w)) || 900;
+    const h = Math.round(Number(img.h)) || 1200;
+    return { lg: img.lg, sm: img.sm, w: Math.min(Math.max(w, 1), 4000), h: Math.min(Math.max(h, 1), 4000) };
+  });
+}
+
 export function cleanProduct(input, current, data) {
   const name = cleanText(input.name, 80, "el nombre", { required: true });
   const brand = cleanText(input.brand, 40, "la marca");
@@ -232,14 +244,7 @@ export function cleanProduct(input, current, data) {
   });
   sizes.sort((a, b) => compareSizes(a.size, b.size));
 
-  const images = Array.isArray(input.images) ? input.images : [];
-  if (images.length > LIMITS.imagesPerProduct) throw new Error(`Máximo ${LIMITS.imagesPerProduct} fotos por producto.`);
-  const cleanImages = images.map((img) => {
-    if (!PHOTO_PATH.test(img?.lg ?? "") || !PHOTO_PATH.test(img?.sm ?? "")) throw new Error("Hay una foto que no es válida.");
-    const w = Math.round(Number(img.w)) || 900;
-    const h = Math.round(Number(img.h)) || 1200;
-    return { lg: img.lg, sm: img.sm, w: Math.min(Math.max(w, 1), 4000), h: Math.min(Math.max(h, 1), 4000) };
-  });
+  const cleanImages = cleanImageList(input.images);
 
   // Dirección del producto: única dentro de la tienda.
   let slug = current?.slug;
@@ -376,6 +381,8 @@ function withChanges(base, change = {}) {
     newSince: change.newSince ?? null,
     mayorista: change.mayorista ?? null,
     bulk: change.bulk ?? null,
+    // Fotos propias del cliente en lugar de las del proveedor (ver storeBrImages).
+    ...(change.images?.length ? { images: change.images, customImages: true } : {}),
   };
 }
 
@@ -484,7 +491,7 @@ export function publicMixedCatalog(data, br) {
     .filter((p) => p.status === "visible")
     .map((p) => withGeneralPrice(p, data))
     // "extra": pares del cliente en ese talle (el piloto los toma de la tienda de L.A IMP como stock de casa).
-    .map(({ hidden, status, sizes, ...p }) => ({ ...p, sizes: sizes.map(({ size, stock, casa }) => ({ size, stock, ...(casa > 0 ? { extra: casa } : {}) })) }));
+    .map(({ hidden, status, customImages, sizes, ...p }) => ({ ...p, sizes: sizes.map(({ size, stock, casa }) => ({ size, stock, ...(casa > 0 ? { extra: casa } : {}) })) }));
   const own = publicCatalog(data).products;
   // L.A IMP: una ojota propia con el mismo nombre que una del proveedor suma los pares de los dos
   // en un solo modelo (con el precio propio). El modelo del proveedor no se repite (ver brProducts).
@@ -540,6 +547,10 @@ export function cleanBrChange(input, base, previous = null) {
     const { id, sizes, ...model } = base;
     change.model = model;
   }
+  // Fotos propias en lugar de las del proveedor. Sin "images" en lo que manda el panel quedan las que
+  // ya tenía; con la lista vacía vuelve a las fotos automáticas.
+  const images = input?.images === undefined ? previous?.images : cleanImageList(input.images);
+  if (images?.length) change.images = images;
   // Una ojota de casa sigue siéndolo aunque se queden sin pares (ver "ojotas de casa").
   if (previous?.soloCasa === true) change.soloCasa = true;
   return Object.keys(change).length ? change : null;
@@ -588,6 +599,24 @@ export async function copyBrPhotos(env, store, images, room) {
     return { ...files, w: Math.round(Number(img.w)) || 900, h: Math.round(Number(img.h)) || 1200 };
   }));
   return copies.filter(Boolean);
+}
+
+/**
+ * Fotos de un modelo del stock automático que el cliente armó en su panel: las suyas ya están en
+ * la tienda; las del proveedor que dejó se copian a la tienda (así siguen aunque el proveedor
+ * cambie o borre el modelo). Respeta el orden. Devuelve la lista lista para guardar.
+ */
+export async function storeBrImages(env, store, value) {
+  const images = Array.isArray(value) ? value : [];
+  if (images.length > LIMITS.imagesPerProduct) throw new Error(`Máximo ${LIMITS.imagesPerProduct} fotos por producto.`);
+  const fromProvider = (path) => (typeof path === "string" && path.startsWith(BR_FILES_URL) ? path.slice(BR_FILES_URL.length) : null);
+  return Promise.all(images.map(async (img) => {
+    const lg = fromProvider(img?.lg);
+    if (!lg) return img;   // foto propia: cleanImageList la revisa
+    const [copy] = await copyBrPhotos(env, store, [{ lg, sm: fromProvider(img.sm), w: img.w, h: img.h }], 1);
+    if (!copy) throw new Error("No se pudo copiar una de las fotos del modelo. Probá de nuevo.");
+    return copy;
+  }));
 }
 
 /** Borra del depósito las fotos que ya no usa ningún producto. */
@@ -826,6 +855,10 @@ export function cleanSettings(input, current = {}) {
     // Mínimo de por mayor distinto por categoría ({ remeras: 10 }). Las que no están, usan el general.
     wholesaleByCategory: cleanByCategory(input?.wholesaleByCategory),
     logo,
+    // Modo catálogo: sin carrito de compra (el cliente consulta por WhatsApp), con precios y nombre/logo opcionales.
+    mode: input?.mode === "catalogo" ? "catalogo" : "tienda",
+    showPrices: input?.showPrices !== false,
+    showBrand: input?.showBrand !== false,
     // Aviso arriba de la tienda (por ejemplo "Envío gratis este fin de semana").
     notice: cleanText(input?.notice, 120, "el aviso"),
     // Mensaje de los pedidos por WhatsApp: el saludo del principio y un texto al final.
@@ -965,7 +998,7 @@ export function applyGroupOffers(catalog, brIds, items) {
 
 /** Fotos del depósito que ya no usa ningún producto (subidas y no guardadas): se borran después de un día. */
 export async function cleanupPhotos(env, store, data) {
-  const used = new Set(data.products.flatMap((p) => p.images.flatMap((img) => [img.lg, img.sm])));
+  const used = new Set([...data.products, ...Object.values(data.br ?? {})].flatMap((p) => (p.images ?? []).flatMap((img) => [img.lg, img.sm])));
   const prefix = `tiendas/${store}/fotos/`;
   const old = Date.now() - 86_400_000;
   const remove = [];

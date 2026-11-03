@@ -2,6 +2,7 @@
 import { escapeHtml, fromRoot, whatsappLink } from "../utils.js";
 import { icon } from "./icons.js";
 import { socialLinksHtml } from "./social.js";
+import { modo, say } from "../modo-catalogo.js";
 
 /** Lista de links del menú: el catálogo primero y después las páginas de información. */
 function menuItems(links, { onlyMenu }) {
@@ -40,7 +41,8 @@ function renderTopbar(header, config) {
 export function renderHeader(root, { config, channel, links }) {
   const consult = whatsappLink(config.contact.whatsappQueries, `¡Hola! Tengo una consulta.`);
   renderTopbar(root, config);
-  const nav = menuItems(links, { onlyMenu: true }).map((item) => `<li>${linkHtml(item, "site-nav__link")}</li>`).join("");
+  // Catálogo sin páginas de información: el único link sería "Catálogo" (repetido), no se muestra.
+  const nav = modo.on && !links.pages.length ? "" : menuItems(links, { onlyMenu: true }).map((item) => `<li>${linkHtml(item, "site-nav__link")}</li>`).join("");
 
   root.innerHTML = `
     <div class="container site-header__inner">
@@ -51,20 +53,20 @@ export function renderHeader(root, { config, channel, links }) {
         ${config.logo ? `<img class="brand__logo" src="${escapeHtml(fromRoot(config.logo.small))}" alt="" width="44" height="44">` : ""}
         <span class="brand__text">
           <span class="brand__name">${escapeHtml(config.name)}</span>
-          <span class="brand__channel">${escapeHtml(channel.label)}</span>
+          ${modo.on && !modo.brand ? "" : `<span class="brand__channel">${escapeHtml(channel.label)}</span>`}
         </span>
       </a>
-      <nav class="site-nav" aria-label="Secciones">
+      ${nav ? `<nav class="site-nav" aria-label="Secciones">
         <ul class="site-nav__list">${nav}</ul>
-      </nav>
+      </nav>` : ""}
       <div class="site-header__actions">
         ${window.storeTheme?.available ? `
           <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="Cambiar entre modo claro y oscuro" title="Modo claro / oscuro">
             ${icon("moon", "theme-toggle__moon")}${icon("sun", "theme-toggle__sun")}
           </button>` : ""}
-        <button class="cart-button" type="button" data-open-cart aria-label="Ver tu pedido, vacío">
+        <button class="cart-button" type="button" data-open-cart aria-label="${say("Ver tu pedido, vacío", "Ver tu consulta, vacía")}">
           ${icon("bag")}
-          <span class="cart-button__label">Tu pedido</span>
+          <span class="cart-button__label">${say("Tu pedido", "Tu consulta")}</span>
           <span class="cart-button__count" data-cart-count aria-hidden="true">0</span>
         </button>
       </div>

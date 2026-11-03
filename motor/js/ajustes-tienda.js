@@ -4,6 +4,7 @@
  * y se aplican sobre configuracion.js antes de dibujar la página.
  */
 import { adjustedTable } from "./ajuste-lista.js";
+import { modo } from "./modo-catalogo.js";
 
 const NETWORKS = {
   instagram: { label: "Instagram", url: (u) => `https://www.instagram.com/${u}/`, handle: (u) => `@${u}` },
@@ -42,10 +43,21 @@ export function applyStoreSettings(config, channel, settings) {
   if (config.footer) config.footer = { ...config.footer, description: settings.tagline || config.footer.description };
 
   const hero = channel.hero;
+  const defaultHeroText = hero?.text;
   if (hero) {
     if (settings.heroTitle) Object.assign(hero, { title: settings.heroTitle, highlight: settings.heroHighlight || "" });
     if (settings.heroText) hero.text = settings.heroText;
     hero.showSocial = config.social.length > 0;
+  }
+
+  // Modo catálogo sin marca: ni el nombre ni el logo ni las redes (la tienda se ve como "Catálogo").
+  if (modo.on) channel.label = "Catálogo";
+  // El texto de bienvenida de siempre habla de "armar el pedido": en catálogo, si no lo cambió, va uno de consulta.
+  if (modo.on && hero && (!settings.heroText || settings.heroText === defaultHeroText)) hero.text = "Mirá los productos, armá tu lista y consultanos por WhatsApp.";
+  if (modo.on && !modo.brand) {
+    Object.assign(config, { name: "Catálogo", tagline: "", logo: null, social: [] });
+    if (config.footer) config.footer = { ...config.footer, description: "", legal: "" };
+    if (hero) hero.showSocial = false;
   }
 
   // Color principal (botones): solo en modo claro; el oscuro mantiene sus colores.
@@ -58,9 +70,10 @@ export function applyStoreSettings(config, channel, settings) {
   }
   // Portada: "Nombre · Catálogo" (en la de revendedores, "Nombre · Por mayor"). Otras páginas: "Cómo comprar · Nombre".
   const firstChannel = Object.values(config.channels ?? {})[0];
-  document.title = document.body.matches("[data-channel]")
-    ? `${settings.name} · ${channel && channel !== firstChannel ? channel.label ?? "Catálogo" : "Catálogo"}`
-    : `${document.title.split(" · ")[0]} · ${settings.name}`;
+  const shownName = config.name;
+  document.title = modo.on && !modo.brand ? "Catálogo" : document.body.matches("[data-channel]")
+    ? `${shownName} · ${channel && channel !== firstChannel ? channel.label ?? "Catálogo" : "Catálogo"}`
+    : `${document.title.split(" · ")[0]} · ${shownName}`;
 }
 
 /**

@@ -25,6 +25,7 @@ import { createToaster } from "./interfaz/toast.js";
 import { renderLastPairs } from "./interfaz/ultimos-pares.js";
 import { renderNewArrivals } from "./interfaz/nuevos-ingresos.js";
 import { isSingleSize, setCatalogWords, storeWords } from "./vocabulario.js";
+import { modo, say, startCatalogMode } from "./modo-catalogo.js";
 
 const OPEN_CART_HASH = "#pedido";
 
@@ -42,12 +43,15 @@ function catalogBase(config) {
 
 const config = window.STORE_CONFIG;
 const { key: channelKey, channel, isDefault } = resolveChannel(config);
+// Tienda con stock propio: nombre, logo, WhatsApp, redes y color los elige el cliente en su panel.
+const storeSettings = config.manualStore ? await loadStoreSettings(config) : null;
+// Modo catálogo (Mi tienda → Tipo de tienda): sin páginas de información, "consulta" en vez de "pedido".
+startCatalogMode(storeSettings);
+if (modo.on) config.pages = [];
 const links = createLinks(config, { key: channelKey, channel, isDefault });
 const storagePrefix = `${config.id}:${channelKey}`;
 const overlays = document.getElementById("overlays");
 
-// Tienda con stock propio: nombre, logo, WhatsApp, redes y color los elige el cliente en su panel.
-const storeSettings = config.manualStore ? await loadStoreSettings(config) : null;
 // Nombre, logo, redes…: solo si guardó "Mi tienda" (si no, queda lo de configuracion.js).
 if (storeSettings?.name) applyStoreSettings(config, channel, storeSettings);
 // Aviso que escribe el cliente en su panel (por ejemplo "Envío gratis este fin de semana").
@@ -98,10 +102,10 @@ async function startStore() {
     headStyle: config.catalogHeader,
     onAdded({ product, size, qty }) {
       toaster.show({
-        title: qty > 1 ? `${qty} ${storeWords().footwear ? "pares" : "productos"} agregados a tu pedido` : "Agregado a tu pedido",
+        title: qty > 1 ? `${qty} ${storeWords().footwear ? "pares" : "productos"} agregados a ${say("tu pedido", "tu consulta")}` : `Agregado a ${say("tu pedido", "tu consulta")}`,
         text: isSingleSize(product) ? product.name : `${product.name} · Talle ${size}`,
         thumb: product.images[0]?.sm,
-        action: { label: "Ver pedido", onClick: () => cartView.open() },
+        action: { label: say("Ver pedido", "Ver consulta"), onClick: () => cartView.open() },
       });
       track("add_to_cart", { id: product.id, size, qty });
     },
@@ -122,7 +126,9 @@ async function startStore() {
     // Tienda con panel: las categorías (sus nombres y su orden) y el orden de los productos
     // dentro de cada una los elige el cliente (Categorías → Orden de tu tienda).
     if (catalog.categories) {
+      // Sin precios a la vista no se puede ordenar por precio.
       const settings = { productOrder: "marca", ...(storeSettings ?? {}) };
+      if (!modo.prices && String(settings.productOrder).startsWith("precio")) settings.productOrder = "alfabetico";
       const order = orderedCategories(catalog.categories, settings);
       const rest = Object.entries(config.categories ?? {}).filter(([id]) => !Object.hasOwn(catalog.categories, id));
       config.categories = { ...Object.fromEntries(order.map((id) => [id, catalog.categories[id]])), ...Object.fromEntries(rest) };
