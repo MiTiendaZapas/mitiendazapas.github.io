@@ -10,6 +10,7 @@
  * y se copia el texto; el link se copia.
  */
 import { escapeHtml } from "../utils.js";
+import { isSingleSizeName } from "../vocabulario.js";
 
 const JPEG_QUALITY = 0.9;
 
@@ -24,7 +25,7 @@ export function shareButtonHtml(channel, iconHtml) {
 
 /** Texto que acompaña las fotos: nombre y talles disponibles, sin precio. */
 export function shareText(product) {
-  const sizes = product.sizes.filter((s) => s.stock > 0).map((s) => s.size);
+  const sizes = product.sizes.filter((s) => s.stock > 0 && !isSingleSizeName(s.size)).map((s) => s.size);
   return sizes.length ? `${product.name}\nTalles disponibles: ${sizes.join(", ")}` : product.name;
 }
 

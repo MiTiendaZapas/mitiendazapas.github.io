@@ -7,7 +7,7 @@
  */
 import { escapeHtml, money, plural, whatsappLink } from "../utils.js";
 import { buildOrderMessage, isFootwear, orderLink } from "../whatsapp.js";
-import { storeWords } from "../vocabulario.js";
+import { isSingleSize, storeWords } from "../vocabulario.js";
 import { icon } from "./icons.js";
 import { sizeLabel } from "./g5.js";
 import { socialLinksHtml } from "./social.js";
@@ -119,7 +119,7 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
     return `
       <div class="wholesale-meter">
         <p>Sumá <strong>${plural(quote.pairsToWholesale, ...pricing.words)} más</strong> (surtidos) para el precio por mayor.</p>
-        <div class="wholesale-meter__track" role="progressbar" aria-valuemin="0" aria-valuemax="${pricing.minPairs}" aria-valuenow="${quote.pairs}" aria-label="Pares para precio por mayor">
+        <div class="wholesale-meter__track" role="progressbar" aria-valuemin="0" aria-valuemax="${pricing.minPairs}" aria-valuenow="${quote.pairs}" aria-label="${escapeHtml(pricing.words[1])} para precio por mayor">
           <span style="width:${percent}%"></span>
         </div>
       </div>`;
@@ -149,9 +149,9 @@ export function createCartView({ config, channel, cart, pricing, overlays, onOpe
           </button>
           <div class="cart-line__info">
             <p class="cart-line__name"><button class="cart-line__name-btn" type="button" data-line-open>${escapeHtml(line.product.name)}</button></p>
-            <p class="cart-line__meta">Talle <strong>${escapeHtml(sizeLabel(line.product, line.size))}</strong>${modo.prices ? ` · <span class="money">${money(line.price)}</span> c/u` : ""}</p>
+            <p class="cart-line__meta">${isSingleSize(line.product) ? (modo.prices ? `<span class="money">${money(line.price)}</span> c/u` : "") : `Talle <strong>${escapeHtml(sizeLabel(line.product, line.size))}</strong>${modo.prices ? ` · <span class="money">${money(line.price)}</span> c/u` : ""}`}</p>
             <div class="cart-line__controls">
-              <div class="stepper stepper--sm" role="group" aria-label="Cantidad de ${escapeHtml(line.product.name)} talle ${escapeHtml(line.size)}">
+              <div class="stepper stepper--sm" role="group" aria-label="Cantidad de ${escapeHtml(line.product.name)}${isSingleSize(line.product) ? "" : ` talle ${escapeHtml(line.size)}`}">
                 <button class="stepper__btn" type="button" data-line-step="-1" aria-label="Restar uno" ${line.qty <= 1 ? "disabled" : ""}>${icon("minus")}</button>
                 <output class="stepper__value">${line.qty}</output>
                 <button class="stepper__btn" type="button" data-line-step="1" aria-label="Sumar uno" ${line.qty >= max ? "disabled" : ""}>${icon("plus")}</button>

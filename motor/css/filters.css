@@ -290,5 +290,19 @@
 .quality-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: var(--space-3); padding: 4px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-surface-2); }
 .quality-tabs[hidden] { display: none; }
 .quality-tab { min-height: 40px; border: 0; border-radius: var(--radius-pill); background: transparent; color: var(--color-text-muted); font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
+.quality-tab { line-height: 1.1; padding: 0 8px; }
+.quality-tab--wide { grid-column: 1 / -1; }
+/* Tres botones: una sola fila, parejos y más compactos (en celular). Con 4 o más, en filas de a dos. */
+.quality-tabs[data-count="3"] { grid-template-columns: repeat(3, 1fr); }
+.quality-tabs[data-count="3"] .quality-tab { padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quality-tabs[data-count="3"] .quality-tab[data-quality^="cat:"] { white-space: normal; }
+.quality-tabs[data-count="4"], .quality-tabs[data-count="5"] { border-radius: var(--radius-lg, 24px); }
+@media (max-width: 639px) {
+  .quality-tabs[data-count="3"] .quality-tab { font-size: 14px; letter-spacing: 0.02em; }
+  .quality-tabs[data-count="3"] .quality-tab__count { font-size: 11px; }
+}
+@media (max-width: 359px) {
+  .quality-tabs[data-count="3"] .quality-tab { font-size: 12px; letter-spacing: 0; }
+}
 .quality-tab[aria-selected="true"] { background: var(--color-accent); color: var(--color-accent-contrast); }
 .quality-tab__count { font-family: var(--font-body); font-size: 12px; font-weight: 600; opacity: 0.75; }

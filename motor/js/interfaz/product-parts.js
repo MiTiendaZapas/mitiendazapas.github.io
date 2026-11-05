@@ -1,6 +1,7 @@
 /* Piezas que comparten la tarjeta del catálogo y la vista de detalle. */
 import { escapeHtml, money } from "../utils.js";
 import { modo } from "../modo-catalogo.js";
+import { isFootwear, isSingleSize } from "../vocabulario.js";
 
 /** Precio por unidad y, debajo, el precio por mayor (o por cantidad en indumentaria). */
 export function priceHtml(product, pricing) {
@@ -42,18 +43,19 @@ export function qualityBadgeHtml(product) {
   return product.category === "g5" ? `<span class="quality-badge">Calidad G5</span>` : "";
 }
 
-export function stockStatus(cart, productId, size) {
+export function stockStatus(cart, product, size) {
+  const productId = product.id;
   const inCart = cart.qtyOf(productId, size);
   const remaining = cart.maxFor(productId, size) - inCart;
   // Al elegir un talle se ve su stock: "Stock: 4". Solo cuando queda uno se resalta
-  // en rojo: "¡Último par!".
+  // en rojo: "¡Último par!" (calzado) o "¡Última unidad!" (lo demás).
   let hint;
   let low = false;
   if (remaining <= 0) {
-    hint = "Ya tenés en tu pedido todo el stock de este talle";
+    hint = `Ya tenés en tu pedido todo el stock de este ${isSingleSize(product) ? "producto" : "talle"}`;
   } else if (remaining === 1) {
     low = true;
-    hint = "¡Último par!";
+    hint = isFootwear(product) ? "¡Último par!" : "¡Última unidad!";
   } else {
     hint = `Stock: ${remaining}`;
   }

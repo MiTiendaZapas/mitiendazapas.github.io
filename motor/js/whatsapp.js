@@ -3,6 +3,7 @@
  * Texto plano, sin emojis que puedan verse mal.
  */
 import { money, plural, whatsappLink } from "./utils.js";
+import { isSingleSize } from "./vocabulario.js";
 import { sizeLabel } from "./interfaz/g5.js";
 import { modo } from "./modo-catalogo.js";
 
@@ -31,9 +32,11 @@ export function buildOrderMessage({ config, channel, quote }) {
   lines.push("");
   const itemLine = (line) => {
     // Catálogo sin precios: solo el producto, el talle y la cantidad.
-    if (!modo.prices) return `${line.product.name} (${sizeLabel(line.product, line.size)})${line.qty > 1 ? ` x${line.qty}` : ""}`;
+    // Producto sin talles ("Único"): no se escribe el talle.
+    const sizeNote = isSingleSize(line.product) ? "" : ` (${sizeLabel(line.product, line.size)})`;
+    if (!modo.prices) return `${line.product.name}${sizeNote}${line.qty > 1 ? ` x${line.qty}` : ""}`;
     const many = line.qty > 1 ? ` x${line.qty} = ${money(line.subtotal)}` : "";
-    return `${line.product.name} (${sizeLabel(line.product, line.size)}) ${money(line.price)}${many}`;
+    return `${line.product.name}${sizeNote} ${money(line.price)}${many}`;
   };
   const count = quote.lines.reduce((sum, line) => sum + line.qty, 0);
   const onlyFootwear = !quote.allProducts && quote.lines.every((line) => isFootwear(line.product));
@@ -102,7 +105,7 @@ export function orderLink(config, message) {
 }
 
 export function productQueryLink(config, product, size) {
-  const sizeText = size ? ` en talle ${size}` : "";
+  const sizeText = size && !isSingleSize(product) ? ` en talle ${size}` : "";
   return whatsappLink(config.contact.whatsappQueries,
     `¡Hola! Quería consultar por ${product.name}${sizeText}.`);
 }

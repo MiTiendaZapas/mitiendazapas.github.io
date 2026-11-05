@@ -164,6 +164,7 @@
 
 /* Categorías */
 .panel-cats { display: grid; gap: var(--space-2); }
+.panel-cat__tab { grid-column: 1 / -1; font-size: 14px; }
 .panel-cat { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px var(--space-2); align-items: center; padding: 8px; border-radius: var(--radius-control); background: var(--color-surface-2); }
 .panel-cat__count { grid-column: 1; font-size: 12px; }
 .panel-cat__actions { display: flex; grid-row: 1 / span 2; grid-column: 2; gap: 4px; }

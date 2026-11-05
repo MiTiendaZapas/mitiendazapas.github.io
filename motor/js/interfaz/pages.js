@@ -7,6 +7,7 @@ import { escapeHtml, fromRoot, PLATFORM_URL, whatsappLink } from "../utils.js";
 import { icon } from "./icons.js";
 import { socialLinksHtml } from "./social.js";
 import { modo } from "../modo-catalogo.js";
+import { storeWords } from "../vocabulario.js";
 
 const esc = escapeHtml;
 
@@ -175,7 +176,7 @@ export function renderInfoPage(root, { config, channel, channelKey, links }) {
       <div class="container page-cta__inner">
         <div>
           <h2 class="page-cta__title">¿Listo para armar tu pedido?</h2>
-          <p class="page-cta__text">Elegí tus modelos y talles, y envianos el pedido por WhatsApp.</p>
+          <p class="page-cta__text">${storeWords().footwear ? "Elegí tus modelos y talles, y envianos el pedido por WhatsApp." : "Elegí tus productos y envianos el pedido por WhatsApp."}</p>
         </div>
         <div class="page-cta__actions">
           <a class="btn btn--primary btn--lg" href="${esc(links.store("#catalogo"))}">Ver catálogo ${icon("arrowRight")}</a>

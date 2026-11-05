@@ -141,7 +141,7 @@ async function startStore() {
     catalogView.connect({ pricing, cart });
     // Tiendas con panel: cada categoría con su título arriba de sus productos.
     catalogView.render(catalog.products, { sections: catalog.categories ? config.categories : null });
-    createFiltersView({ config, filters: createFilters(catalog.products), catalogView, overlays });
+    createFiltersView({ config, filters: createFilters(catalog.products, { tabCategories: storeSettings?.tabCategories ?? [] }), catalogView, overlays });
     renderNewArrivals(document.querySelector("[data-new-arrivals]"), { products: catalog.products, pricing });
     renderLastPairs(document.querySelector("[data-last-pairs]"), { products: catalog.products, pricing });
     cartView = createCartView({
@@ -160,7 +160,7 @@ async function startStore() {
       onAdded: ({ product, size, qty }) => track("add_to_cart", { id: product.id, size, qty, source: "detalle" }),
       onMissing: () => toaster.show({
         variant: "warning",
-        title: "Ese modelo ya no está disponible",
+        title: `Ese ${storeWords().footwear ? "modelo" : "producto"} ya no está disponible`,
         text: "Puede que se haya agotado. Mirá el resto del catálogo.",
         duration: 5000,
       }),
@@ -190,7 +190,7 @@ async function startStore() {
       toaster.show({
         variant: "warning",
         title: "Actualizamos tu pedido",
-        text: "Algunos talles se agotaron o bajó su stock desde tu última visita.",
+        text: "Algunos productos se agotaron o bajó su stock desde tu última visita.",
         action: { label: "Revisar", onClick: () => cartView.open() },
         duration: 7000,
       });
@@ -198,7 +198,7 @@ async function startStore() {
   } catch (error) {
     console.error(error);
     catalogView.showError({
-      whatsappHref: whatsappLink(config.contact.whatsappQueries, `¡Hola! No me carga el catálogo, ¿me pasás los modelos disponibles?`),
+      whatsappHref: whatsappLink(config.contact.whatsappQueries, `¡Hola! No me carga el catálogo, ¿me pasás lo que tenés disponible?`),
     });
   }
 }

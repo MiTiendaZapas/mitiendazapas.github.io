@@ -67,7 +67,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
         <div class="skeleton-card__line"></div>
         <div class="skeleton-card__line skeleton-card__line--short"></div>
       </li>`).join("");
-    countLabel.textContent = "Cargando modelos…";
+    countLabel.textContent = "Cargando catálogo…";
   }
 
   function showError({ whatsappHref } = {}) {
@@ -220,7 +220,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
         <p class="stock-hint"></p>
         <button class="btn btn--primary add-btn" type="button" disabled>Elegí un talle</button>`;
     }
-    const { remaining, hint, low } = stockStatus(cart, product.id, state.size);
+    const { remaining, hint, low } = stockStatus(cart, product, state.size);
     const qty = Math.min(Math.max(state.qty, 1), Math.max(remaining, 1));
     state.qty = qty;
 
@@ -309,7 +309,7 @@ export function createCatalogView(root, { onAdded, headStyle = "compacto" }) {
     const buy = card.querySelector("[data-buy]");
     const button = buy.querySelector("[data-add]");
     button.classList.add("is-added");
-    button.innerHTML = `${icon("check")} ${qty > 1 ? `${qty} agregados` : "Agregado"}<span class="add-btn__size"> · talle ${escapeHtml(size)}</span>`;
+    button.innerHTML = `${icon("check")} ${qty > 1 ? `${qty} agregados` : "Agregado"}${isSingleSize(product) ? "" : `<span class="add-btn__size"> · talle ${escapeHtml(size)}</span>`}`;
     card.classList.add("is-added");
     clearTimeout(Number(card.dataset.feedbackTimer));
     card.dataset.feedbackTimer = setTimeout(() => {

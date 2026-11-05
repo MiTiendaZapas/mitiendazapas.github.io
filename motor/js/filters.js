@@ -23,7 +23,11 @@ function simpleSizes(product) {
   return result;
 }
 
-export function createFilters(products) {
+export function createFilters(products, { tabCategories = [] } = {}) {
+  // Categorías del cliente que van como botón arriba (solo las que tienen productos). Esos productos viven en su
+  // botón: no se mezclan dentro de Calidad BR / G5.
+  const tabCats = [...new Set(tabCategories)].filter((id) => id !== "g5" && products.some((p) => p.category === id));
+  const isTabCat = (product) => tabCats.includes(product.category);
   // Se precalcula lo que se busca en cada producto, así filtrar es instantáneo.
   const index = new Map(products.map((p) => [p.id, {
     text: normalize(`${p.name} ${p.brand ?? ""}`),
@@ -33,7 +37,13 @@ export function createFilters(products) {
   // Si el catálogo trae G5, el catálogo se separa por calidad (BR / G5) y nunca se mezclan.
   const hasQualities = products.some((p) => qualityOf(p) === "g5");
   const state = { q: "", brands: new Set(), sizes: new Set(), category: "", quality: hasQualities ? "br" : "" };
-  const inQuality = (product) => !state.quality || tabOf(product) === null || tabOf(product) === state.quality;
+  const hasTabs = hasQualities || tabCats.length > 0;
+  const inQuality = (product) => {
+    if (state.quality.startsWith("cat:")) return product.category === state.quality.slice(4);
+    // Sin Calidad BR / G5, "Todos" muestra todo; con ellas, la categoría con botón propio no se mezcla.
+    if (isTabCat(product)) return !hasQualities && state.quality === "";
+    return !state.quality || tabOf(product) === null || tabOf(product) === state.quality;
+  };
   const listeners = new Set();
 
   function matches(product, skip = null) {
@@ -71,7 +81,7 @@ export function createFilters(products) {
     set(PARAMS.brands, [...state.brands].join(","));
     set(PARAMS.sizes, [...state.sizes].join(","));
     set(PARAMS.category, state.category);
-    set(PARAMS.quality, state.quality === "g5" ? "g5" : "");
+    set(PARAMS.quality, state.quality === "g5" || state.quality.startsWith("cat:") ? state.quality : "");
     history.replaceState(history.state, "", url);
   }
 
@@ -83,7 +93,10 @@ export function createFilters(products) {
     state.brands = new Set(list(PARAMS.brands).map((b) => brandNames.get(normalize(b))).filter(Boolean));
     state.sizes = new Set(list(PARAMS.sizes).filter((s) => /^[\d.]+$/.test(s)));
     state.category = products.some((p) => p.category === params.get(PARAMS.category) && p.category !== "g5") ? params.get(PARAMS.category) : "";
-    if (hasQualities) state.quality = params.get(PARAMS.quality) === "g5" || params.get(PARAMS.category) === "g5" ? "g5" : "br";
+    const wanted = params.get(PARAMS.quality) ?? "";
+    if (wanted.startsWith("cat:") && tabCats.includes(wanted.slice(4))) state.quality = wanted;
+    else if (hasQualities) state.quality = wanted === "g5" || params.get(PARAMS.category) === "g5" ? "g5" : "br";
+    else state.quality = "";
   }
 
   return {
@@ -103,17 +116,28 @@ export function createFilters(products) {
       return products.filter(inQuality).length;
     },
 
-    /** Botones de calidad: vacío si el catálogo no trae G5. */
+    /**
+     * Botones de arriba: Calidad BR / G5 (si el catálogo trae G5) y las categorías que el cliente eligió como botón.
+     * Sin G5 pero con categorías: "Todos" y esas categorías. Vacío si no hay nada de eso.
+     */
     qualities() {
-      if (!hasQualities) return [];
-      return ["br", "g5"].map((value) => ({
-        value, label: QUALITY_LABELS[value], selected: state.quality === value,
-        count: products.filter((p) => tabOf(p) === value).length,
-      }));
+      if (!hasTabs) return [];
+      const list = hasQualities
+        ? ["br", "g5"].map((value) => ({
+          value, label: QUALITY_LABELS[value], selected: state.quality === value,
+          count: products.filter((p) => tabOf(p) === value).length,
+        }))
+        : [{ value: "", label: "Todos", selected: state.quality === "", count: products.length }];
+      for (const id of tabCats) {
+        list.push({ value: `cat:${id}`, category: id, label: null, selected: state.quality === `cat:${id}`,
+          count: products.filter((p) => p.category === id).length });
+      }
+      return list;
     },
 
     setQuality(quality) {
-      if (!hasQualities || state.quality === quality) return;
+      const known = quality === "" ? !hasQualities : quality === "br" || quality === "g5" ? hasQualities : tabCats.includes(quality.replace(/^cat:/, ""));
+      if (!hasTabs || !known || state.quality === quality) return;
       state.quality = quality;
       // Las marcas y talles de una calidad pueden no existir en la otra: se empieza de cero.
       state.brands.clear();

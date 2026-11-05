@@ -500,10 +500,12 @@ export function publicMixedCatalog(data, br) {
     for (const product of own) {
       const extra = product.category === SANDALS ? provider.get(normalize(product.name)) : null;
       if (!extra) continue;
-      const total = new Map(product.sizes.map((s) => [s.size, { ...s }]));
+      // "propio": los pares que de verdad son de casa (sin los del proveedor). El piloto toma de acá el stock de
+      // casa que comparten las demás tiendas: con la suma, el stock del proveedor se contaba dos veces.
+      const total = new Map(product.sizes.map((s) => [s.size, { ...s, propio: s.stock }]));
       for (const s of extra.sizes) {
         const mine = total.get(s.size);
-        if (mine) mine.stock += s.stock; else total.set(s.size, { size: s.size, stock: s.stock });
+        if (mine) mine.stock += s.stock; else total.set(s.size, { size: s.size, stock: s.stock, propio: 0 });
       }
       product.sizes = [...total.values()].sort((a, b) => compareSizes(a.size, b.size));
     }
@@ -819,6 +821,13 @@ export async function saveSettings(env, store, settings) {
 }
 
 /** Revisa los ajustes que mandó el panel. Las redes se arman desde el usuario (@nombre). */
+/** Categorías que van como botón arriba: códigos de categoría, sin repetir, hasta 3. */
+export function cleanTabCategories(value) {
+  if (!Array.isArray(value)) return [];
+  const ids = value.filter((id) => typeof id === "string" && /^[a-z0-9][a-z0-9-]{0,59}$/.test(id));
+  return [...new Set(ids)].slice(0, 3);
+}
+
 export function cleanSettings(input, current = {}) {
   // Se guarda completo (con el 549 si es de Argentina y lo escribieron sin él). Ver fullPhone.
   const phone = fullPhone(input?.whatsapp);
@@ -857,6 +866,8 @@ export function cleanSettings(input, current = {}) {
     // "tienda" (pedido con precios), "catalogo" (lista de consulta, precios y marca opcionales) o
     // "compartir" (el diseño de los catálogos para compartir, sin precios, con lista de consulta).
     mode: ["catalogo", "compartir"].includes(input?.mode) ? input.mode : "tienda",
+    // Categorías del cliente que salen como botón arriba del catálogo (junto a Calidad BR / G5). Apagado por defecto.
+    tabCategories: cleanTabCategories(input?.tabCategories),
     showPrices: input?.showPrices !== false,
     showBrand: input?.showBrand !== false,
     // Aviso arriba de la tienda (por ejemplo "Envío gratis este fin de semana").

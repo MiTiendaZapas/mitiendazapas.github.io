@@ -11,6 +11,7 @@
  * Los modelos que entran nuevos aparecen la próxima vez que se abre la tienda (sumarlos
  * en el momento movería toda la página).
  */
+import { isSingleSize } from "./vocabulario.js";
 const EVERY_MS = 2 * 60 * 1000;
 const AWAY_MS = 30 * 1000;   // al volver a la pestaña después de 30 s, se revisa enseguida
 
@@ -35,9 +36,11 @@ export function applyStock(catalog, fresh) {
 export function orderChangeText(changes) {
   if (changes.length === 1) {
     const { product, size, qty } = changes[0];
+    // Producto sin talles ("Único"): no se nombra el talle.
+    const single = isSingleSize(product);
     return qty === 0
-      ? `Se agotó el talle ${size} de ${product.name}: lo sacamos de tu pedido.`
-      : `Del talle ${size} de ${product.name} quedan ${qty}: ajustamos tu pedido.`;
+      ? (single ? `Se agotó ${product.name}: lo sacamos de tu pedido.` : `Se agotó el talle ${size} de ${product.name}: lo sacamos de tu pedido.`)
+      : (single ? `De ${product.name} quedan ${qty}: ajustamos tu pedido.` : `Del talle ${size} de ${product.name} quedan ${qty}: ajustamos tu pedido.`);
   }
   return `Cambió el stock de ${changes.length} productos de tu pedido: ya lo ajustamos.`;
 }

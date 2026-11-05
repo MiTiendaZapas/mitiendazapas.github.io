@@ -7,7 +7,7 @@
 import { escapeHtml, plural } from "../utils.js";
 import { icon } from "./icons.js";
 import { brandLogo } from "./marcas.js";
-import { storeWords } from "../vocabulario.js";
+import { isSingleSizeName, storeWords } from "../vocabulario.js";
 
 const SEARCH_DELAY_MS = 150;
 
@@ -18,7 +18,7 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
   const { one, many } = storeWords();
 
   toolbar.innerHTML = `
-    <div class="quality-tabs" role="tablist" aria-label="Calidad" data-quality-tabs hidden></div>
+    <div class="quality-tabs" role="tablist" aria-label="Secciones" data-quality-tabs hidden></div>
     <div class="catalog-toolbar">
       <div class="search">
         ${icon("search")}
@@ -44,9 +44,11 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
   function renderQualityTabs() {
     const qualities = filters.qualities();
     qualityTabs.hidden = qualities.length === 0;
-    qualityTabs.innerHTML = qualities.map((q) => `
-      <button class="quality-tab" type="button" role="tab" aria-selected="${q.selected}" data-quality="${q.value}">
-        ${escapeHtml(q.label)} <span class="quality-tab__count">${q.count}</span>
+    qualityTabs.dataset.count = String(qualities.length);
+    // Hasta 3 botones van en una sola fila; con más, de a dos y, si sobra uno, ocupa toda la fila.
+    qualityTabs.innerHTML = qualities.map((q, i) => `
+      <button class="quality-tab${qualities.length > 3 && qualities.length % 2 === 1 && i === qualities.length - 1 ? " quality-tab--wide" : ""}" type="button" role="tab" aria-selected="${q.selected}" data-quality="${escapeHtml(q.value)}">
+        ${escapeHtml(q.label ?? categoryNames[q.category] ?? q.category)} <span class="quality-tab__count">${q.count}</span>
       </button>`).join("");
   }
   qualityTabs.addEventListener("click", (event) => {
@@ -100,8 +102,9 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
         </div>
       </fieldset>` : "";
 
-    return `
-      ${categories}
+    // Marca y talle solo si hay algo para elegir (una tienda de pirotecnia, perfumes… no tiene ni marcas ni talles).
+    const sizes = options.sizes.filter((s) => !isSingleSizeName(s.value));
+    const brands = options.brands.some((b) => b.value) ? `
       <fieldset class="filter-group">
         <legend class="filter-group__title">Marca</legend>
         <div class="filter-checks">
@@ -113,16 +116,19 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
               <span class="filter-count">${b.count}</span>
             </label>`).join("")}
         </div>
-      </fieldset>
+      </fieldset>` : "";
+    const sizeGroup = sizes.length ? `
       <fieldset class="filter-group">
         <legend class="filter-group__title">${filters.state.quality === "g5" ? "Talle europeo" : "Talle"} <span class="filter-group__hint">con stock</span></legend>
         <div class="filter-sizes">
-          ${options.sizes.map((s) => `
+          ${sizes.map((s) => `
             <button class="size-chip" type="button" data-filter-size="${escapeHtml(s.value)}" aria-pressed="${s.selected}"
               ${s.count === 0 && !s.selected ? "disabled" : ""}
               aria-label="Talle ${escapeHtml(s.value)}, ${plural(s.count, "modelo")}">${escapeHtml(s.value)}</button>`).join("")}
         </div>
-      </fieldset>`;
+      </fieldset>` : "";
+
+    return `${categories}${brands}${sizeGroup}`;
   }
 
   function brandStripHtml(options) {
@@ -191,9 +197,14 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
     const results = filters.results();
     const html = sectionsHtml(options);
     const focused = focusKey();
-    sidebar.innerHTML = `<h2 class="visually-hidden">Filtros</h2>${html}`;
+    // Sin nada para filtrar queda vacío y la tienda ocupa todo el ancho (ver layout.css).
+    sidebar.innerHTML = html.trim() ? `<h2 class="visually-hidden">Filtros</h2>${html}` : "";
     sheetBody.innerHTML = html;
     brandStrip.innerHTML = brandStripHtml(options);
+    // Sin nada para filtrar (ni categorías, ni marcas, ni talles): no se muestran el panel, el botón ni la fila de marcas.
+    const hasFilters = html.trim() !== "";
+    toolbar.querySelector("[data-open-filters]").hidden = !hasFilters;
+    brandStrip.hidden = !options.brands.some((b) => b.value);
     restoreFocus(focused);
 
     const active = activeHtml();
@@ -235,7 +246,7 @@ export function createFiltersView({ config, filters, catalogView, overlays }) {
     } else {
       catalogView.showEmpty({
         title: `No hay ${many} con esos filtros`,
-        text: "Probá sacando algún filtro o eligiendo otro talle. También podés consultarnos por WhatsApp.",
+        text: `Probá sacando algún filtro${storeWords().footwear ? " o eligiendo otro talle" : ""}. También podés consultarnos por WhatsApp.`,
         actionLabel: "Limpiar filtros",
         onAction: () => filters.clear(),
       });

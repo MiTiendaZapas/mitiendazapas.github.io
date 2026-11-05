@@ -183,7 +183,7 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
         <p class="stock-hint" data-pv-hint>Elegí un talle para agregarlo a ${say("tu pedido", "tu consulta")}.</p>
         <button class="btn btn--primary btn--lg add-btn" type="button" disabled>Elegí un talle</button>`;
     }
-    const { remaining, hint, low } = stockStatus(cart, product.id, state.size);
+    const { remaining, hint, low } = stockStatus(cart, product, state.size);
     state.qty = Math.min(Math.max(state.qty, 1), Math.max(remaining, 1));
     return `
       <div class="product-view__buy-row">
@@ -369,11 +369,12 @@ export function createProductView({ config, channel, catalog, pricing, cart, ove
     renderBuy();
     const button = content.querySelector("[data-add]");
     button.classList.add("is-added");
-    button.innerHTML = `${icon("check")} ${qty > 1 ? `${qty} agregados` : "Agregado"} · talle ${escapeHtml(size)}`;
+    const sizeNote = isSingleSize(product) ? "" : ` · talle ${escapeHtml(size)}`;
+    button.innerHTML = `${icon("check")} ${qty > 1 ? `${qty} agregados` : "Agregado"}${sizeNote}`;
     const banner = content.querySelector("[data-added]");
     banner.hidden = false;
     banner.querySelector("[data-added-text]").textContent =
-      `${plural(qty, `${pricing.words[0]} agregado`, `${pricing.words[1]} agregados`)} (talle ${size}). Tenés ${plural(cart.count(), ...pricing.words)} en ${say("tu pedido", "tu consulta")}.`;
+      `${plural(qty, `${pricing.words[0]} agregado`, `${pricing.words[1]} agregados`)}${isSingleSize(product) ? "" : ` (talle ${size})`}. Tenés ${plural(cart.count(), ...pricing.words)} en ${say("tu pedido", "tu consulta")}.`;
     clearTimeout(showAdded.timer);
     showAdded.timer = setTimeout(() => { if (product) renderBuy(); }, ADDED_FEEDBACK_MS);
   }

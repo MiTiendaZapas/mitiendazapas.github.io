@@ -34,3 +34,5 @@ export const itemWord = (product) => (isFootwear(product) ? "par" : "producto");
 // "Talle único" y parecidos: el producto no tiene talles para elegir.
 const SINGLE = /^(u|ú|unico|único|talle unico|talle único|tu|t\.u\.|one size|os|sin talle|-)$/i;
 export const isSingleSize = (product) => product?.sizes?.length === 1 && SINGLE.test(String(product.sizes[0].size).trim());
+/** Lo mismo para un talle suelto ("Único"): no sirve como filtro. */
+export const isSingleSizeName = (size) => SINGLE.test(String(size).trim());

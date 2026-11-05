@@ -68,7 +68,7 @@ export async function onRequestGet({ request, env, params, next, waitUntil }) {
   const hideBrand = catalog && settings.showBrand === false;
   const title = hideBrand ? "Catálogo" : `${settings.name} · Catálogo`;
   const fallback = catalog ? "Mirá los productos, armá tu lista y consultá por WhatsApp."
-    : "Elegí producto y talle, armá tu pedido y envialo por WhatsApp.";
+    : "Elegí tus productos, armá tu pedido y envialo por WhatsApp.";
   // Sin marca, la frase de la tienda tampoco se muestra (podría nombrarla).
   const description = (hideBrand ? settings.heroText : settings.tagline || settings.heroText) || fallback;
   const rewriter = new HTMLRewriter()

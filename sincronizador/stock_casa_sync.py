@@ -281,8 +281,12 @@ def _desde_panel(raiz, estado):
         if not nombre:
             continue
         if p.get("manual"):
-            # Producto propio = modelo solo de casa.
-            talles = {str(s["size"]): int(s.get("stock") or 0) for s in p.get("sizes", []) if int(s.get("stock") or 0) > 0}
+            # Producto propio = modelo solo de casa. Si la tienda lo muestra sumado con el del proveedor
+            # (ojotas con el mismo nombre), "propio" trae solo los pares de casa: usar "stock" contaba
+            # dos veces el stock del proveedor.
+            def _pares(s):
+                return int(s["propio"] if s.get("propio") is not None else (s.get("stock") or 0))
+            talles = {str(s["size"]): _pares(s) for s in p.get("sizes", []) if _pares(s) > 0}
         else:
             # Modelo del proveedor: solo los pares que cargó el socio ("extra").
             talles = {str(s["size"]): int(s.get("extra") or 0) for s in p.get("sizes", []) if int(s.get("extra") or 0) > 0}

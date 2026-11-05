@@ -15,6 +15,7 @@ import { createPricing } from "../js/pricing.js";
 import { adjustedTable } from "../js/ajuste-lista.js";
 import { isNewArrival } from "../js/catalog.js";
 import { compareSizes, sortSizes } from "../js/talles.js";
+import { isSingleSizeName } from "../js/vocabulario.js";
 import { CATEGORY_ORDERS, PRODUCT_ORDERS, orderedCategories, sortProducts } from "../vidriera/orden.js";
 
 const config = window.STORE_CONFIG ?? {};
@@ -637,13 +638,13 @@ function renderWholesale() {
   paintPlaceholders();
   const body = h("div", { class: "panel-w-body" },
     h("section", { class: "panel-card" }, h("h2", {}, "Mínimo general"),
-      field("w-min", "Desde cuántos productos surtidos", general, "Se pueden mezclar modelos y talles."),
+      field("w-min", "Desde cuántos productos surtidos", general, "Se pueden mezclar distintos productos."),
       h("p", { class: "panel-muted" }, "El precio por mayor de cada producto se pone al editarlo.")),
     h("section", { class: "panel-card" }, h("h2", {}, "Mínimo por categoría (opcional)"),
       h("p", { class: "panel-muted" }, "Si una categoría tiene otro mínimo, escribilo. Esa categoría cuenta sus productos aparte; las demás suman juntas para el mínimo general."),
       h("div", { class: "panel-w-cats" }, perCategory.map(({ id, label, input }) =>
         h("label", { class: "panel-w-cat", for: `w-cat-${id}` }, h("span", {}, label), h("span", { class: "panel-w-cat__field" }, "desde", input)))),
-      h("p", { class: "panel-muted" }, "Ejemplo: con Remeras desde 10 y el general en 5, quien lleva 5 zapatillas y 6 remeras paga las zapatillas por mayor y las remeras al precio normal.")));
+      h("p", { class: "panel-muted" }, "Ejemplo: con una categoría desde 10 y el general en 5, quien lleva 5 productos de otra categoría y 6 de esa paga los 5 por mayor y los 6 al precio normal.")));
   // El texto de abajo dice lo que pasa con el interruptor como está ahora.
   const onHint = h("small", { class: "panel-muted" });
   const paintOn = () => {
@@ -888,7 +889,9 @@ function renderOwnProducts() {
     h("input", { class: "panel-input", type: "search", placeholder: "Buscar producto", value: state.search, "aria-label": "Buscar producto",
       oninput: (e) => { state.search = e.target.value; renderItems(); } }),
     chips,
-    h("p", { class: "panel-muted panel-stock-hint" }, "Tocá − cuando vendas y + cuando te llegue: se guarda solo. Con “+ Talle” agregás uno que no está."),
+    h("p", { class: "panel-muted panel-stock-hint" }, state.products.some((p) => p.sizes.some((s) => !isSingleSizeName(s.size)))
+      ? "Tocá − cuando vendas y + cuando te llegue: se guarda solo. Con “+ Talle” agregás uno que no está."
+      : "Tocá − cuando vendas y + cuando te llegue: se guarda solo."),
     list);
   renderAll();
 }
@@ -1005,11 +1008,13 @@ function renderQuickStock(product, box, totalEl) {
           toast(e.message, "error");
         }
       };
-      cell = sizeCell(s.size, value, change(-1), change(1), null, product.sizes.length > 1 ? remove : null);
+      // Producto sin talles ("Único"): se ve "Cantidad" y no se puede borrar ese único talle.
+      const noSizes = product.sizes.length === 1 && isSingleSizeName(s.size);
+      cell = sizeCell(noSizes ? "Cantidad" : s.size, value, change(-1), change(1), null, product.sizes.length > 1 ? remove : null);
       return cell;
     }),
-    // Un talle nuevo (por ejemplo, te llegó un 45): se agrega acá mismo, con 1 unidad.
-    addSizeCell(async (size) => {
+    // Un talle nuevo (por ejemplo, te llegó un 45): se agrega acá mismo, con 1 unidad. Sin talles no hace falta.
+    product.sizes.length === 1 && isSingleSizeName(product.sizes[0].size) ? null : addSizeCell(async (size) => {
       const { sizes } = await api("/stock", { method: "POST", body: { id: product.id, size, delta: 1, nuevo: true } });
       product.sizes = sizes;
       renderQuickStock(product, box, totalEl);
@@ -1191,7 +1196,7 @@ function tagsFor(product) {
  */
 function extraFields(prefix, draft) {
   const description = h("textarea", { id: `${prefix}-description`, class: "panel-input panel-textarea", maxlength: 500, rows: 3,
-    placeholder: "Ej: Algodón peinado. Calce amplio, si dudás pedí un talle menos." }, draft.description ?? "");
+    placeholder: "Ej: Qué incluye, medidas, materiales, para qué sirve." }, draft.description ?? "");
   const featured = h("input", { id: `${prefix}-featured`, type: "checkbox", checked: draft.featured === true });
   // "Nuevo ingreso": se ve 30 días con la etiqueta "Nuevo" y en la fila "Nuevos ingresos" de la tienda.
   const wasNew = isNewArrival(draft);
@@ -1648,6 +1653,11 @@ function renderEditor(product) {
   const draft = product
     ? { ...structuredClone(product), sizes: sortSizes(product.sizes) }
     : { name: "", brand: "", category: "", price: "", wholesalePrice: "", sizes: [], images: [], hidden: false };
+  // Producto nuevo: arranca SIN talles (solo la cantidad), salvo que la tienda ya venda cosas con talles
+  // (ropa, calzado o stock automático): ahí arranca con talles, como siempre. Se cambia con "Este producto tiene talles".
+  const isUnique = (size) => /^[uú]nico$/i.test(String(size).trim());
+  const storeUsesSizes = Boolean(state.br) || state.products.some((p) => p.sizes.some((s) => !isUnique(s.size)));
+  if (!product && !storeUsesSizes) draft.sizes = [{ size: "Único", stock: 0 }];
   let uploading = 0;
   const progress = new Map();   // foto que se está subiendo -> porcentaje
   // Fotos copiadas de un modelo del stock automático: en pantalla se ve la del modelo (ya está en
@@ -1862,11 +1872,15 @@ function renderEditor(product) {
     toast(row.stock ? `Quedaron ${fresh.length} talles con ${row.stock} unidades cada uno: revisá las cantidades.` : "Listo: poné cuántas unidades hay de cada talle.");
   }
 
-  // "Este producto no tiene talles" (perfumes, accesorios…): un solo talle "Único" y sus unidades.
-  const noSizes = h("input", { id: "f-no-sizes", type: "checkbox", checked: draft.sizes.length === 1 && /^[uú]nico$/i.test(draft.sizes[0].size.trim()) });
+  // Sin talles (pirotecnia, perfumes, accesorios…): un solo talle "Único" y sus unidades.
+  // En pantalla es el interruptor "Este producto tiene talles"; "noSizes" es su opuesto.
+  const hasSizes = h("input", { id: "f-has-sizes", type: "checkbox", checked: !(draft.sizes.length === 1 && isUnique(draft.sizes[0].size)) });
+  const noSizes = { get checked() { return !hasSizes.checked; }, set checked(value) { hasSizes.checked = !value; } };
+  const sizesTitle = h("h2", {}, "Talles y cantidades");
   const sizedBlock = h("div", { class: "panel-sized" });
   const singleBlock = h("div", { class: "panel-single" });
   function paintSizeMode() {
+    sizesTitle.textContent = noSizes.checked ? "Cantidad" : "Talles y cantidades";
     sizedBlock.hidden = noSizes.checked;
     singleBlock.hidden = !noSizes.checked;
     if (!noSizes.checked) return renderSizes();
@@ -1879,7 +1893,7 @@ function renderEditor(product) {
         value,
         h("button", { type: "button", "aria-label": "Sumar una unidad", onclick: () => set(unit.stock + 1) }, ico("plus")))));
   }
-  noSizes.addEventListener("change", async () => {
+  hasSizes.addEventListener("change", async () => {
     if (noSizes.checked) {
       const total = draft.sizes.reduce((sum, s) => sum + s.stock, 0);
       if (draft.sizes.some((s) => s.size.trim()) && !await ask(`Se van a sacar los talles y queda una sola cantidad (${total} unidades). ¿Seguir?`, { ok: "Sí, sin talles" })) {
@@ -1924,7 +1938,7 @@ function renderEditor(product) {
     if (!price.value.replace(/\D/g, "")) return fieldError(price, "Escribí el precio.");
     if (!draft.sizes.some((s) => s.size.trim())) {
       sizesBox.scrollIntoView({ block: "center", behavior: "smooth" });
-      return toast("Agregá al menos un talle (o tildá “Este producto no tiene talles”).", "error");
+      return toast("Agregá al menos un talle (o apagá “Este producto tiene talles”).", "error");
     }
     try { offer.check(); } catch (e) { return toast(e.message, "error"); }
     const deal = offer.read();
@@ -1964,9 +1978,9 @@ function renderEditor(product) {
       field("f-name", "Nombre", name),
       field("f-category", "Categoría", categorySelect), newCategoryField,
       extras.descriptionField),
-    h("section", { class: "panel-card" }, h("h2", {}, "Talles y cantidades"),
-      h("label", { class: "panel-switch", for: "f-no-sizes" }, noSizes, h("span", {}, "Este producto no tiene talles"),
-        h("small", { class: "panel-muted" }, "Para perfumes, accesorios, carteras… Solo ponés cuántas unidades tenés.")),
+    h("section", { class: "panel-card" }, sizesTitle,
+      h("label", { class: "panel-switch", for: "f-has-sizes" }, hasSizes, h("span", {}, "Este producto tiene talles"),
+        h("small", { class: "panel-muted" }, "Prendelo para ropa o calzado. Si no, solo ponés cuántas unidades tenés.")),
       singleBlock,
       sizedBlock),
     h("section", { class: "panel-card" }, h("h2", {}, "Precio"),
@@ -2013,6 +2027,9 @@ async function removeProduct(product) {
  * Categorías y orden de la tienda. Acá todo se guarda solo, al momento (sin botón
  * "Guardar"): son cambios chicos y así una categoría nueva ya aparece al cargar un producto.
  */
+// Categorías del stock automático (no son del cliente): no llevan "botón arriba".
+const BR_FIXED = ["zapatillas", "ojotas", "ninos", "g5"];
+
 function renderCategories() {
   let rows = Object.entries(state.categories).map(([id, label]) => ({ id, label }));
   const select = (id, options, value) => h("select", { id, class: "panel-input" },
@@ -2100,6 +2117,8 @@ function renderCategories() {
           onchange: () => { if (row.label.trim()) saveCategories(row.id ? "Categoría renombrada." : "Categoría creada: ya la podés usar en tus productos."); },
           onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.blur(); } } }),
         h("span", { class: "panel-muted panel-cat__count" }, count === 1 ? "1 producto" : `${count} productos`),
+        // "Botón arriba": la categoría sale como botón arriba del catálogo (hasta 3), junto a Calidad BR / G5.
+        row.id && !BR_FIXED.includes(row.id) ? tabSwitch(row) : null,
         h("div", { class: "panel-cat__actions" },
           h("button", { type: "button", "aria-label": `Subir ${row.label}`, title: "Subir", disabled: i === 0 || !row.id, onclick: () => move(i, -1) }, ico("arrowUp")),
           h("button", { type: "button", "aria-label": `Bajar ${row.label}`, title: "Bajar", disabled: i === rows.length - 1 || !row.id, onclick: () => move(i, 1) }, ico("arrowDown")),
@@ -2116,6 +2135,22 @@ function renderCategories() {
     }), ...(rows.length ? [] : [h("p", { class: "panel-muted" }, "Todavía no tenés categorías. Agregá la primera.")]));
   }
 
+  const tabSwitch = (row) => {
+    const box = h("input", { type: "checkbox", id: `tab-${row.id}`, checked: (state.settings.tabCategories ?? []).includes(row.id),
+      onchange: () => {
+        const now = (state.settings.tabCategories ?? []).filter((id) => id !== row.id);
+        if (box.checked) {
+          if (now.length >= 3) { box.checked = false; return toast("Podés tener hasta 3 categorías como botón arriba.", "error"); }
+          now.push(row.id);
+        }
+        persist(async () => {
+          const { settings } = await api("/ajustes", { method: "POST", body: { ...state.settings, name: state.settings.name || config.name, tabCategories: now } });
+          state.settings = settings;
+        }, box.checked ? "Listo: la categoría sale como botón arriba de tu tienda." : "Listo: la categoría ya no es un botón arriba.");
+      } });
+    return h("label", { class: "panel-switch panel-cat__tab", for: `tab-${row.id}` }, box, h("span", {}, "Mostrar como botón arriba de la tienda"));
+  };
+
   const ordersCard = h("section", { class: "panel-card" },
       h("h2", {}, "Orden de tu tienda"),
       h("p", { class: "panel-muted" }, "Los productos se ven agrupados por categoría. Elegí en qué orden van las categorías y cómo se ordenan los productos dentro de cada una."),
@@ -2128,7 +2163,7 @@ function renderCategories() {
   show(
     h("section", { class: "panel-card" },
       h("h2", {}, "Tus categorías"),
-      h("p", { class: "panel-muted" }, "Tocá un nombre para cambiarlo. Con las flechas elegís en qué orden salen en la tienda."),
+      h("p", { class: "panel-muted" }, "Tocá un nombre para cambiarlo. Con las flechas elegís en qué orden salen en la tienda. Con “Mostrar como botón arriba” una categoría sale como botón arriba del catálogo (hasta 3)."),
       list,
       h("button", { class: "btn btn--outline panel-add-size", type: "button", onclick: () => {
         rows.push({ id: null, label: "" });
@@ -2167,12 +2202,12 @@ function renderStoreSettings() {
   const s = state.settings?.name ? state.settings : { ...settingsFromConfig(), ...state.settings };
   const input = (id, value, attrs = {}) => h("input", { id, class: "panel-input", value: value ?? "", ...attrs });
   const name = input("s-name", s.name || config.name, { maxlength: 50, required: true });
-  const tagline = input("s-tagline", s.tagline, { maxlength: 70, placeholder: "Ej: Ropa y calzado para toda la familia" });
+  const tagline = input("s-tagline", s.tagline, { maxlength: 70, placeholder: "Ej: Todo para tus fiestas" });
   const whatsapp = input("s-whatsapp", s.whatsapp, { inputmode: "tel", placeholder: "Ej: 5491123456789" });
   const instagram = input("s-instagram", s.instagram, { placeholder: "tu_usuario", autocapitalize: "none" });
   const tiktok = input("s-tiktok", s.tiktok, { placeholder: "tu_usuario", autocapitalize: "none" });
   const facebook = input("s-facebook", s.facebook, { placeholder: "tu.pagina", autocapitalize: "none" });
-  const heroTitle = input("s-hero-title", s.heroTitle, { maxlength: 40, placeholder: "Ej: Ropa y zapatillas" });
+  const heroTitle = input("s-hero-title", s.heroTitle, { maxlength: 40, placeholder: "Ej: Nuestros productos" });
   const heroHighlight = input("s-hero-highlight", s.heroHighlight, { maxlength: 40, placeholder: "Ej: al mejor precio" });
   const notice = input("s-notice", s.notice, { maxlength: 120, placeholder: "Ej: ¡Envío gratis este fin de semana!" });
   const DEFAULT_GREETING = "¡Hola! Quiero hacer el siguiente pedido del catálogo:";
@@ -2191,7 +2226,7 @@ function renderStoreSettings() {
   orderFooter.addEventListener("input", paintPreview);
   paintPreview();
   const heroText = h("textarea", { id: "s-hero-text", class: "panel-input panel-textarea", maxlength: 220, rows: 3,
-    placeholder: "Ej: Elegí tu producto y talle, armá el pedido y envialo por WhatsApp." }, s.heroText ?? "");
+    placeholder: "Ej: Elegí tus productos, armá el pedido y envialo por WhatsApp." }, s.heroText ?? "");
   let color = s.color || COLORS[0].value;
   const swatches = h("div", { class: "panel-swatches", role: "radiogroup", "aria-label": "Color de los botones" });
   const renderSwatches = () => swatches.replaceChildren(...COLORS.map((c) => h("button", {
@@ -2453,10 +2488,10 @@ function termsCard() {
 function renderHelp() {
   // Preguntas que se abren al tocarlas (antes era una pared de texto, todo abierto).
   const steps = [
-    ["¿Cómo cargo un producto?", "En “Productos” tocá “Nuevo producto”: subí las fotos, poné el nombre y la categoría, elegí los talles con su cantidad y el precio. Tocá “Guardar” y ya aparece en tu tienda."],
-    ["Vendí algo: ¿cómo resto el stock?", "En “Productos”, cada producto muestra sus talles: tocá “−” en el que vendiste. Se guarda solo. Lo que llega a 0 deja de verse en la tienda."],
-    ["Me llegó un talle que no tenía", "En el producto tocá “+ Talle” (al final de sus talles), escribí el talle y dale a ✓. Queda con 1 unidad: sumale más con “+”."],
-    ["El mismo modelo en otro color", "Tocá “⋯” → “Copiar (otro color)”. Se crea una copia pausada con las mismas fotos y talles: cambiale el nombre, las fotos y las cantidades, y tildá “Se ve en la tienda”."],
+    ["¿Cómo cargo un producto?", "En “Productos” tocá “Nuevo producto”: subí las fotos, poné el nombre y la categoría, la cantidad que tenés (o los talles con su cantidad, si tiene) y el precio. Tocá “Guardar” y ya aparece en tu tienda."],
+    ["Vendí algo: ¿cómo resto el stock?", "En “Productos”, cada producto muestra su stock: tocá “−” en el que vendiste (y en su talle, si tiene). Se guarda solo. Lo que llega a 0 deja de verse en la tienda."],
+    ["Me llegó un talle que no tenía (productos con talles)", "En el producto tocá “+ Talle” (al final de sus talles), escribí el talle y dale a ✓. Queda con 1 unidad: sumale más con “+”."],
+    ["El mismo producto en otro color o variante", "Tocá “⋯” → “Copiar (otro color)”. Se crea una copia pausada con las mismas fotos y datos: cambiale el nombre, las fotos y las cantidades, y tildá “Se ve en la tienda”."],
     ["Pausar sin borrar", "El botón “Pausar” lo esconde de la tienda (por ejemplo, mientras esperás mercadería). Con “Mostrar” vuelve a aparecer. Para borrarlo del todo: “Editar” → “Borrar este producto”, abajo de todo."],
     ["Ordenar las categorías", "En “Categorías”, con las flechas ↑ ↓ elegís en qué orden salen en la tienda. Ahí también creás, renombrás o borrás categorías."],
     ["Subir o bajar todos los precios", "En “Productos” tocá “Cambiar precios”: elegí subir o bajar, cuánto (5%, 10%…) y a cuáles."],
