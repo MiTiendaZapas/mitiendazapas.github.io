@@ -422,7 +422,7 @@ export function brProducts(data, br) {
   // En L.A IMP, una ojota del proveedor que ya es producto propio (mismo nombre) no se repite:
   // manda el producto propio. (Antes del 02/11 esto lo hacía el modo "solo casa".)
   const ownSandals = isHouseStore
-    ? new Set((data.products ?? []).filter((p) => p.category === SANDALS).map((p) => normalize(p.name)))
+    ? new Set((data.products ?? []).filter((p) => p.category === SANDALS && !p.hidden).map((p) => normalize(p.name)))
     : null;
   const list = [];
   for (const p of br.products) {
