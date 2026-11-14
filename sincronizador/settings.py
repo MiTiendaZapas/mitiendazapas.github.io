@@ -38,17 +38,13 @@ EXTRA_PROVIDERS = {
 }
 
 # Modelos de otro proveedor que son EL MISMO producto que uno de la tienda: su stock se
-# SUMA, talle por talle, al modelo de la tienda (en todas las tiendas). Si el proveedor
-# principal lo agota, el modelo sigue con el stock del otro. {nombre en la tienda: nombre allá}
-# 15/10: las ojotas, que se venden mucho, suman el stock de las chinelas de Beto.
-STOCK_SUMS = {
-    "beto_g5": {
-        "Ojotas camufladas": "Chinela Nike Adjust Camuflada Negra",
-        "Ojotas total black": "Chinela Nike Adjust Negra",
-        "Ojotas Louis Vuitton bege": "Chinela Nike Adjust Louis Vuitton Beige",
-        "Ojotas Louis Vuitton negras": "Chinela Nike Adjust Louis Vuitton",
-    },
-}
+# SUMA, talle por talle, al modelo de la tienda (en todas las tiendas). {nombre en la tienda: nombre allá}
+# 15/10: las ojotas sumaban el stock de las chinelas de Beto.
+# 14/11: SE APAGÓ. Mateo no tiene ese stock tomado: si el proveedor principal no tiene un talle,
+# tiene que figurar agotado (le llegó un pedido de 3 Louis Vuitton 37/38 que solo existían en Beto).
+# Para volver a sumarlas, devolver el contenido anterior (ver el historial de git de este archivo).
+STOCK_SUMS = {}
+
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 REQUEST_DELAY_SEC = 0.7      # pausa entre pedidos para no castigar al proveedor
