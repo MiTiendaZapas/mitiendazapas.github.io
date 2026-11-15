@@ -450,6 +450,10 @@ export function brProducts(data, br) {
   for (const [id, change] of Object.entries(changes)) {
     if (!seen.has(id) && change.model && change.extra && !(g5Off(data) && isG5(change.model))) list.push(withChanges({ ...change.model, id, sizes: [] }, change));
   }
+  // 15/11: las tiendas de clientes SIEMPRE usan sus propios precios (su lista, su precio general o el que
+  // pusieron en su panel). El precio que L.A IMP le puso a un modelo de casa no les llega (a Emma le salía
+  // una zapatilla a $40.000 cuando ella vende a $60.000).
+  if (!isHouseStore) for (const product of list) Object.assign(product, { basePrice: null, baseWholesale: null });
   for (const product of list) product.status = visibility(product, data);
   return list;
 }

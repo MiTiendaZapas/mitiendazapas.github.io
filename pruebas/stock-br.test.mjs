@@ -317,6 +317,32 @@ describe("productos propios en la tienda (marca, nuevo ingreso, calidad)", () =>
   });
 });
 
+describe("precios de modelos de casa: las tiendas de clientes usan SIEMPRE los suyos (15/11)", () => {
+  const feed = { generatedAt: "2026-11-15T10:00:00Z", house: { ids: new Set(), names: new Set() }, products: [
+    { id: "casa-fit", slug: "nike-fit", name: "Nike fit negra borde blanco", category: "zapatillas", origin: ["casa"], price: 40000, wholesalePrice: 35000,
+      sizes: [{ size: "40", stock: 2, casa: 2 }], images: [] },
+  ] };
+  const withHouse = { casa: true, g5: false };
+  test("Emma: el precio que L.A IMP le puso al modelo no le llega (usa su lista)", () => {
+    const [fit] = brProducts(store({ store: "emma", stockBR: withHouse }), feed);
+    assert.equal(fit.basePrice, null);
+    assert.equal(fit.baseWholesale, null);
+  });
+  test("Emma: si guardó una copia del modelo, tampoco se cuela el precio de L.A IMP", () => {
+    const saved = { model: { name: "Nike fit negra borde blanco", category: "zapatillas", basePrice: 40000, baseWholesale: 35000 }, extra: { 40: 1 } };
+    const list = brProducts(store({ store: "emma", stockBR: withHouse, br: { "casa-fit": saved, "viejo": saved } }), feed);
+    for (const product of list) assert.equal(product.basePrice, null);
+  });
+  test("Emma: el precio que ella pone en su panel se respeta", () => {
+    const [fit] = brProducts(store({ store: "emma", stockBR: withHouse, br: { "casa-fit": { price: 61000 } } }), feed);
+    assert.equal(fit.price, 61000);
+  });
+  test("L.A IMP: sigue con su propio precio", () => {
+    const [fit] = brProducts(store({ store: "laimp", stockBR: withHouse }), feed);
+    assert.equal(fit.basePrice, 40000);
+  });
+});
+
 describe("cambiar precios de una sola categoría propia", () => {
   test("sube solo los productos de esa categoría; lo demás (otros productos y stock automático) queda igual", () => {
     const catalog = { products: [{ id: "a", category: "remeras", price: 20000 }, { id: "b", category: "buzos", price: 30000 }],
@@ -362,7 +388,7 @@ describe("ojotas de casa: si el socio les cargó pares, se venden solo esos (26/
     assert.deepEqual(stockOf(list["vp-tb"]), [["37/38", 14], ["39/40", 69]]);
     assert.deepEqual(stockOf(list["vp-lv"]), [["39/40", 76]]);
     assert.deepEqual(stockOf(list["casa-cam"]), [["37/38", 4]]);
-    assert.equal(list["casa-cam"].basePrice, 40000);
+    assert.equal(list["casa-cam"].basePrice, null);   // el precio de L.A IMP no llega a las tiendas de clientes
     assert.deepEqual(stockOf(list["vp-mind"]), [["41/42", 23]]);
   });
 
