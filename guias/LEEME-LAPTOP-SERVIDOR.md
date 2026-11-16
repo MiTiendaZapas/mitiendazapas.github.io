@@ -116,6 +116,16 @@ La «segunda tienda» es **Brasil 2**: la línea BR de la tienda de Beto, que el
 
 Resultado del 12/11 (09:20–09:52): 56 modelos enviados, 0 fallidos; WhatsApp Web estaba lento (el separador tardó ~4,5 min en confirmarse y 2 fotos necesitaron la comprobación antes del reintento, sin repetirse). Después el bot quedó en modo programado: próximo envío 13/11 06:02:45.
 
+## Sesión de WhatsApp vencida: pidió el QR (16/11) y cómo se resolvió
+
+El lunes 16/11 a las 05:51 el bot abrió WhatsApp Web y pidió el código QR (la sesión vinculada venció). El bot no puede resolverlo solo: avisó, anotó `ERROR ... sesión venció` en `estado_bot.json` y no mandó el stock de ese día.
+
+**Qué se hizo (07:36–08:56):**
+1. Se cerró el bot (estaba inactivo) y se abrió `automatizacion/Vincular_WhatsApp_QR.bat` con el Explorador. Corre `vincular_whatsapp_nuevo.py`: abre una sesión NUEVA (`sesion_wsp_nueva`) con el QR, el usuario lo escaneó con el celular del bot (mismo número), el script comprobó **sin mandar nada** que el grupo real aparece, guardó la sesión vieja como `sesion_wsp_anterior_20261116_073945` y dejó la nueva como `sesion_wsp`. Después el `.bat` vuelve solo al modo programado.
+2. A pedido del usuario se mandó el stock completo de ese día: se respaldó `estado_bot.json` como `estado_bot.json.bak1611`, se puso el estado de hoy en limpio **conservando `proxima`** (17/11 05:57:27) y se corrió `bot_whatsapp.py --ahora` seguido del bot programado. Resultado: 239 enviados (141 BR + 76 G5 + 22 indumentaria), 0 fallidos, todos los mensajes de precios y el final enviados; terminó 08:56.
+
+**Si vuelve a pasar:** cerrar el bot programado y abrir `Vincular_WhatsApp_QR.bat` con el Explorador (no desde Claude); el usuario tiene que escanear el QR en la pantalla de la laptop. Para recuperar el envío del día, poner el estado del día en limpio como arriba y correr `--ahora`. Las carpetas `sesion_wsp_anterior*` ocupan espacio: se pueden borrar las viejas cuando todo ande bien.
+
 ## Ojotas de casa en el bot (31/10) — DESACTIVADO el 09/11
 
 **Actualización 09/11:** la regla de abajo ya no rige. El 02/11 las tiendas volvieron a sumar proveedor + casa en las ojotas («solo casa» quedó solo para Fabri) y el bot no se enteró: seguía mandando solo los pares de casa, y con casa en 0 no salían las Louis Vuitton (123 pares) ni otras ojotas. Ahora `OJOTAS_SOLO_CASA = False` en `bot_whatsapp.py` y el bot manda el stock completo (8 ojotas hoy). Con `True` vuelve la regla vieja. **Si las tiendas vuelven a cambiar una regla de stock, hay que avisar en esta guía: el bot las lee del catálogo pero aplica sus propias reglas.**
