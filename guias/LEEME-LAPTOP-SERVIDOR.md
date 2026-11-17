@@ -116,6 +116,15 @@ La «segunda tienda» es **Brasil 2**: la línea BR de la tienda de Beto, que el
 
 Resultado del 12/11 (09:20–09:52): 56 modelos enviados, 0 fallidos; WhatsApp Web estaba lento (el separador tardó ~4,5 min en confirmarse y 2 fotos necesitaron la comprobación antes del reintento, sin repetirse). Después el bot quedó en modo programado: próximo envío 13/11 06:02:45.
 
+## Neceser (carteras) en el envío diario (17/11)
+
+A pedido del usuario el envío diario suma al final las fotos de **neceser/carteras**. Salen del **panel de L.A IMP** (`https://mitiendastock.com/api/tienda/laimp/productos.json`), categoría **`nesecer`** (así está escrita en el panel; si se corrige la ortografía allá, cambiar `CATEGORIA_NECESER` en `bot_whatsapp.py`). El 17/11 son 10 productos «NESECER CALIDAD PREMIUN», talle único, 1 a 3 unidades cada uno.
+
+- Orden: … indumentaria y sus precios → **separador «⬇️ NECESER ⬇️» → una foto por producto** → mensaje final de la tienda. Cada foto lleva «Neceser calidad premium - modelo N» y «Stock: n» (el bot corrige la errata del nombre y numera los modelos porque todos se llaman igual). Usa la primera foto de cada producto. **No manda mensaje de precios** (no se pidió; el panel tiene $15.000 / mayor $12.000).
+- Es una sección tolerante, igual que G5 e indumentaria: si falla, no corta lo ya enviado; si no hay stock, no se manda nada. Lleva su marca/estado del día (`separador_neceser_enviado`, ids `nec-...`), así que una reanudación no repite.
+- `python bot_whatsapp.py --ver-neceser` muestra cómo sale (sin WhatsApp); `--solo-neceser` lo manda solo al grupo real (`--prueba` → «Notas Whassap», se puede sumar `--limite 3`).
+- Probado el 17/11 en «Notas Whassap» (separador + 3 fotos, 0 fallidos). Primer envío real: el martes 17/11 a las 05:57:27.
+
 ## Sesión de WhatsApp vencida: pidió el QR (16/11) y cómo se resolvió
 
 El lunes 16/11 a las 05:51 el bot abrió WhatsApp Web y pidió el código QR (la sesión vinculada venció). El bot no puede resolverlo solo: avisó, anotó `ERROR ... sesión venció` en `estado_bot.json` y no mandó el stock de ese día.
