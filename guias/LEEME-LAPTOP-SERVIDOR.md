@@ -13,7 +13,7 @@ Inicio de Windows):
 
 | Programa | Qué hace | Dónde |
 |---|---|---|
-| **Piloto** `sincronizador/piloto.py --publicar` | Vuelta cada 10-15 min (antes 15-20; se bajó el 07/10): baja de GitHub, corre `sync_catalog.py`, publica `catalogo/` y el stock de casa. Descansa de 00:00 a 05:15. | `Desktop/mitiendazapas.github.io` |
+| **Piloto** `sincronizador/piloto.py --publicar` | **Desde el 19/11/2026:** vuelta cada 4-6 min de día y 1 por hora de noche (00:00-05:15); corre `sync_catalog.py` y sube **solo a Cloudflare** (ya no usa git ni GitHub). Ver "Cambio del 19/11/2026". | `Desktop/mitiendazapas.github.io` |
 | **Bot de WhatsApp** `automatizacion/bot_whatsapp.py` | Todos los días (menos domingos), a una hora al azar entre 05:45 y 06:10, manda el stock al grupo real. | `Desktop/tienda-zapatillas/automatizacion` |
 
 Carpetas en el Escritorio de la laptop:
@@ -21,6 +21,20 @@ Carpetas en el Escritorio de la laptop:
 - `tienda-zapatillas` — es el repo `TiendaZapasOficial` (stock de casa: `zapatillas_manual.js`, `indumentaria.js`,
   `Fotos/`) **y** el del bot. La carpeta se llama distinto que en la PC principal.
 - `AppPedidos` — copia suelta de la app (no es un repo git). Solo se usa para leer `firebase-config.js`.
+
+## Cambio del 19/11/2026: piloto sin GitHub y con ritmo nuevo (T-001 de `COMUNICACION.md`)
+
+El canal con la PC principal es el repo privado `MiTiendaZapas/sesiones-claude` (clonado en `%USERPROFILE%\sesiones-claude`, archivo `COMUNICACION.md`): al empezar `git pull` y leerlo; al terminar anotar ahí.
+- **Qué se aplicó** (parche de la PC principal sobre `sincronizador/`, `.gitignore` y `pruebas/`; **sin commit** en este repo, queda como cambio local): el catálogo solo se reescribe si cambió
+  (una vez por día, desde las 05:15, se reescribe igual para que el bot vea un `generatedAt` de hoy); se escribe un latido `catalogo/estado.json` (ignorado por git) en cada vuelta buena;
+  cadencia 4-6 min de día / 1 h de noche / 10 min si falla; `PUBLISH_TO_GITHUB = False` en `piloto.py` (el piloto ya **no** hace pull/push ni sube el stock de casa a `tienda-zapatillas`).
+  Volver atrás: detener el piloto, `git checkout -- sincronizador .gitignore pruebas/test_sincronizador.py`, arrancarlo (y poner el bot con las dos fuentes, commit `b5cf2bc` o anterior de `tienda-zapatillas`).
+- **Bot:** `FUENTES_CATALOGO` quedó solo con Cloudflare (commit `3bf1e2b` de `tienda-zapatillas`).
+- **Orden que se siguió:** primero el bot (código + `--dry-run`), después detener el piloto, aplicar el parche, correr 2 veces `sync_catalog.py --no-images` (la 2.ª: "Sin cambios de stock" y "Catálogo al día"),
+  `python -m unittest discover pruebas` (37 OK), reiniciar el bot y por último el piloto (ambos lanzados con el Explorador de Windows, no directo desde la app de Claude: si no, se mueren cuando la app se reinicia).
+- **Cómo se ve que anda:** `sincronizador/informes/piloto.log` dice `✅ Catálogo actualizado y subido a Cloudflare.` y `Próxima actualización en N minutos` (de noche `(modo noche)`), sin mensajes de git;
+  `https://catalogo.mitiendastock.com/estado.json` tiene la hora de la última vuelta. Un "Catálogo escrito" en todas las vueltas aunque no cambie nada sería señal de que algún dato cambia solo.
+- Aviso: el banner del piloto al arrancar todavía dice "(publica en GitHub)"; es solo el texto, no hace nada con git.
 
 ## 2. Qué se corrigió hoy
 
@@ -59,7 +73,7 @@ No es problema porque también viene del proveedor y se usa la foto del proveedo
 
 ## 4. Lo que el bot de WhatsApp espera del catálogo (para no romperlo)
 
-Desde el 09/10 el bot lee el catálogo de **Cloudflare** (`https://catalogo.mitiendastock.com/productos.json` y `productos-g5.json`) y también de GitHub (`https://mitiendazapas.github.io/catalogo/...`): mira las dos y usa la que tenga el `generatedAt` más reciente (si empatan, Cloudflare). Las fotos las baja de Cloudflare y, si falla, de GitHub; si las dos fallan usa la copia local del piloto. Mientras el piloto siga publicando en los dos lados, cualquiera de las dos que se atrase no afecta al bot. **Si algún día se deja de publicar en GitHub**, el bot ya está preparado (usa Cloudflare). De cada producto usa **solo**:
+**Desde el 19/11/2026 el bot lee SOLO de Cloudflare** (`https://catalogo.mitiendastock.com/productos.json`, `productos-g5.json`, `productos-br2.json`, siempre con `User-Agent`); las fotos, de la copia local del piloto o de Cloudflare. Si Cloudflare falla usa la copia local del piloto (`mitiendazapas.github.io/catalogo/`), **nunca GitHub** (esa copia quedó congelada). (Antes, del 09/10 al 19/11, miraba Cloudflare y GitHub y usaba el `generatedAt` más nuevo.) De cada producto usa **solo**:
 `id`, `name`, `sizes[{size, stock}]`, `images[0].lg`; y del archivo, `generatedAt` y `products`.
 
 - Si cambia ese formato, avisalo en una guía antes de publicarlo: el bot tiene que adaptarse a la vez.
