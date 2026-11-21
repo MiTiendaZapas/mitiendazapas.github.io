@@ -35,6 +35,10 @@ El canal con la PC principal es el repo privado `MiTiendaZapas/sesiones-claude` 
 - **Cómo se ve que anda:** `sincronizador/informes/piloto.log` dice `✅ Catálogo actualizado y subido a Cloudflare.` y `Próxima actualización en N minutos` (de noche `(modo noche)`), sin mensajes de git;
   `https://catalogo.mitiendastock.com/estado.json` tiene la hora de la última vuelta. Un "Catálogo escrito" en todas las vueltas aunque no cambie nada sería señal de que algún dato cambia solo.
 - Aviso: el banner del piloto al arrancar todavía dice "(publica en GitHub)"; es solo el texto, no hace nada con git.
+- **Verificado el 21/11/2026 (T-004):** de noche hace una vuelta por hora, a las ~05:15 reescribe el catálogo ("de hoy") y de ahí vuelve a 4-6 min; el bot del 20/11 mandó 251 con 0 fallidos.
+- **Log del piloto:** con la cadencia nueva `piloto.log` llega a 2 MB en ~1,5 días y rota a `piloto.log.old` (solo se guarda el anterior). Si hace falta evidencia de una noche, copiarla antes de la próxima rotación.
+- **Ojotas (T-005, 21/11/2026):** `STOCK_SUMS` en `sincronizador/settings.py` suma otra vez el stock de las 4 ojotas con las chinelas de Beto (cambio local sin commit). Para apagarlo: `STOCK_SUMS = {}`; no hace falta reiniciar.
+- El repo del piloto queda con muchos archivos de `catalogo/` "modificados" en git: es normal (el piloto ya no hace commit); no hacer `git add -A` ahí.
 
 ## 2. Qué se corrigió hoy
 
