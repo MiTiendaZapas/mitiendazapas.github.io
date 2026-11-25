@@ -40,6 +40,15 @@ El canal con la PC principal es el repo privado `MiTiendaZapas/sesiones-claude` 
 - **Ojotas (T-005, 21/11/2026):** `STOCK_SUMS` en `sincronizador/settings.py` suma otra vez el stock de las 4 ojotas con las chinelas de Beto (cambio local sin commit). Para apagarlo: `STOCK_SUMS = {}`; no hace falta reiniciar.
 - El repo del piloto queda con muchos archivos de `catalogo/` "modificados" en git: es normal (el piloto ya no hace commit); no hacer `git add -A` ahí.
 
+## Programa "buenos días" (25/11/2026): un tercer programa en la laptop
+
+Lo pidió el usuario y lo armó otra sesión de Claude; **esta sesión lo revisó y no interfiere**. Carpeta aparte: `C:\Users\Admin\Desktop\buenos-dias` (sin git; tiene su `LEEME.md`). Arranca solo desde la carpeta Inicio (`Buenos dias WhatsApp.lnk`).
+- Manda un saludo fijo a un grupo una vez por día, a una hora sorteada entre **05:20 y 05:30**, y termina antes de las 05:40 (si no pudo empezar antes de las 05:37, no manda tarde). Todos los días, incluso domingos (el bot de stock no manda domingos).
+- Usa **otro número de WhatsApp**, perfil propio `buenos-dias\buenosdias_sesion`, candado propio `Global\BuenosDiasWhatsApp`, y no usa el portapapeles. Si pide el QR: `vincular.bat` y mirar `ATENCION_buenosdias.txt`.
+- **Reglas para no pisar al bot y al piloto:** la ventana 05:20-05:40 queda reservada (el bot arranca desde las 05:45; si se cambia su horario, mantener ≥ 05:45). Nunca cerrar `python.exe` por nombre (hay 3 procesos python: piloto, bot y este).
+  Antes de abrir su navegador revisa que el del bot (`automatizacion\sesion_wsp`) no esté en uso.
+- Cómo se ve que anda: `buenos-dias\logs\buenosdias.log` (`PRÓXIMO ENVÍO`, `OK: enviado` o `FALLÓ: motivo`) y `estado_buenosdias.json`. Ese log lista nombres de chats personales de esa cuenta: no compartirlo.
+
 ## 2. Qué se corrigió hoy
 
 **Problema:** `stock_casa_sync.py` tenía escrito a mano `.../TiendaZapasOficial`. En la laptop esa carpeta no existe
