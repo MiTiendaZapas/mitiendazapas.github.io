@@ -49,6 +49,13 @@ Lo pidió el usuario y lo armó otra sesión de Claude; **esta sesión lo revis�
   Antes de abrir su navegador revisa que el del bot (`automatizacion\sesion_wsp`) no esté en uso.
 - Cómo se ve que anda: `buenos-dias\logs\buenosdias.log` (`PRÓXIMO ENVÍO`, `OK: enviado` o `FALLÓ: motivo`) y `estado_buenosdias.json`. Ese log lista nombres de chats personales de esa cuenta: no compartirlo.
 
+## Portadas de L.A IMP y links finales en el envío diario (26/11/2026)
+
+Pedido del usuario. Dos cambios en `automatizacion\bot_whatsapp.py` (el bot, no el piloto):
+- **Foto de portada = la de la tienda de L.A IMP.** En las zapatillas/ojotas BR (no en las G5, que ya eran iguales) el bot usa la portada que L.A IMP cargó en su tienda (`https://mitiendastock.com/api/tienda/laimp/productos.json`, fotos en `catalogo.mitiendastock.com/tiendas/laimp/`) cuando el modelo tiene una propia; si no, la del proveedor. Los modelos de stock de casa (`casa-...` en el catálogo) se reconocen por nombre. El 26/11: 60 de 129 modelos con portada propia. Si no se puede leer la tienda o bajar una foto, el bot manda la del proveedor (nunca corta la tanda). Se ve en el log: `🖼️ N de M modelos van con la portada de la tienda de L.A IMP`.
+- **Dos mensajes nuevos, lo último de todo** (después del mensaje de la tienda propia): `🛒 Para hacer sus pedidos` + `https://mitiendastock.com/laimp/mayorista/` (tienda para revendedores) y `📸 Catálogo para compartir con sus clientes (solo fotos, sin precios)` + `https://mitiendastock.com/catalogo/`. Textos en `MENSAJE_LINK_TIENDA` y `MENSAJE_LINK_CATALOGO`; cada uno lleva su marca en el estado (no se repite si se corta). `--textos-prueba links` los manda solo a «Notas Whassap».
+- El resultado del día en `estado_bot.json` suma `links=True/False`.
+
 ## 2. Qué se corrigió hoy
 
 **Problema:** `stock_casa_sync.py` tenía escrito a mano `.../TiendaZapasOficial`. En la laptop esa carpeta no existe
